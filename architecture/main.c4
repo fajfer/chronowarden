@@ -1,0 +1,27 @@
+//SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+//
+//SPDX-License-Identifier: EUPL-1.2
+model {
+  user = actor 'User' {
+    description 'Authenticated Chronowarden user'
+  }
+
+  chronowarden = system 'Chronowarden' {
+    component frontend
+    component database {
+      style {
+        shape cylinder
+      }
+    }
+    
+    // User uses the UI
+    user -> chronowarden.frontend 'opens in browser'
+  }
+}
+
+views {
+  view index {
+    include *
+    include chronowarden.*
+  }
+}
