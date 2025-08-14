@@ -7,15 +7,32 @@ model {
   }
 
   chronowarden = system 'Chronowarden' {
-    component frontend
+    component frontend {
+      technology 'JavaScript'
+      description 'Web-based user interface for Chronowarden'
+
+    }
+
     component database {
+      technology 'sqlite'
+      description 'Relational database for Chronowarden'
+
       style {
         shape cylinder
       }
     }
     
+    component backend {
+      technology 'Python'
+      description 'Backend service for Chronowarden'
+    }
     // User uses the UI
-    user -> chronowarden.frontend 'opens in browser'
+    user -> chronowarden.frontend 'CRUD operations on secrets'
+    // Frontend interacts with the database
+    chronowarden.frontend -[api]-> chronowarden.backend 'Triggers API through frontend'
+    // Backend interacts with the database2
+    chronowarden.backend -[api]-> chronowarden.database 'Stores and retrieves secrets'
+
   }
 }
 

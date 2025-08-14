@@ -9,4 +9,5 @@ specification {
     }
     element system
     element component
+    relationship api
 }

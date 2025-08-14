@@ -33,6 +33,7 @@ This document contains critical information about working with this codebase. Fo
   - Update SPDX headers for year mismatch
     - eg. if it said 2025-2026 and the current year is 2027, change the date range to 2025-2027
 
+- Use [conventional commits](https://www.conventionalcommits.org/) as a standard for committing
 - NEVER ever mention a `co-authored-by` or similar aspects. In particular, never
   mention the tool used to create the commit message or PR.
 
