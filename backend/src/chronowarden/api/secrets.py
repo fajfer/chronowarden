@@ -13,7 +13,8 @@ from chronowarden.models import EngineType, Secret, SecretCreate, SecretUpdate
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 
-# In-memory storage for demo purposes
+# NOTE: In-memory storage for demo purposes only.
+# In production, replace with persistent database (e.g., PostgreSQL, SQLite)
 _secrets_db: dict[int, Secret] = {}
 _next_id = 1
 

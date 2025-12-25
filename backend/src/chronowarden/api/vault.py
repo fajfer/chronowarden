@@ -14,7 +14,8 @@ from chronowarden.metrics import INTEGRATION_HEALTH, VAULT_CONNECTIONS_TOTAL, VA
 
 router = APIRouter(prefix="/vault", tags=["vault"])
 
-# Global vault client (would be properly managed via dependency injection in production)
+# NOTE: Global vault client for demo purposes.
+# In production, use FastAPI dependency injection for proper lifecycle management
 _vault_client: Optional[VaultIntegration] = None
 
 

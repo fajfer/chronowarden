@@ -36,9 +36,10 @@ app = FastAPI(
 )
 
 # CORS middleware for frontend access
+# NOTE: In production, replace "*" with specific allowed origins (e.g., ["https://chronowarden.example.com"])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
