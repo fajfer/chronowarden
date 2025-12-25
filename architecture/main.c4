@@ -7,8 +7,16 @@ model {
   }
 
   chronowarden = system 'Chronowarden' {
-    component frontend
+    component frontend {
+      description 'Svelte-based web UI for secret management'
+    }
+    
+    component api {
+      description 'FastAPI REST backend with OpenAPI support'
+    }
+    
     component database {
+      description 'Secret metadata storage'
       style {
         shape cylinder
       }
@@ -16,6 +24,12 @@ model {
     
     // User uses the UI
     user -> chronowarden.frontend 'opens in browser'
+    
+    // Frontend calls API
+    chronowarden.frontend -> chronowarden.api 'REST API calls'
+    
+    // API stores metadata
+    chronowarden.api -> chronowarden.database 'stores secret metadata'
   }
 }
 

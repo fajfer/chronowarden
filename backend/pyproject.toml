@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+[project]
+name = "chronowarden"
+version = "0.1.0"
+description = "Secret management service with expiration tracking"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "EUPL-1.2"
+authors = [
+    { name = "Damian Fajfer", email = "damian@fajfer.org" }
+]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "pydantic>=2.10.0",
+    "hvac>=2.3.0",
+    "prometheus-client>=0.21.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.0",
+    "ruff>=0.8.0",
+    "black>=24.10.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.black]
+line-length = 120
+target-version = ["py311"]

@@ -1,3 +1,33 @@
 //SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
 //
 //SPDX-License-Identifier: EUPL-1.2
+
+// External integrations
+model {
+  hashicorp_vault = system 'HashiCorp Vault' {
+    description 'External secret storage backend'
+    style {
+      shape storage
+    }
+  }
+  
+  prometheus = system 'Prometheus' {
+    description 'Metrics collection and monitoring'
+    style {
+      shape storage
+    }
+  }
+  
+  // Integration relationships
+  chronowarden.api -> hashicorp_vault 'reads/writes secrets via hvac'
+  prometheus -> chronowarden.api 'scrapes /metrics endpoint'
+}
+
+views {
+  view integrations {
+    include chronowarden
+    include chronowarden.api
+    include hashicorp_vault
+    include prometheus
+  }
+}
