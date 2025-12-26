@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chronowarden-backend-pdb
+  namespace: chronowarden-prod
+  labels:
+    app.kubernetes.io/name: chronowarden-backend
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: chronowarden
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chronowarden-backend
+      app.kubernetes.io/component: backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chronowarden-frontend-pdb
+  namespace: chronowarden-prod
+  labels:
+    app.kubernetes.io/name: chronowarden-frontend
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: chronowarden
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chronowarden-frontend
+      app.kubernetes.io/component: frontend

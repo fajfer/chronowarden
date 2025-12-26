@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: chronowarden
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+
+images:
+  - name: chronowarden-backend
+    newName: chronowarden-backend
+    newTag: latest
+  - name: chronowarden-frontend
+    newName: chronowarden-frontend
+    newTag: latest

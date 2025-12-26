@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+# =============================================================================
+# Docker Compose for Chronowarden
+# =============================================================================
+# Usage:
+#   Development: docker compose up
+#   Production:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Backend API Service
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      target: development
+    container_name: chronowarden-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./backend/src:/app/chronowarden:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - chronowarden-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Frontend Web UI Service
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    container_name: chronowarden-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chronowarden-network
+    restart: unless-stopped
+
+networks:
+  chronowarden-network:
+    driver: bridge

@@ -1,0 +1,101 @@
+# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: chronowarden-backend-netpol
+  namespace: chronowarden-prod
+  labels:
+    app.kubernetes.io/name: chronowarden-backend
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: chronowarden
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: chronowarden-backend
+      app.kubernetes.io/component: backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from frontend and ingress controller
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: chronowarden-frontend
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow outbound to external services (e.g., Vault)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8200
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: chronowarden-frontend-netpol
+  namespace: chronowarden-prod
+  labels:
+    app.kubernetes.io/name: chronowarden-frontend
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: chronowarden
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: chronowarden-frontend
+      app.kubernetes.io/component: frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow traffic to backend
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: chronowarden-backend
+      ports:
+        - protocol: TCP
+          port: 8000
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53

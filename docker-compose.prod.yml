@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+# =============================================================================
+# Docker Compose Production Override for Chronowarden
+# =============================================================================
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =============================================================================
+
+services:
+  backend:
+    build:
+      target: production
+    environment:
+      - LOG_LEVEL=INFO
+    volumes: []  # Remove development volume mounts
+    healthcheck:
+      # In production, health checks are done via Kubernetes probes
+      # This is a fallback for non-K8s deployments
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  frontend:
+    build:
+      target: production
+    ports:
+      - "8080:8080"
+    volumes: []  # Remove development volume mounts
+    environment:
+      - NODE_ENV=production
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M

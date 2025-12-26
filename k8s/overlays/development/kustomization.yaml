@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: chronowarden-dev
+
+resources:
+  - ../../base
+
+nameSuffix: -dev
+
+patches:
+  - target:
+      kind: Deployment
+      name: chronowarden-backend
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "50m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "64Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "200m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "256Mi"
+  - target:
+      kind: Deployment
+      name: chronowarden-frontend
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: ConfigMap
+      name: chronowarden-backend-config
+    patch: |-
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: "DEBUG"
+
+images:
+  - name: chronowarden-backend
+    newName: chronowarden-backend
+    newTag: dev
+  - name: chronowarden-frontend
+    newName: chronowarden-frontend
+    newTag: dev

@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: chronowarden-prod
+
+resources:
+  - ../../base
+  - hpa.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+
+nameSuffix: -prod
+
+patches:
+  - target:
+      kind: Deployment
+      name: chronowarden-backend
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "250m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "1Gi"
+  - target:
+      kind: Deployment
+      name: chronowarden-frontend
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target:
+      kind: Ingress
+      name: chronowarden-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: chronowarden.example.com
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts:
+              - chronowarden.example.com
+            secretName: chronowarden-tls
+
+images:
+  - name: chronowarden-backend
+    newName: ghcr.io/fajfer/chronowarden-backend
+    newTag: "0.1.0"
+  - name: chronowarden-frontend
+    newName: ghcr.io/fajfer/chronowarden-frontend
+    newTag: "0.1.0"
