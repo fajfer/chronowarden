@@ -290,6 +290,27 @@ images:
     newTag: "1.0.0"
 ```
 
+### Customizing Network Policies
+
+The production network policies require customization for your environment:
+
+1. **Ingress Controller**: Update the namespace selector labels in `networkpolicy.yaml` to match your ingress controller:
+   ```yaml
+   namespaceSelector:
+     matchLabels:
+       app.kubernetes.io/name: ingress-nginx  # Change for traefik, etc.
+   ```
+
+2. **HashiCorp Vault**: Restrict egress to your specific Vault server IPs:
+   ```yaml
+   - to:
+       - ipBlock:
+           cidr: <vault-server-ip>/32
+     ports:
+       - protocol: TCP
+         port: 8200
+   ```
+
 ### Resource Limits
 
 | Environment | Component | CPU Request | CPU Limit | Memory Request | Memory Limit |
@@ -304,7 +325,7 @@ images:
 ### Container Security
 
 1. **Non-root execution**: All containers run as non-root users
-2. **Read-only filesystem**: Production backend uses read-only root filesystem
+2. **Read-only filesystem**: Both backend and frontend use read-only root filesystem
 3. **Distroless images**: Minimal attack surface with no shell
 4. **Security contexts**: Proper seccomp profiles and capability drops
 

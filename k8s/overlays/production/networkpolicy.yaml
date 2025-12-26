@@ -21,6 +21,9 @@ spec:
     - Egress
   ingress:
     # Allow traffic from frontend and ingress controller
+    # NOTE: Update the namespaceSelector labels to match your ingress controller's namespace labels
+    # For nginx-ingress-controller: app.kubernetes.io/name: ingress-nginx
+    # For traefik: app.kubernetes.io/name: traefik
     - from:
         - podSelector:
             matchLabels:
@@ -42,7 +45,10 @@ spec:
         - protocol: UDP
           port: 53
     # Allow outbound HTTPS for HashiCorp Vault connectivity
-    # Restrict to specific Vault server IPs in production by replacing the ipBlock
+    # SECURITY NOTE: For production, replace the ipBlock with specific Vault server IPs:
+    # - ipBlock:
+    #     cidr: <vault-server-ip>/32
+    # The current configuration allows egress to any external IP on port 8200
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -73,6 +79,7 @@ spec:
     - Egress
   ingress:
     # Allow traffic from ingress controller
+    # NOTE: Update the namespaceSelector labels to match your ingress controller's namespace labels
     - from:
         - namespaceSelector:
             matchLabels:
