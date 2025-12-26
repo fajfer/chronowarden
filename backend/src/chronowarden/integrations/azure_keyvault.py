@@ -152,12 +152,9 @@ class AzureKeyVaultIntegration(BaseIntegration):
 
     def disconnect(self) -> None:
         """Close connection to Azure Key Vault."""
-        if self._secret_client is not None:
-            self._secret_client.close()
-            self._secret_client = None
-        if self._certificate_client is not None:
-            self._certificate_client.close()
-            self._certificate_client = None
+        # Azure SDK clients don't require explicit closing but we reset state
+        self._secret_client = None
+        self._certificate_client = None
         self._connected = False
         logger.info("Disconnected from Azure Key Vault")
 
@@ -318,7 +315,7 @@ class AzureKeyVaultIntegration(BaseIntegration):
                         )
                     )
 
-            return sorted(expiring_secrets, key=lambda x: x.expires_on or datetime.max.replace(tzinfo=timezone.utc))
+            return sorted(expiring_secrets, key=lambda x: x.expires_on or datetime(9999, 1, 1, tzinfo=timezone.utc))
 
         except Exception:
             logger.exception("Error getting expiring secrets from Azure Key Vault")
@@ -451,7 +448,7 @@ class AzureKeyVaultIntegration(BaseIntegration):
                         )
                     )
 
-            return sorted(expiring_certs, key=lambda x: x.expires_on or datetime.max.replace(tzinfo=timezone.utc))
+            return sorted(expiring_certs, key=lambda x: x.expires_on or datetime(9999, 1, 1, tzinfo=timezone.utc))
 
         except Exception:
             logger.exception("Error getting expiring certificates from Azure Key Vault")

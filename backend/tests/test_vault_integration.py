@@ -76,8 +76,8 @@ class TestVaultIntegrationConnection:
             verify_ssl=False,
         )
         result = integration.connect()
-        # Connection may succeed but authentication will fail
-        assert result is False or not integration.is_connected()
+        # With invalid token, connection should fail or auth check should fail
+        assert result is False, "Expected connection to fail with invalid token"
 
 
 class TestVaultIntegrationSecrets:

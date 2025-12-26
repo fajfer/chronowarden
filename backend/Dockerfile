@@ -152,7 +152,6 @@ RUN pip install --no-cache-dir \
     httpx>=0.28.0 \
     ruff>=0.8.0 \
     black>=24.10.0 \
-    syft \
     azure-identity>=1.15.0 \
     azure-keyvault-secrets>=4.8.0 \
     azure-keyvault-certificates>=4.8.0
