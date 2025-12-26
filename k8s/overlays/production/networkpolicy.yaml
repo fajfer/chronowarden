@@ -45,17 +45,13 @@ spec:
         - protocol: UDP
           port: 53
     # Allow outbound HTTPS for HashiCorp Vault connectivity
-    # SECURITY NOTE: For production, replace the ipBlock with specific Vault server IPs:
-    # - ipBlock:
-    #     cidr: <vault-server-ip>/32
-    # The current configuration allows egress to any external IP on port 8200
+    # IMPORTANT: Replace the placeholder CIDR with your Vault server's actual IP
+    # Example for a Vault server at 10.0.1.50:
+    #   cidr: 10.0.1.50/32
+    # Without proper configuration, Vault integration will not work
     - to:
         - ipBlock:
-            cidr: 0.0.0.0/0
-            except:
-              - 10.0.0.0/8
-              - 172.16.0.0/12
-              - 192.168.0.0/16
+            cidr: 127.0.0.1/32  # Placeholder - replace with actual Vault server IP
       ports:
         - protocol: TCP
           port: 8200  # HashiCorp Vault

@@ -301,11 +301,11 @@ The production network policies require customization for your environment:
        app.kubernetes.io/name: ingress-nginx  # Change for traefik, etc.
    ```
 
-2. **HashiCorp Vault**: Restrict egress to your specific Vault server IPs:
+2. **HashiCorp Vault**: The network policy uses a placeholder IP. You **must** update it to your Vault server's IP:
    ```yaml
    - to:
        - ipBlock:
-           cidr: <vault-server-ip>/32
+           cidr: <vault-server-ip>/32  # e.g., 10.0.1.50/32
      ports:
        - protocol: TCP
          port: 8200
