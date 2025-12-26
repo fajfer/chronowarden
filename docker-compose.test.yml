@@ -1,0 +1,153 @@
+# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+# =============================================================================
+# Docker Compose for Integration Testing
+# =============================================================================
+# This configuration spins up a complete test environment including:
+# - HashiCorp Vault (dev mode) for secret management testing
+# - Backend service for API testing
+# - Test runner container for executing integration tests
+#
+# Usage:
+#   Run all integration tests: docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+#   Run Vault only: docker compose -f docker-compose.test.yml up vault
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # HashiCorp Vault - Development Mode
+  # ---------------------------------------------------------------------------
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: chronowarden-vault-test
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "test-root-token"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - test-network
+
+  # ---------------------------------------------------------------------------
+  # Vault Initializer - Seeds test data into Vault
+  # ---------------------------------------------------------------------------
+  vault-init:
+    image: hashicorp/vault:1.15
+    container_name: chronowarden-vault-init
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_TOKEN: "test-root-token"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        # Wait for Vault to be ready
+        sleep 2
+        
+        # Enable KV v2 secrets engine at custom path
+        vault secrets enable -path=chronowarden kv-v2 || true
+        
+        # Create test secrets with various expiry dates
+        vault kv put chronowarden/test/api-key \
+          value="test-api-key-12345" \
+          expiry_date="2025-12-31T23:59:59Z" \
+          description="Test API key for integration testing"
+        
+        vault kv put chronowarden/test/database-credentials \
+          username="testuser" \
+          password="testpass123" \
+          expiry_date="2025-06-30T23:59:59Z" \
+          description="Test database credentials"
+        
+        vault kv put chronowarden/test/certificate \
+          cert="-----BEGIN CERTIFICATE-----\nMIIB...test\n-----END CERTIFICATE-----" \
+          expiry_date="2025-03-15T23:59:59Z" \
+          description="Test certificate expiring soon"
+        
+        vault kv put chronowarden/production/critical-secret \
+          value="production-critical-value" \
+          expiry_date="2025-01-15T23:59:59Z" \
+          description="Critical production secret"
+        
+        echo "Vault initialization complete!"
+    networks:
+      - test-network
+
+  # ---------------------------------------------------------------------------
+  # Backend Service for Testing
+  # ---------------------------------------------------------------------------
+  backend-test:
+    build:
+      context: ./backend
+      target: test
+    container_name: chronowarden-backend-test
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=test-root-token
+      - VAULT_MOUNT_PATH=chronowarden
+    depends_on:
+      vault:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - test-network
+
+  # ---------------------------------------------------------------------------
+  # Integration Test Runner
+  # ---------------------------------------------------------------------------
+  test-runner:
+    build:
+      context: ./backend
+      target: test
+    container_name: chronowarden-test-runner
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=test-root-token
+      - VAULT_MOUNT_PATH=chronowarden
+      - BACKEND_URL=http://backend-test:8000
+      - PYTEST_ARGS=${PYTEST_ARGS:---verbose -x}
+    depends_on:
+      backend-test:
+        condition: service_healthy
+    command: >
+      pytest tests/
+      --verbose
+      -x
+      --tb=short
+      --junitxml=/app/test-results/junit.xml
+      --cov=chronowarden
+      --cov-report=xml:/app/test-results/coverage.xml
+      --cov-report=term-missing
+    volumes:
+      - ./test-results:/app/test-results
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge

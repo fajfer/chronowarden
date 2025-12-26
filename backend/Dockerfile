@@ -120,3 +120,62 @@ LABEL org.opencontainers.image.title="Chronowarden Backend (Development)" \
 
 # Run the application with auto-reload for development
 CMD ["python", "-m", "uvicorn", "chronowarden.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+# -----------------------------------------------------------------------------
+# Stage 4: Test - Image for running tests in CI/CD pipelines
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim AS test
+
+WORKDIR /app
+
+# Install runtime and test dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# Copy application source
+COPY --from=builder /build/src/chronowarden /app/chronowarden
+
+# Copy test files
+COPY tests/ /app/tests/
+COPY pyproject.toml /app/
+
+# Install test dependencies including coverage
+RUN pip install --no-cache-dir \
+    pytest>=8.3.0 \
+    pytest-asyncio>=0.24.0 \
+    pytest-cov>=4.1.0 \
+    httpx>=0.28.0 \
+    ruff>=0.8.0 \
+    black>=24.10.0 \
+    syft \
+    azure-identity>=1.15.0 \
+    azure-keyvault-secrets>=4.8.0 \
+    azure-keyvault-certificates>=4.8.0
+
+# Set Python path
+ENV PYTHONPATH="/usr/local/lib/python3.11/site-packages:/app"
+
+# Create test results directory
+RUN mkdir -p /app/test-results
+
+# Create non-root user for testing
+RUN useradd --create-home --shell /bin/bash testuser && \
+    chown -R testuser:testuser /app
+USER testuser
+
+# Expose the application port
+EXPOSE 8000
+
+LABEL org.opencontainers.image.title="Chronowarden Backend (Test)" \
+      org.opencontainers.image.description="Secret management service - Test image for CI/CD" \
+      org.opencontainers.image.version="0.1.0-test" \
+      org.opencontainers.image.vendor="Damian Fajfer" \
+      org.opencontainers.image.licenses="EUPL-1.2"
+
+# Default command runs the test suite
+CMD ["pytest", "tests/", "-v", "--tb=short"]

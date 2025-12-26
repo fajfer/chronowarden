@@ -4,10 +4,18 @@
 
 """Integrations package for Chronowarden."""
 
+from chronowarden.integrations.azure_keyvault import (
+    AzureKeyVaultIntegration,
+    CertificateExpiryInfo,
+    SecretExpiryInfo,
+)
 from chronowarden.integrations.base import BaseIntegration
 from chronowarden.integrations.vault import VaultIntegration
 
 __all__ = [
+    "AzureKeyVaultIntegration",
     "BaseIntegration",
+    "CertificateExpiryInfo",
+    "SecretExpiryInfo",
     "VaultIntegration",
 ]

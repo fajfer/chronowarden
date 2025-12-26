@@ -46,6 +46,12 @@ dist/
 .pytest_cache/
 .coverage
 htmlcov/
+test-results/
+*.xml
 
 # Build artifacts
 *.log
+
+# SBOM (generated files, keep README)
+sbom/*.json
+sbom/*.spdx
