@@ -74,3 +74,32 @@ class Router(BaseModel):
 - Chronowarden zostaje striggerowany, jeżeli zbliża się `Secret.expiry_time_alert`
 - Chronowarden do wszystkich obiektów `Secret.routing` wysyła informację o wygasającym secrecie
 - Chronowarden odczekuje `Secret.expiry_time_interval` i ponawia poprzedni krok, jeżeli po wyliczeniu `Secret.expiry_time_alert` warunek jest spełniony
+
+# Backend
+### Installation
+
+```bash
+uv sync
+```
+
+### Running the server
+
+```bash
+uv run uvicorn chronowarden:app --reload
+```
+
+### Unit tests
+
+```bash
+uv run pytest
+```
+
+# Integration tests
+
+The idea is to test on both of these platforms to maintain compatibility, even though [OpenBao intends to remain API compatible with HashiCorp Vault](https://openbao.org/api-docs/libraries/).
+
+### https://openbao.org/docs/install/#container-registries
+`docker run -p 127.0.0.1:8200:8200 --name openbao-dev --detach quay.io/openbao/openbao`
+
+### https://hub.docker.com/r/hashicorp/vault
+`docker run -p 127.0.0.1:8201:8201 --cap-add=IPC_LOCK -e 'VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8201' -d --name=dev-vault hashicorp/vault`
