@@ -37,16 +37,14 @@ export const criticalSecrets = derived(secrets, ($secrets) => {
   });
 });
 
-const now = new Date();
-
 function daysFromNow(days: number): string {
-  const d = new Date(now);
+  const d = new Date();
   d.setDate(d.getDate() + days);
   return d.toISOString();
 }
 
 function daysAgo(days: number): string {
-  const d = new Date(now);
+  const d = new Date();
   d.setDate(d.getDate() - days);
   return d.toISOString();
 }

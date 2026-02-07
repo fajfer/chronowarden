@@ -11,6 +11,7 @@ export interface MockUser {
   password: string;
 }
 
+// Demo-only mock users — not used in production authentication
 export const MOCK_USERS: MockUser[] = [
   { username: 'admin', name: 'Alice Admin', role: 'admin', password: 'admin' },
   { username: 'bob', name: 'Bob Engineer', role: 'read-write', password: 'bob' },
