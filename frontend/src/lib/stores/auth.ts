@@ -2,76 +2,55 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
+/**
+ * Auth store — no authentication backend exists yet.
+ * This is a placeholder that defaults to an authenticated state
+ * since the backend has no auth middleware.
+ */
+
 import { writable, derived } from 'svelte/store';
-import { MOCK_USERS, canEdit, canSync, canBulkEdit, canManageOwners } from '$lib/utils/permissions';
-import type { Role, MockUser } from '$lib/utils/permissions';
 
 const STORAGE_KEY = 'chronowarden_auth';
 
-export const currentUser = writable<MockUser | null>(null);
-export const currentRole = writable<Role>('read-only');
+export interface AppUser {
+  name: string;
+}
+
+export const currentUser = writable<AppUser | null>(null);
 export const isAuthenticated = derived(currentUser, ($user) => $user !== null);
 
-export const canEditSecrets = derived(currentRole, ($role) => canEdit($role));
-export const canTriggerSync = derived(currentRole, ($role) => canSync($role));
-export const canBulkEditSecrets = derived(currentRole, ($role) => canBulkEdit($role));
-export const canManageOwnerProfiles = derived(currentRole, ($role) => canManageOwners($role));
-
-/**
- * Initialize auth state from localStorage.
- */
+/** Initialize auth state. Auto-logs in since the backend has no auth. */
 export function initAuth(): void {
   if (typeof window === 'undefined') return;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      const data = JSON.parse(stored) as { username: string };
-      const user = MOCK_USERS.find((u) => u.username === data.username);
-      if (user) {
-        currentUser.set(user);
-        currentRole.set(user.role);
-      }
+      currentUser.set(JSON.parse(stored) as AppUser);
+    } else {
+      // No auth in backend — default to logged in
+      const user: AppUser = { name: 'Operator' };
+      currentUser.set(user);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     }
   } catch {
-    // Ignore parse errors
+    const user: AppUser = { name: 'Operator' };
+    currentUser.set(user);
   }
 }
 
-/**
- * Log in with username and password.
- */
-export function login(username: string, password: string): boolean {
-  const user = MOCK_USERS.find((u) => u.username === username && u.password === password);
-  if (!user) return false;
+/** Set user name. */
+export function setUserName(name: string): void {
+  const user: AppUser = { name };
   currentUser.set(user);
-  currentRole.set(user.role);
   if (typeof window !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: user.username }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
   }
-  return true;
 }
 
-/**
- * Log out the current user.
- */
+/** Log out. */
 export function logout(): void {
   currentUser.set(null);
-  currentRole.set('read-only');
   if (typeof window !== 'undefined') {
     localStorage.removeItem(STORAGE_KEY);
-  }
-}
-
-/**
- * Switch to a different mock user by username.
- */
-export function switchUser(username: string): void {
-  const user = MOCK_USERS.find((u) => u.username === username);
-  if (user) {
-    currentUser.set(user);
-    currentRole.set(user.role);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: user.username }));
-    }
   }
 }

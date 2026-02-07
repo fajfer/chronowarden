@@ -4,6 +4,9 @@
 
 const BASE_URL = '/api/v1';
 
+/**
+ * API error with HTTP status code.
+ */
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -24,35 +27,31 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   const response = await fetch(`${BASE_URL}${path}`, options);
   if (!response.ok) {
-    throw new ApiError(response.status, `API error: ${response.statusText}`);
+    const detail = await response.text().catch(() => response.statusText);
+    throw new ApiError(response.status, detail);
+  }
+  if (response.status === 204) {
+    return undefined as T;
   }
   return response.json() as Promise<T>;
 }
 
-/**
- * Perform a GET request.
- */
+/** Perform a GET request. */
 export function apiGet<T>(path: string): Promise<T> {
   return request<T>('GET', path);
 }
 
-/**
- * Perform a POST request.
- */
+/** Perform a POST request. */
 export function apiPost<T>(path: string, body?: unknown): Promise<T> {
   return request<T>('POST', path, body);
 }
 
-/**
- * Perform a PUT request.
- */
+/** Perform a PUT request. */
 export function apiPut<T>(path: string, body?: unknown): Promise<T> {
   return request<T>('PUT', path, body);
 }
 
-/**
- * Perform a DELETE request.
- */
-export function apiDelete<T>(path: string): Promise<T> {
-  return request<T>('DELETE', path);
+/** Perform a DELETE request. */
+export function apiDelete(path: string): Promise<void> {
+  return request<void>('DELETE', path);
 }

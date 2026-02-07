@@ -8,7 +8,7 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import { isAuthenticated, initAuth } from '$lib/stores/auth';
-  import { loadDemoSecrets } from '$lib/stores/secrets';
+  import { loadSecrets } from '$lib/stores/secrets';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
 
@@ -17,7 +17,7 @@
 
   $effect(() => {
     initAuth();
-    loadDemoSecrets();
+    loadSecrets();
   });
 
   $effect(() => {

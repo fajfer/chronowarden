@@ -2,24 +2,18 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-import type { SecretStatus, SeverityType } from './Secret';
+import type { EngineType, SecretStatus } from './Secret';
 
 export interface FilterState {
   search: string;
-  vaults: string[];
-  severities: SeverityType[];
+  engineTypes: EngineType[];
   statuses: SecretStatus[];
-  engines: string[];
-  owners: string[];
-  enabled: boolean | null;
+  isPublic: boolean | null;
 }
 
 export const DEFAULT_FILTERS: FilterState = {
   search: '',
-  vaults: [],
-  severities: [],
+  engineTypes: [],
   statuses: [],
-  engines: [],
-  owners: [],
-  enabled: null,
+  isPublic: null,
 };

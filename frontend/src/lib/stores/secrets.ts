@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { writable, derived } from 'svelte/store';
-import type { Secret } from '$lib/types';
+import * as secretsApi from '$lib/api/secrets';
+import type { Secret, SecretCreate, SecretUpdate } from '$lib/types';
+import { getDaysUntilExpiry } from '$lib/utils/dateFormat';
 import { getStatusFromDays } from '$lib/utils/statusColor';
 
 export const secrets = writable<Secret[]>([]);
@@ -18,7 +20,8 @@ export const secretStats = derived(secrets, ($secrets) => {
   let expired = 0;
 
   for (const s of $secrets) {
-    const status = getStatusFromDays(s.days_until_expiry);
+    const days = getDaysUntilExpiry(s.expiry_date);
+    const status = getStatusFromDays(days);
     switch (status) {
       case 'healthy': healthy++; break;
       case 'warning': warning++; break;
@@ -32,189 +35,43 @@ export const secretStats = derived(secrets, ($secrets) => {
 
 export const criticalSecrets = derived(secrets, ($secrets) => {
   return $secrets.filter((s) => {
-    const status = getStatusFromDays(s.days_until_expiry);
+    const days = getDaysUntilExpiry(s.expiry_date);
+    const status = getStatusFromDays(days);
     return status === 'critical' || status === 'expired';
   });
 });
 
-function daysFromNow(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString();
+/** Fetch all secrets from the backend. */
+export async function loadSecrets(): Promise<void> {
+  secretsLoading.set(true);
+  secretsError.set(null);
+  try {
+    const data = await secretsApi.fetchSecrets();
+    secrets.set(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load secrets';
+    secretsError.set(message);
+  } finally {
+    secretsLoading.set(false);
+  }
 }
 
-function daysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString();
+/** Create a new secret via the backend. */
+export async function addSecret(data: SecretCreate): Promise<Secret> {
+  const created = await secretsApi.createSecret(data);
+  secrets.update((list) => [...list, created]);
+  return created;
 }
 
-export const DEMO_SECRETS: Secret[] = [
-  {
-    id: 1,
-    name: 'api-gateway-key',
-    path: 'apps/api-gateway/key',
-    engine: 'apps',
-    engine_type: 'kv-v2',
-    vault: 'production',
-    owner_id: 'owner-1',
-    owner_name: 'Alice Admin',
-    severity: 'critical',
-    enabled: true,
-    ttl: 86400 * 90,
-    expiry_date: daysFromNow(45),
-    days_until_expiry: 45,
-    status: 'healthy',
-    last_updated: daysAgo(5),
-    created_at: daysAgo(120),
-    raw_metadata: {},
-    ttl_history: [],
-  },
-  {
-    id: 2,
-    name: 'db-password-prod',
-    path: 'databases/prod/password',
-    engine: 'databases',
-    engine_type: 'kv-v2',
-    vault: 'production',
-    owner_id: 'owner-1',
-    owner_name: 'Alice Admin',
-    severity: 'pci-dss-4.0',
-    enabled: true,
-    ttl: 86400 * 30,
-    expiry_date: daysFromNow(22),
-    days_until_expiry: 22,
-    status: 'warning',
-    last_updated: daysAgo(8),
-    created_at: daysAgo(90),
-    raw_metadata: {},
-    ttl_history: [],
-  },
-  {
-    id: 3,
-    name: 'tls-cert-web',
-    path: 'certs/web/tls',
-    engine: 'certs',
-    engine_type: 'pki',
-    vault: 'production',
-    owner_id: 'owner-2',
-    owner_name: 'Bob Engineer',
-    severity: 'critical',
-    enabled: true,
-    ttl: 86400 * 365,
-    expiry_date: daysFromNow(7),
-    days_until_expiry: 7,
-    status: 'critical',
-    last_updated: daysAgo(2),
-    created_at: daysAgo(358),
-    raw_metadata: {},
-    ttl_history: [],
-  },
-  {
-    id: 4,
-    name: 'aws-iam-staging',
-    path: 'cloud/aws/iam-staging',
-    engine: 'cloud',
-    engine_type: 'aws',
-    vault: 'staging',
-    owner_id: 'owner-2',
-    owner_name: 'Bob Engineer',
-    severity: 'default',
-    enabled: true,
-    ttl: 86400 * 60,
-    expiry_date: daysFromNow(55),
-    days_until_expiry: 55,
-    status: 'healthy',
-    last_updated: daysAgo(3),
-    created_at: daysAgo(60),
-    raw_metadata: {},
-    ttl_history: [],
-  },
-  {
-    id: 5,
-    name: 'compliance-audit-key',
-    path: 'compliance/audit/key',
-    engine: 'compliance',
-    engine_type: 'kv-v2',
-    vault: 'production',
-    owner_id: 'owner-1',
-    owner_name: 'Alice Admin',
-    severity: 'pci-dss-4.0',
-    enabled: true,
-    ttl: 86400 * 90,
-    expiry_date: daysFromNow(-5),
-    days_until_expiry: -5,
-    status: 'expired',
-    last_updated: daysAgo(30),
-    created_at: daysAgo(180),
-    raw_metadata: {},
-    ttl_history: [],
-  },
-  {
-    id: 6,
-    name: 'dev-api-token',
-    path: 'apps/dev/api-token',
-    engine: 'apps',
-    engine_type: 'kv-v2',
-    vault: 'dev',
-    owner_id: null,
-    owner_name: null,
-    severity: 'none',
-    enabled: true,
-    ttl: 86400 * 30,
-    expiry_date: daysFromNow(90),
-    days_until_expiry: 90,
-    status: 'healthy',
-    last_updated: daysAgo(1),
-    created_at: daysAgo(30),
-    raw_metadata: {},
-    ttl_history: [],
-  },
-  {
-    id: 7,
-    name: 'staging-db-creds',
-    path: 'databases/staging/creds',
-    engine: 'databases',
-    engine_type: 'kv-v2',
-    vault: 'staging',
-    owner_id: 'owner-2',
-    owner_name: 'Bob Engineer',
-    severity: 'default',
-    enabled: false,
-    ttl: 86400 * 60,
-    expiry_date: daysFromNow(10),
-    days_until_expiry: 10,
-    status: 'critical',
-    last_updated: daysAgo(15),
-    created_at: daysAgo(90),
-    raw_metadata: {},
-    ttl_history: [],
-  },
-  {
-    id: 8,
-    name: 'internal-cert-ca',
-    path: 'certs/internal/ca',
-    engine: 'certs',
-    engine_type: 'pki',
-    vault: 'production',
-    owner_id: 'owner-1',
-    owner_name: 'Alice Admin',
-    severity: 'critical',
-    enabled: true,
-    ttl: 86400 * 365,
-    expiry_date: daysFromNow(200),
-    days_until_expiry: 200,
-    status: 'healthy',
-    last_updated: daysAgo(10),
-    created_at: daysAgo(165),
-    raw_metadata: {},
-    ttl_history: [],
-  },
-];
+/** Update a secret via the backend. */
+export async function editSecret(id: number, data: SecretUpdate): Promise<Secret> {
+  const updated = await secretsApi.updateSecret(id, data);
+  secrets.update((list) => list.map((s) => (s.id === id ? updated : s)));
+  return updated;
+}
 
-/**
- * Load demo secrets into the store.
- */
-export function loadDemoSecrets(): void {
-  secrets.set(DEMO_SECRETS);
+/** Delete a secret via the backend. */
+export async function removeSecret(id: number): Promise<void> {
+  await secretsApi.deleteSecret(id);
+  secrets.update((list) => list.filter((s) => s.id !== id));
 }

@@ -3,9 +3,8 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import { logout } from '$lib/stores/auth';
+  import { currentUser, logout } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
-  import RoleSwitcher from './RoleSwitcher.svelte';
   import SyncButton from './SyncButton.svelte';
 
   let { onToggleSidebar }: {
@@ -27,14 +26,13 @@
         </button>
       {/if}
       <a href="/" class="flex items-center gap-2 text-white font-bold text-lg">
-        <span>⏱</span>
         <span>Chronowarden</span>
       </a>
     </div>
 
     <div class="flex items-center gap-3">
       <SyncButton />
-      <RoleSwitcher />
+      <span class="text-sm text-gray-400">{$currentUser?.name ?? ''}</span>
       <button
         onclick={handleLogout}
         class="px-3 py-1.5 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
