@@ -16,6 +16,10 @@
 #
 # Token resolution priority: token_file > token_env > token
 
+# Global CA certificates directory (optional)
+# All .pem, .crt, and .cert files in this directory will be trusted for all vaults
+ca_certs_dir: /etc/chronowarden/certs
+
 vaults:
   # Production Vault cluster
   - name: production
