@@ -4,7 +4,22 @@ SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
 
 SPDX-License-Identifier: EUPL-1.2
 -->
-Serwis do zarządzania sekretami
+Simple service to monitor expiring secrets
+
+## Vault Permissions
+Chronowarden requires only to list your secrets and be able to read its metadata. This way, you don't need to actually expose your secrets to this tool.
+
+Example:
+
+```hcl
+path "<secret_engine>/data/*" {
+  capabilities = ["list"]
+}
+
+path "<secret_engine>/metadata/*" {
+  capabilities = ["read", "list"]
+}
+```
 
 ```python
 class Secret(BaseModel):
@@ -98,7 +113,7 @@ This script will:
 
 Cleanup with:
 ```bash
-docker stop dev-vault openbao-dev && docker rm dev-vault openbao-dev
+docker stop dev-vault-1.20.1 dev-vault-1.21.3 openbao-dev && docker rm dev-vault-1.20.1 dev-vault-1.21.3 openbao-dev
 ```
 
 ### Running the server

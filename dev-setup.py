@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
+# /// script
+# dependencies = ["hvac>=2.3.0", "pyyaml>=6.0.0"]
+# ///
 # SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 #
 # SPDX-License-Identifier: EUPL-1.2
@@ -139,8 +142,8 @@ def extract_token_from_logs(name: str, token_pattern: str) -> Optional[str]:
     return None
 
 
-def create_dev_config(tokens: dict[str, str]) -> None:
-    """Create a development config.yaml with extracted tokens."""
+def create_dev_config(approle_tokens: dict[str, str]) -> None:
+    """Create a development config.yaml with AppRole tokens."""
     config_path = Path("config.yaml")
 
     config = {
@@ -148,22 +151,22 @@ def create_dev_config(tokens: dict[str, str]) -> None:
             {
                 "name": "dev-openbao",
                 "address": "http://localhost:8200",
-                "token": tokens.get("openbao-dev", "REPLACE_WITH_ACTUAL_TOKEN"),
-                "mount_path": "secret",
+                "token": approle_tokens.get("openbao-dev", "REPLACE_WITH_ACTUAL_TOKEN"),
+                "mount_path": "apps",
                 "verify_ssl": False,
             },
             {
                 "name": "dev-vault-1.21.3",
                 "address": "http://localhost:8201",
-                "token": tokens.get("dev-vault-1.21.3", "REPLACE_WITH_ACTUAL_TOKEN"),
-                "mount_path": "secret",
+                "token": approle_tokens.get("dev-vault-1.21.3", "REPLACE_WITH_ACTUAL_TOKEN"),
+                "mount_path": "apps",
                 "verify_ssl": False,
             },
             {
                 "name": "dev-vault-1.20.1",
                 "address": "http://localhost:8202",
-                "token": tokens.get("dev-vault-1.20.1", "REPLACE_WITH_ACTUAL_TOKEN"),
-                "mount_path": "secret",
+                "token": approle_tokens.get("dev-vault-1.20.1", "REPLACE_WITH_ACTUAL_TOKEN"),
+                "mount_path": "apps",
                 "verify_ssl": False,
             },
         ]
@@ -195,6 +198,100 @@ def generate_random_url() -> str:
     domains = ["example.com", "test.org", "demo.net", "app.io", "service.dev"]
     paths = ["/api", "/admin", "/dashboard", "/portal", "/console", "/app"]
     return f"{random.choice(protocols)}://{random.choice(domains)}{random.choice(paths)}"
+
+
+def create_chronowarden_policy(client: hvac.Client) -> None:
+    """Create the chronowarden policy in the vault."""
+    policy = """
+# Read and list secrets from all KV v2 mounts
+path "apps/data/*" {
+  capabilities = ["list"]
+}
+
+path "apps/metadata/*" {
+  capabilities = ["read", "list"]
+}
+
+path "databases/data/*" {
+  capabilities = ["list"]
+}
+
+path "databases/metadata/*" {
+  capabilities = ["read", "list"]
+}
+
+path "services/data/*" {
+  capabilities = ["list"]
+}
+
+path "services/metadata/*" {
+  capabilities = ["read", "list"]
+}
+"""
+    client.sys.create_or_update_policy(
+        name="chronowarden",
+        policy=policy,
+    )
+    logger.info("  Created chronowarden policy")
+
+
+def setup_approle(client: hvac.Client) -> tuple[str, str]:
+    """
+    Set up AppRole authentication and return (role_id, secret_id).
+    
+    Returns:
+        Tuple of (role_id, secret_id) for AppRole authentication
+    """
+    # Enable AppRole auth method
+    try:
+        client.sys.enable_auth_method("approle")
+        logger.info("  Enabled AppRole auth method")
+    except hvac.exceptions.InvalidRequest:
+        logger.info("  AppRole auth method already enabled")
+
+    # Create the AppRole
+    client.auth.approle.create_or_update_approle(
+        role_name="chronowarden",
+        token_policies=["chronowarden"],
+        token_ttl="1h",
+        token_max_ttl="24h",
+        secret_id_ttl="0",
+        secret_id_num_uses=0,
+        bind_secret_id=True,
+    )
+    logger.info("  Created chronowarden AppRole")
+
+    # Get role_id
+    role_id = client.auth.approle.read_role_id(role_name="chronowarden")["data"]["role_id"]
+    
+    # Generate secret_id
+    secret_id_response = client.auth.approle.generate_secret_id(role_name="chronowarden")
+    secret_id = secret_id_response["data"]["secret_id"]
+    
+    logger.info(f"  Generated AppRole credentials (role_id: {role_id[:8]}...)")
+    
+    return role_id, secret_id
+
+
+def login_with_approle(address: str, role_id: str, secret_id: str) -> Optional[str]:
+    """
+    Login to Vault using AppRole and return the client token.
+    
+    Returns:
+        Client token string or None on failure
+    """
+    try:
+        client = hvac.Client(url=address, verify=False)
+        login_response = client.auth.approle.login(
+            role_id=role_id,
+            secret_id=secret_id,
+        )
+        token = login_response["auth"]["client_token"]
+        logger.info(f"  Successfully logged in with AppRole (token: {token[:8]}...)")
+        return token
+    except Exception:
+        logger.exception("Failed to login with AppRole")
+        return None
 
 
 def populate_vault(vault_name: str, address: str, token: str) -> None:
@@ -248,7 +345,14 @@ def main():
     """Main setup function."""
     logger.info("Setting up Chronowarden development environment...")
 
-    tokens = {}
+    root_tokens = {}
+    approle_tokens = {}
+
+    vault_addresses = {
+        "openbao-dev": "http://localhost:8200",
+        "dev-vault-1.21.3": "http://localhost:8201",
+        "dev-vault-1.20.1": "http://localhost:8202",
+    }
 
     for container_name, config in CONTAINERS.items():
         logger.info(f"Checking {container_name}...")
@@ -269,28 +373,54 @@ def main():
             logger.error(f"{container_name} failed readiness check")
             sys.exit(1)
 
-        # Extract token
-        token = extract_token_from_logs(container_name, config["token_pattern"])
-        if token:
-            tokens[container_name] = token
+        # Extract root token
+        root_token = extract_token_from_logs(container_name, config["token_pattern"])
+        if root_token:
+            root_tokens[container_name] = root_token
 
-    # Create config
-    create_dev_config(tokens)
+    # Populate vaults with test data and set up AppRole
+    logger.info("Setting up vaults with AppRole authentication...")
 
-    # Populate vaults with test data
-    logger.info("Populating vaults with test data...")
-    vault_addresses = {
-        "openbao-dev": "http://localhost:8200",
-        "dev-vault-1.21.3": "http://localhost:8201",
-        "dev-vault-1.20.1": "http://localhost:8202",
-    }
+    for container_name, root_token in root_tokens.items():
+        if root_token and container_name in vault_addresses:
+            address = vault_addresses[container_name]
+            
+            # Populate vault with secrets
+            populate_vault(container_name, address, root_token)
+            
+            # Set up AppRole authentication
+            try:
+                client = hvac.Client(url=address, token=root_token, verify=False)
+                if not client.is_authenticated():
+                    logger.error(f"Failed to authenticate to {container_name}")
+                    continue
+                
+                # Create policy and AppRole
+                create_chronowarden_policy(client)
+                role_id, secret_id = setup_approle(client)
+                
+                # Login with AppRole to get client token
+                approle_token = login_with_approle(address, role_id, secret_id)
+                if approle_token:
+                    approle_tokens[container_name] = approle_token
+                else:
+                    logger.error(f"Failed to get AppRole token for {container_name}")
+                    
+            except Exception:
+                logger.exception(f"Error setting up AppRole for {container_name}")
 
-    for container_name, token in tokens.items():
-        if token and container_name in vault_addresses:
-            populate_vault(container_name, vault_addresses[container_name], token)
+    # Create config with AppRole tokens
+    create_dev_config(approle_tokens)
 
+    logger.info("\n" + "="*70)
     logger.info("Development setup complete!")
+    logger.info("="*70)
+    logger.info("\nRoot tokens (for emergency access only):")
+    for container_name, root_token in root_tokens.items():
+        logger.info(f"  {container_name}: {root_token}")
+    logger.info("\nConfig file created with AppRole tokens for secure access.")
     logger.info("You can now run: uv run uvicorn chronowarden:app --reload")
+    logger.info("="*70 + "\n")
 
 
 if __name__ == "__main__":
