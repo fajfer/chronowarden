@@ -8,14 +8,14 @@ model {
 
   chronowarden = system 'Chronowarden' {
     component frontend {
-      technology 'JavaScript'
-      description 'Web-based user interface for Chronowarden'
+      technology 'SvelteKit, TypeScript, Tailwind CSS'
+      description 'Dark mode dashboard UI for secret monitoring, owner management, and sync control'
 
     }
 
     component database {
       technology 'sqlite'
-      description 'SQLite database storing secret metadata cache and engine configuration'
+      description 'SQLite database storing secret metadata cache, engine configuration, and owner profiles'
 
       style {
         shape cylinder
@@ -33,11 +33,11 @@ model {
     }
 
     // User uses the UI
-    user -> chronowarden.frontend 'CRUD operations on secrets'
+    user -> chronowarden.frontend 'CRUD operations on secrets and owner management'
     // Frontend interacts with the database
     chronowarden.frontend -[api]-> chronowarden.backend 'Triggers API through frontend'
     // Backend interacts with the database
-    chronowarden.backend -[api]-> chronowarden.database 'Stores and retrieves secret metadata cache'
+    chronowarden.backend -[api]-> chronowarden.database 'Stores and retrieves secret metadata cache and owner profiles'
     // Backend uses metadata module
     chronowarden.backend -[api]-> chronowarden.metadata 'TTL calculation and sync'
 

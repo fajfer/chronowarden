@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 #
 # SPDX-License-Identifier: EUPL-1.2
 
@@ -53,3 +53,6 @@ chronowarden.db
 
 # Build artifacts
 *.log
+
+# SvelteKit
+.svelte-kit/
