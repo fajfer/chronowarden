@@ -205,6 +205,10 @@ def create_chronowarden_policy(client: hvac.Client) -> None:
     policy = """
 # Read, list, and update metadata for all KV v2 mounts
 # Chronowarden manages custom_metadata fields (chronowarden_ttl, chronowarden_severity, chronowarden_enabled)
+path "secret/metadata/*" {
+  capabilities = ["read", "list", "update"]
+}
+
 path "apps/metadata/*" {
   capabilities = ["read", "list", "update"]
 }
