@@ -5,9 +5,7 @@
 import { apiPost } from './client';
 import type { SyncResult } from '$lib/types';
 
-/**
- * Trigger a sync for the specified vaults.
- */
-export function triggerSync(vaults?: string[]): Promise<SyncResult[]> {
-  return apiPost<SyncResult[]>('/sync', vaults ? { vaults } : undefined);
+/** POST /api/v1/sync/vault/:name — trigger sync for a specific vault. */
+export function triggerVaultSync(vaultName: string): Promise<SyncResult> {
+  return apiPost<SyncResult>(`/sync/vault/${vaultName}`);
 }

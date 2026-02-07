@@ -3,18 +3,42 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { apiGet } from './client';
-import type { VaultInstance } from '$lib/types';
+import type { VaultInstanceHealth, HealthStatus, ApiInfo } from '$lib/types';
 
-/**
- * Fetch all vault instances.
- */
-export function fetchVaults(): Promise<VaultInstance[]> {
-  return apiGet<VaultInstance[]>('/vaults');
+/** GET /api/v1/vault/instances — list configured vault instance names. */
+export function fetchVaultInstances(): Promise<{ instances: string[] }> {
+  return apiGet<{ instances: string[] }>('/vault/instances');
 }
 
-/**
- * Fetch a single vault by name.
- */
-export function fetchVault(name: string): Promise<VaultInstance> {
-  return apiGet<VaultInstance>(`/vaults/${name}`);
+/** GET /api/v1/vault/health — health of all vault instances. */
+export function fetchAllVaultHealth(): Promise<VaultInstanceHealth[]> {
+  return apiGet<VaultInstanceHealth[]>('/vault/health');
+}
+
+/** GET /api/v1/vault/:name/health — health of a single vault. */
+export function fetchVaultHealth(name: string): Promise<VaultInstanceHealth> {
+  return apiGet<VaultInstanceHealth>(`/vault/${name}/health`);
+}
+
+/** GET /api/v1/vault/:name/secrets/list — list secrets in a vault. */
+export function fetchVaultSecrets(
+  name: string,
+  path: string = '',
+  mountPoint?: string,
+): Promise<{ vault: string; secrets: string[] }> {
+  const params = new URLSearchParams();
+  if (path) params.set('path', path);
+  if (mountPoint) params.set('mount_point', mountPoint);
+  const qs = params.toString();
+  return apiGet(`/vault/${name}/secrets/list${qs ? `?${qs}` : ''}`);
+}
+
+/** GET /api/v1/health — basic health check. */
+export function fetchHealthCheck(): Promise<HealthStatus> {
+  return apiGet<HealthStatus>('/health');
+}
+
+/** GET /api/v1/info — API name, version and docs link. */
+export function fetchApiInfo(): Promise<ApiInfo> {
+  return apiGet<ApiInfo>('/info');
 }

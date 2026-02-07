@@ -2,8 +2,14 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-export type { Secret, TtlHistoryEntry, SeverityType, SecretStatus } from './Secret';
-export type { Owner, NotificationRoute } from './Owner';
-export type { VaultInstance, SyncResult, SyncStatus } from './Vault';
+export type { Secret, SecretCreate, SecretUpdate, EngineType, SecretStatus } from './Secret';
+export type {
+  Owner, OwnerCreate, OwnerUpdate,
+  NotificationRoute, NotificationRouteCreate,
+} from './Owner';
+export type {
+  VaultInstanceHealth, SyncResult, SyncedSecretEntry,
+  ApiInfo, HealthStatus,
+} from './Vault';
 export type { FilterState } from './Filter';
 export { DEFAULT_FILTERS } from './Filter';

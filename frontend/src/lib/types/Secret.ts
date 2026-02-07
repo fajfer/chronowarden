@@ -2,33 +2,59 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-export type SeverityType = 'default' | 'critical' | 'pci-dss-4.0' | 'none';
+/**
+ * Engine types matching the backend EngineType enum.
+ */
+export type EngineType = 'manual' | 'azure_keyvault' | 'hashicorp_vault' | 'x509';
 
+/**
+ * Derived status for UI display based on days until expiry.
+ */
 export type SecretStatus = 'healthy' | 'warning' | 'critical' | 'expired';
 
-export interface TtlHistoryEntry {
-  date: string;
-  ttl: number;
-  days_until_expiry: number;
-}
-
+/**
+ * Secret model matching the backend Secret pydantic model.
+ */
 export interface Secret {
   id: number;
   name: string;
-  path: string;
-  engine: string;
-  engine_type: string;
-  vault: string;
-  owner_id: string | null;
-  owner_name: string | null;
-  severity: SeverityType;
-  enabled: boolean;
-  ttl: number;
-  expiry_date: string;
-  days_until_expiry: number | null;
-  status: SecretStatus;
-  last_updated: string;
+  description: string | null;
+  is_public: boolean;
+  expiry_time_alert: number;
+  expiry_time_interval: number;
+  owner_id: number;
+  routing_ids: number[];
+  backend_id: number;
   created_at: string;
-  raw_metadata: Record<string, unknown>;
-  ttl_history: TtlHistoryEntry[];
+  expiry_date: string | null;
+  engine_type: EngineType;
+}
+
+/**
+ * Payload for creating a new secret.
+ */
+export interface SecretCreate {
+  name: string;
+  description?: string | null;
+  is_public?: boolean;
+  expiry_time_alert?: number;
+  expiry_time_interval?: number;
+  owner_id: number;
+  routing_ids?: number[];
+  backend_id: number;
+  expiry_date?: string | null;
+  engine_type: EngineType;
+}
+
+/**
+ * Payload for updating a secret.
+ */
+export interface SecretUpdate {
+  name?: string;
+  description?: string | null;
+  is_public?: boolean;
+  expiry_time_alert?: number;
+  expiry_time_interval?: number;
+  routing_ids?: number[];
+  expiry_date?: string | null;
 }

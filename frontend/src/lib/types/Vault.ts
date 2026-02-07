@@ -2,27 +2,51 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-export interface VaultInstance {
+/**
+ * Vault instance health matching the backend VaultInstanceHealth model.
+ */
+export interface VaultInstanceHealth {
   name: string;
   connected: boolean;
   healthy: boolean;
-  version?: string;
-  sealed: boolean;
-  initialized: boolean;
-  error?: string;
+  initialized: boolean | null;
+  sealed: boolean | null;
+  version: string | null;
+  error: string | null;
 }
 
+/**
+ * Sync result matching the backend sync endpoint response.
+ */
 export interface SyncResult {
   vault: string;
   secrets_synced: number;
-  status: 'success' | 'error';
-  duration?: number;
-  error?: string;
-  timestamp: string;
+  secrets: SyncedSecretEntry[];
 }
 
-export interface SyncStatus {
-  vault: string;
-  syncing: boolean;
-  last_sync?: string;
+/**
+ * Individual synced secret entry from the sync response.
+ */
+export interface SyncedSecretEntry {
+  engine: string;
+  path: string;
+  ttl: string | null;
+  severity: string | null;
+  enabled: boolean;
+}
+
+/**
+ * API root info from GET /.
+ */
+export interface ApiInfo {
+  name: string;
+  version: string;
+  docs: string;
+}
+
+/**
+ * Health check response from GET /api/v1/health.
+ */
+export interface HealthStatus {
+  status: string;
 }
