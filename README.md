@@ -7,13 +7,18 @@ SPDX-License-Identifier: EUPL-1.2
 Simple service to monitor expiring secrets
 
 ## Vault Permissions
-Chronowarden requires you to read/list your secrets' metadata. This way, you don't need to actually expose your secrets to this tool.
+Chronowarden manages (read/write) custom metadata on your Vault secrets to track expiry. It reads secret metadata (creation time, version) and writes custom metadata fields (`chronowarden_ttl`, `chronowarden_severity`, `chronowarden_enabled`). You don't need to expose your actual secret values to this tool.
 
 Example:
 
 ```hcl
 path "<secret_engine>/metadata/*" {
-  capabilities = ["read", "list"]
+  capabilities = ["read", "list", "update"]
+}
+
+# Optional: allow engine discovery
+path "sys/mounts" {
+  capabilities = ["read"]
 }
 ```
 
