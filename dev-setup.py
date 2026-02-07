@@ -204,24 +204,12 @@ def create_chronowarden_policy(client: hvac.Client) -> None:
     """Create the chronowarden policy in the vault."""
     policy = """
 # Read and list secrets from all KV v2 mounts
-path "apps/data/*" {
-  capabilities = ["list"]
-}
-
 path "apps/metadata/*" {
   capabilities = ["read", "list"]
 }
 
-path "databases/data/*" {
-  capabilities = ["list"]
-}
-
 path "databases/metadata/*" {
   capabilities = ["read", "list"]
-}
-
-path "services/data/*" {
-  capabilities = ["list"]
 }
 
 path "services/metadata/*" {
