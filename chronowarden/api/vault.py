@@ -124,52 +124,6 @@ async def vault_instance_health(
     )
 
 
-@router.post("/{vault_name}/secrets/get", summary="Get secret from a Vault instance")
-async def get_vault_secret(
-    request: VaultSecretRequest,
-    vault_name: str = Path(description="Name of the vault instance"),
-) -> dict[str, Any]:
-    """
-    Retrieve a secret from a specific Vault instance.
-
-    Args:
-        request: Secret path and optional key.
-        vault_name: Name of the vault instance.
-
-    Returns:
-        The secret data.
-
-    Raises:
-        HTTPException: If vault not found or secret not found.
-    """
-    manager = _get_vault_manager()
-    vault = manager.get(vault_name)
-
-    if not vault:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Vault instance '{vault_name}' not found",
-        )
-
-    if not vault.is_connected():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Vault instance '{vault_name}' is not connected",
-        )
-
-    secret = vault.get_secret(request.path, request.key, request.mount_point)
-
-    if secret is None:
-        VAULT_OPERATIONS_TOTAL.labels(operation="get_secret", status="not_found").inc()
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Secret not found at path: {request.path}",
-        )
-
-    VAULT_OPERATIONS_TOTAL.labels(operation="get_secret", status="success").inc()
-    return {"vault": vault_name, "data": secret}
-
-
 @router.get("/{vault_name}/secrets/list", summary="List secrets in a Vault instance")
 async def list_vault_secrets(
     vault_name: str = Path(description="Name of the vault instance"),
