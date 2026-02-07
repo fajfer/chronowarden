@@ -347,18 +347,22 @@ class Database:
         if self._conn is None:
             logger.error("Database not connected")
             return
+
+        _ALLOWED_COLUMNS = {"name", "email"}
         updates = []
         params: list = []
-        if name is not None:
-            updates.append("name = ?")
-            params.append(name)
-        if email is not None:
-            updates.append("email = ?")
-            params.append(email)
+        field_map = {"name": name, "email": email}
+
+        for column, value in field_map.items():
+            if value is not None and column in _ALLOWED_COLUMNS:
+                updates.append(f"{column} = ?")
+                params.append(value)
+
         if not updates:
             return
         params.append(owner_id)
-        self._conn.execute(f"UPDATE owners SET {', '.join(updates)} WHERE id = ?", params)
+        query = "UPDATE owners SET " + ", ".join(updates) + " WHERE id = ?"
+        self._conn.execute(query, params)
         self._conn.commit()
 
     def delete_owner(self, owner_id: str) -> None:
