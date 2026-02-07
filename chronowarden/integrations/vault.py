@@ -228,3 +228,77 @@ class VaultIntegration(BaseIntegration):
         except VaultError:
             logger.exception("Error checking Vault health")
             return {"healthy": False, "error": "Health check failed"}
+
+    def write_secret_metadata(
+        self,
+        path: str,
+        custom_metadata: dict[str, str],
+        mount_point: Optional[str] = None,
+    ) -> bool:
+        """
+        Write custom metadata fields to a Vault secret.
+
+        Args:
+            path: Path to the secret.
+            custom_metadata: Dictionary of custom metadata key-value pairs to write.
+            mount_point: Override the default mount point for this request.
+
+        Returns:
+            True if metadata was written successfully, False otherwise.
+        """
+        if not self._client:
+            logger.error("Not connected to Vault")
+            return False
+
+        mount = mount_point if mount_point is not None else self._mount_path
+
+        try:
+            self._client.secrets.kv.v2.update_metadata(
+                path=path,
+                mount_point=mount,
+                custom_metadata=custom_metadata,
+            )
+            logger.debug("Updated custom metadata for %s/%s", mount, path)
+            return True
+        except VaultError:
+            logger.exception("Error writing metadata to Vault")
+            return False
+
+    def discover_engines(self) -> list[dict[str, Any]]:
+        """
+        Auto-discover KV v2 secret engines from Vault.
+
+        Returns:
+            List of discovered engine dictionaries with 'path' and 'type' keys.
+        """
+        if not self._client:
+            logger.error("Not connected to Vault")
+            return []
+
+        try:
+            mounts = self._client.sys.list_mounted_secrets_engines()
+            engines: list[dict[str, Any]] = []
+            if mounts and "data" in mounts:
+                mount_data = mounts["data"]
+            elif isinstance(mounts, dict):
+                mount_data = mounts
+            else:
+                return []
+
+            for mount_path, details in mount_data.items():
+                if not isinstance(details, dict):
+                    continue
+                engine_type = details.get("type", "")
+                options = details.get("options", {}) or {}
+                version = options.get("version", "")
+                if engine_type == "kv" and version == "2":
+                    engines.append({
+                        "path": mount_path.rstrip("/"),
+                        "type": "kv",
+                        "version": "2",
+                        "description": details.get("description", ""),
+                    })
+            return engines
+        except VaultError:
+            logger.exception("Error discovering secret engines")
+            return []

@@ -19,6 +19,19 @@
 # Global CA certificates directory (optional)
 # All .pem, .crt, and .cert files in this directory will be trusted for all vaults
 ca_certs_dir: /etc/chronowarden/certs
+# Global defaults
+date_format: "YYYY-MM-DD"  # or "YYYY-DD-MM", with auto-detection fallback
+polling_interval: "6h"     # Global polling interval for all vaults (e.g. '6h', '30m')
+
+# Expiry profiles: define rotation periods per severity level
+# Supports: d (days), m (months), y (years)
+expiry_profiles:
+  default:
+    rotation_period: "365d"  # 1 year
+  critical:
+    rotation_period: "6m"    # 6 months (~180 days)
+  pci-dss-4.0:
+    rotation_period: "90d"   # 90 days
 
 vaults:
   # Production Vault cluster
@@ -29,6 +42,8 @@ vaults:
     mount_path: secret
     verify_ssl: true
     auth_method: token
+    # date_format: "YYYY-DD-MM"   # optional per-vault override
+    # default_severity: "critical" # optional vault-level default severity
 
   # Staging Vault (OpenBao fork)
   - name: staging
@@ -45,3 +60,8 @@ vaults:
     mount_path: secret
     verify_ssl: false
     auth_method: token
+
+# Per-engine configuration (auto-discovered from Vault, can be overridden here)
+engines:
+  # - id: secret/my-app
+  #   default_severity: "pci-dss-4.0"  # optional engine-level override

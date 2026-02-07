@@ -203,17 +203,27 @@ def generate_random_url() -> str:
 def create_chronowarden_policy(client: hvac.Client) -> None:
     """Create the chronowarden policy in the vault."""
     policy = """
-# Read and list secrets from all KV v2 mounts
+# Read, list, and update metadata for all KV v2 mounts
+# Chronowarden manages custom_metadata fields (chronowarden_ttl, chronowarden_severity, chronowarden_enabled)
+path "secret/metadata/*" {
+  capabilities = ["read", "list", "update"]
+}
+
 path "apps/metadata/*" {
-  capabilities = ["read", "list"]
+  capabilities = ["read", "list", "update"]
 }
 
 path "databases/metadata/*" {
-  capabilities = ["read", "list"]
+  capabilities = ["read", "list", "update"]
 }
 
 path "services/metadata/*" {
-  capabilities = ["read", "list"]
+  capabilities = ["read", "list", "update"]
+}
+
+# Allow listing mount points for engine discovery
+path "sys/mounts" {
+  capabilities = ["read"]
 }
 """
     client.sys.create_or_update_policy(
