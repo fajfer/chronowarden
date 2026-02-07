@@ -1,4 +1,4 @@
-//SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+//SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 //
 //SPDX-License-Identifier: EUPL-1.2
 model {
@@ -15,7 +15,7 @@ model {
 
     component database {
       technology 'sqlite'
-      description 'Relational database for Chronowarden'
+      description 'SQLite database storing secret metadata cache and engine configuration'
 
       style {
         shape cylinder
@@ -24,14 +24,22 @@ model {
     
     component backend {
       technology 'Python'
-      description 'Backend service for Chronowarden'
+      description 'Backend service for Chronowarden with metadata management and polling'
     }
+
+    component metadata {
+      technology 'Python'
+      description 'Metadata management module for TTL calculation, date parsing, and sync'
+    }
+
     // User uses the UI
     user -> chronowarden.frontend 'CRUD operations on secrets'
     // Frontend interacts with the database
     chronowarden.frontend -[api]-> chronowarden.backend 'Triggers API through frontend'
-    // Backend interacts with the database2
-    chronowarden.backend -[api]-> chronowarden.database 'Stores and retrieves secrets'
+    // Backend interacts with the database
+    chronowarden.backend -[api]-> chronowarden.database 'Stores and retrieves secret metadata cache'
+    // Backend uses metadata module
+    chronowarden.backend -[api]-> chronowarden.metadata 'TTL calculation and sync'
 
   }
 }

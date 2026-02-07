@@ -48,5 +48,8 @@ dist/
 htmlcov/
 config.yaml
 
+# Database
+chronowarden.db
+
 # Build artifacts
 *.log

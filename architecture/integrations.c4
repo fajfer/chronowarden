@@ -1,3 +1,6 @@
-//SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+//SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 //
 //SPDX-License-Identifier: EUPL-1.2
+
+// Vault integration reads/writes custom_metadata (chronowarden_ttl, chronowarden_severity, chronowarden_enabled)
+// and discovers KV v2 secret engines for monitoring
