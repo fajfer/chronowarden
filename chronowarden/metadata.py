@@ -175,7 +175,7 @@ def resolve_secret_severity(
         db_engine = db.get_engine_config(vault_name, engine_id)
         if db_engine and db_engine.default_severity:
             if secret_severity is None:
-                return config.resolve_severity(None, None, None) if False else db_engine.default_severity
+                return db_engine.default_severity
 
     return config.resolve_severity(secret_severity, engine_id, vault_name)
 
