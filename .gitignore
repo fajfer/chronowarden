@@ -46,6 +46,7 @@ dist/
 .pytest_cache/
 .coverage
 htmlcov/
+config.yaml
 
 # Build artifacts
 *.log

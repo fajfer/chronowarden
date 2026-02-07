@@ -11,12 +11,16 @@ creates a config.yaml with extracted tokens for local development.
 """
 
 import logging
+import random
 import re
+import string
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Optional
+
+import hvac
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -156,6 +160,74 @@ def create_dev_config(tokens: dict[str, str]) -> None:
     logger.info(f"Created development config at {config_path}")
 
 
+def generate_random_string(length: int = 16) -> str:
+    """Generate a random string for passwords."""
+    chars = string.ascii_letters + string.digits + "!@#$%^&*"
+    return "".join(random.choice(chars) for _ in range(length))
+
+
+def generate_random_username() -> str:
+    """Generate a random username."""
+    adjectives = ["happy", "clever", "bright", "swift", "calm", "brave", "wise", "cool", "wild", "bold"]
+    nouns = ["tiger", "eagle", "wolf", "fox", "bear", "lion", "hawk", "shark", "panda", "dragon"]
+    return f"{random.choice(adjectives)}_{random.choice(nouns)}_{random.randint(100, 999)}"
+
+
+def generate_random_url() -> str:
+    """Generate a random URL."""
+    protocols = ["https"]
+    domains = ["example.com", "test.org", "demo.net", "app.io", "service.dev"]
+    paths = ["/api", "/admin", "/dashboard", "/portal", "/console", "/app"]
+    return f"{random.choice(protocols)}://{random.choice(domains)}{random.choice(paths)}"
+
+
+def populate_vault(vault_name: str, address: str, token: str) -> None:
+    """Populate a vault with secret engines and secrets."""
+    logger.info(f"Populating {vault_name}...")
+
+    try:
+        client = hvac.Client(url=address, token=token, verify=False)
+        if not client.is_authenticated():
+            logger.error(f"Failed to authenticate to {vault_name}")
+            return
+
+        # Define 3 secret engines
+        engines = ["apps", "databases", "services"]
+
+        for engine in engines:
+            # Enable KV v2 secrets engine
+            try:
+                client.sys.enable_secrets_engine(
+                    backend_type="kv",
+                    path=engine,
+                    options={"version": "2"},
+                )
+                logger.info(f"  Enabled secret engine: {engine}")
+            except hvac.exceptions.InvalidRequest:
+                logger.info(f"  Secret engine {engine} already exists, skipping")
+
+            # Create 5 secrets in each engine
+            for i in range(1, 6):
+                secret_path = f"secret-{i}"
+                secret_data = {
+                    "username": generate_random_username(),
+                    "password": generate_random_string(),
+                    "url": generate_random_url(),
+                }
+
+                client.secrets.kv.v2.create_or_update_secret(
+                    path=secret_path,
+                    secret=secret_data,
+                    mount_point=engine,
+                )
+                logger.info(f"    Created secret: {engine}/{secret_path}")
+
+        logger.info(f"Successfully populated {vault_name} with {len(engines)} engines and {len(engines) * 5} secrets")
+
+    except Exception:
+        logger.exception(f"Error populating {vault_name}")
+
+
 def main():
     """Main setup function."""
     logger.info("Setting up Chronowarden development environment...")
@@ -188,6 +260,17 @@ def main():
 
     # Create config
     create_dev_config(tokens)
+
+    # Populate vaults with test data
+    logger.info("Populating vaults with test data...")
+    vault_addresses = {
+        "openbao-dev": "http://localhost:8200",
+        "dev-vault": "http://localhost:8201",
+    }
+
+    for container_name, token in tokens.items():
+        if token and container_name in vault_addresses:
+            populate_vault(container_name, vault_addresses[container_name], token)
 
     logger.info("Development setup complete!")
     logger.info("You can now run: uv run uvicorn chronowarden:app --reload")
