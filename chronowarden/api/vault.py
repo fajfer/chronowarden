@@ -19,6 +19,7 @@ class VaultSecretRequest(BaseModel):
 
     path: str
     key: Optional[str] = None
+    mount_point: Optional[str] = None
 
 
 class VaultInstanceHealth(BaseModel):
@@ -156,7 +157,7 @@ async def get_vault_secret(
             detail=f"Vault instance '{vault_name}' is not connected",
         )
 
-    secret = vault.get_secret(request.path, request.key)
+    secret = vault.get_secret(request.path, request.key, request.mount_point)
 
     if secret is None:
         VAULT_OPERATIONS_TOTAL.labels(operation="get_secret", status="not_found").inc()
@@ -173,6 +174,7 @@ async def get_vault_secret(
 async def list_vault_secrets(
     vault_name: str = Path(description="Name of the vault instance"),
     path: str = "",
+    mount_point: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     List secrets at a given path in a specific Vault instance.
@@ -180,6 +182,7 @@ async def list_vault_secrets(
     Args:
         vault_name: Name of the vault instance.
         path: Path to list secrets from.
+        mount_point: Override the default mount point.
 
     Returns:
         List of secret keys.
@@ -202,7 +205,7 @@ async def list_vault_secrets(
             detail=f"Vault instance '{vault_name}' is not connected",
         )
 
-    secrets = vault.list_secrets(path)
+    secrets = vault.list_secrets(path, mount_point)
     VAULT_OPERATIONS_TOTAL.labels(operation="list_secrets", status="success").inc()
 
     return {"vault": vault_name, "secrets": secrets}
@@ -241,7 +244,7 @@ async def get_vault_secret_metadata(
             detail=f"Vault instance '{vault_name}' is not connected",
         )
 
-    metadata = vault.get_secret_metadata(request.path)
+    metadata = vault.get_secret_metadata(request.path, request.mount_point)
 
     if metadata is None:
         VAULT_OPERATIONS_TOTAL.labels(operation="get_metadata", status="not_found").inc()

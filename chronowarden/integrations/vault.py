@@ -90,13 +90,14 @@ class VaultIntegration(BaseIntegration):
             logger.exception("Error checking Vault connection")
             return False
 
-    def get_secret(self, path: str, key: Optional[str] = None) -> Optional[dict[str, Any]]:
+    def get_secret(self, path: str, key: Optional[str] = None, mount_point: Optional[str] = None) -> Optional[dict[str, Any]]:
         """
         Retrieve a secret from Vault KV v2 engine.
 
         Args:
             path: Path to the secret within the mount point.
             key: Optional specific key to retrieve from the secret.
+            mount_point: Override the default mount point for this request.
 
         Returns:
             The secret data dictionary or None if not found.
@@ -105,10 +106,12 @@ class VaultIntegration(BaseIntegration):
             logger.error("Not connected to Vault")
             return None
 
+        mount = mount_point if mount_point is not None else self._mount_path
+
         try:
             response = self._client.secrets.kv.v2.read_secret_version(
                 path=path,
-                mount_point=self._mount_path,
+                mount_point=mount,
             )
 
             if response and "data" in response and "data" in response["data"]:
@@ -125,12 +128,13 @@ class VaultIntegration(BaseIntegration):
             logger.exception("Error retrieving secret from Vault")
             return None
 
-    def list_secrets(self, path: str) -> list[str]:
+    def list_secrets(self, path: str, mount_point: Optional[str] = None) -> list[str]:
         """
         List secrets at the given path in Vault.
 
         Args:
             path: Path to list secrets from.
+            mount_point: Override the default mount point for this request.
 
         Returns:
             List of secret names at the path.
@@ -139,10 +143,12 @@ class VaultIntegration(BaseIntegration):
             logger.error("Not connected to Vault")
             return []
 
+        mount = mount_point if mount_point is not None else self._mount_path
+
         try:
             response = self._client.secrets.kv.v2.list_secrets(
                 path=path,
-                mount_point=self._mount_path,
+                mount_point=mount,
             )
 
             if response and "data" in response and "keys" in response["data"]:
@@ -156,12 +162,13 @@ class VaultIntegration(BaseIntegration):
             logger.exception("Error listing secrets from Vault")
             return []
 
-    def get_secret_metadata(self, path: str) -> Optional[dict[str, Any]]:
+    def get_secret_metadata(self, path: str, mount_point: Optional[str] = None) -> Optional[dict[str, Any]]:
         """
         Get metadata about a secret from Vault.
 
         Args:
             path: Path to the secret.
+            mount_point: Override the default mount point for this request.
 
         Returns:
             Metadata dictionary including creation_time, updated_time, version, etc.
@@ -170,10 +177,12 @@ class VaultIntegration(BaseIntegration):
             logger.error("Not connected to Vault")
             return None
 
+        mount = mount_point if mount_point is not None else self._mount_path
+
         try:
             response = self._client.secrets.kv.v2.read_secret_metadata(
                 path=path,
-                mount_point=self._mount_path,
+                mount_point=mount,
             )
 
             if response and "data" in response:
