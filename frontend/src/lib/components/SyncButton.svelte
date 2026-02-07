@@ -52,7 +52,7 @@
         {/each}
         <div class="border-t border-gray-700">
           <button
-            onclick={() => { vaults.forEach(v => handleSync(v)); }}
+            onclick={async () => { for (const v of vaults) { await handleSync(v); } }}
             class="w-full text-left px-4 py-2 text-sm text-indigo-400 hover:bg-gray-700 transition-colors font-medium"
           >
             Sync All

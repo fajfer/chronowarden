@@ -5,8 +5,9 @@
 <script lang="ts">
   import type { Owner, NotificationRoute } from '$lib/types';
 
-  let { owner = null, onClose, onSave }: {
+  let { owner = null, open = false, onClose, onSave }: {
     owner?: Owner | null;
+    open?: boolean;
     onClose: () => void;
     onSave?: (data: Partial<Owner>) => void;
   } = $props();
@@ -25,15 +26,12 @@
   }
 </script>
 
-{#if owner !== null || owner === undefined}
-  <!-- Only render if explicitly opened -->
-{/if}
-
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 hidden" onclick={onClose}>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md mx-4"
-       onclick={(e: MouseEvent) => e.stopPropagation()}>
+{#if open}
+  <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick={onClose}>
+    <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+    <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md mx-4"
+         onclick={(e: MouseEvent) => e.stopPropagation()}>
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
       <h2 class="text-lg font-semibold text-white">{owner ? 'Edit Owner' : 'Create Owner'}</h2>
       <button onclick={onClose} class="text-gray-400 hover:text-white text-xl">&times;</button>
@@ -73,4 +71,4 @@
       </button>
     </div>
   </div>
-</div>
+{/if}
