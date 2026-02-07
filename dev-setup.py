@@ -28,17 +28,26 @@ logger = logging.getLogger(__name__)
 # Container configurations
 CONTAINERS = {
     "openbao-dev": {
-        "image": "quay.io/openbao/openbao",
+        "image": "quay.io/openbao/openbao:2.5.0",
         "ports": ["127.0.0.1:8200:8200"],
         "name": "openbao-dev",
         "token_pattern": r"Root Token:\s*([a-zA-Z0-9._-]+)",
         "ready_pattern": r"OpenBao server started",
     },
-    "dev-vault": {
-        "image": "hashicorp/vault",
+    "dev-vault-1.21.3": {
+        "image": "hashicorp/vault:1.21.3",
         "ports": ["127.0.0.1:8201:8201"],
-        "name": "dev-vault",
+        "name": "dev-vault-1.21.3",
         "env": ["VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8201"],
+        "cap_add": ["IPC_LOCK"],
+        "token_pattern": r"Root Token:\s*([a-zA-Z0-9._-]+)",
+        "ready_pattern": r"Vault server started",
+    },
+    "dev-vault-1.20.1": {
+        "image": "hashicorp/vault:1.20.1",
+        "ports": ["127.0.0.1:8202:8202"],
+        "name": "dev-vault-1.20.1",
+        "env": ["VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8202"],
         "cap_add": ["IPC_LOCK"],
         "token_pattern": r"Root Token:\s*([a-zA-Z0-9._-]+)",
         "ready_pattern": r"Vault server started",
@@ -144,9 +153,16 @@ def create_dev_config(tokens: dict[str, str]) -> None:
                 "verify_ssl": False,
             },
             {
-                "name": "dev-vault",
+                "name": "dev-vault-1.21.3",
                 "address": "http://localhost:8201",
-                "token": tokens.get("dev-vault", "REPLACE_WITH_ACTUAL_TOKEN"),
+                "token": tokens.get("dev-vault-1.21.3", "REPLACE_WITH_ACTUAL_TOKEN"),
+                "mount_path": "secret",
+                "verify_ssl": False,
+            },
+            {
+                "name": "dev-vault-1.20.1",
+                "address": "http://localhost:8202",
+                "token": tokens.get("dev-vault-1.20.1", "REPLACE_WITH_ACTUAL_TOKEN"),
                 "mount_path": "secret",
                 "verify_ssl": False,
             },
@@ -265,7 +281,8 @@ def main():
     logger.info("Populating vaults with test data...")
     vault_addresses = {
         "openbao-dev": "http://localhost:8200",
-        "dev-vault": "http://localhost:8201",
+        "dev-vault-1.21.3": "http://localhost:8201",
+        "dev-vault-1.20.1": "http://localhost:8202",
     }
 
     for container_name, token in tokens.items():
