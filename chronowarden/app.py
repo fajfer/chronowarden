@@ -13,7 +13,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
-from chronowarden.api import health_router, secrets_router, sync_router, vault_router
+from chronowarden.api import health_router, owners_router, secrets_router, sync_router, vault_router
 from chronowarden.config import AppConfig, load_config
 from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
@@ -81,6 +81,7 @@ app = FastAPI(
         {"name": "secrets", "description": "Secret management operations"},
         {"name": "vault", "description": "HashiCorp Vault integration"},
         {"name": "sync", "description": "Metadata synchronization"},
+        {"name": "owners", "description": "Owner profile management"},
     ],
 )
 
@@ -88,6 +89,7 @@ app = FastAPI(
 app.include_router(secrets_router, prefix="/api/v1")
 app.include_router(vault_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
+app.include_router(owners_router, prefix="/api/v1")
 
 
 @app.get("/", summary="Root endpoint")
