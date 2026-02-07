@@ -15,6 +15,7 @@ This document contains critical information about working with this codebase. Fo
    - Functions must be focused and small
    - Follow existing patterns exactly
    - Line length: 120 chars maximum
+   - Each time, you add a new integration make changes to the architecture as well
 
 2. Testing Requirements
    - Coverage: test edge cases and errors

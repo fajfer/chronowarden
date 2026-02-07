@@ -16,6 +16,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "pydantic>=2.10.0",
+    "pyyaml>=6.0.0",
     "hvac>=2.3.0",
     "prometheus-client>=0.21.0",
 ]

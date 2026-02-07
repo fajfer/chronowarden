@@ -82,6 +82,25 @@ class Router(BaseModel):
 uv sync
 ```
 
+### Development Setup
+
+For local development, use the provided setup script to ensure development Vault instances are running and create a config file:
+
+```bash
+python dev-setup.py
+```
+
+This script will:
+- Check if `openbao-dev` (port 8200) and `dev-vault` (port 8201) containers are running
+- Start them if needed using the commands from the integration tests section
+- Extract root tokens from container logs
+- Create `config.yaml` with both vaults configured
+
+Cleanup with:
+```bash
+docker stop dev-vault openbao-dev && docker rm dev-vault openbao-dev
+```
+
 ### Running the server
 
 ```bash

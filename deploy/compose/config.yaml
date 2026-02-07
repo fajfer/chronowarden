@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+# Example: Docker/Podman Compose deployment
+#
+# Usage with compose.yaml:
+#
+#   services:
+#     chronowarden:
+#       image: chronowarden:latest
+#       environment:
+#         CHRONOWARDEN_CONFIG: /etc/chronowarden/config.yaml
+#         VAULT_TOKEN: hvs.your-vault-token
+#       volumes:
+#         - ./deploy/compose/config.yaml:/etc/chronowarden/config.yaml:ro
+
+vaults:
+  - name: vault
+    address: http://vault:8200
+    token_env: VAULT_TOKEN
+    mount_path: secret
+    verify_ssl: false

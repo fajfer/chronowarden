@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+# Example: Kubernetes deployment with ConfigMap + Secret
+#
+# 1. Create this as a ConfigMap:
+#      kubectl create configmap chronowarden-config --from-file=config.yaml=deploy/kubernetes/config.yaml
+#
+# 2. Create a Secret for the Vault tokens:
+#      kubectl create secret generic chronowarden-vault-tokens \
+#        --from-literal=VAULT_PROD_TOKEN=hvs.actual-production-token \
+#        --from-literal=VAULT_STAGING_TOKEN=hvs.actual-staging-token
+#
+# 3. Mount the ConfigMap and inject Secret as env vars in your Deployment:
+#
+#    spec:
+#      containers:
+#        - name: chronowarden
+#          image: chronowarden:latest
+#          envFrom:
+#            - secretRef:
+#                name: chronowarden-vault-tokens
+#          env:
+#            - name: CHRONOWARDEN_CONFIG
+#              value: /etc/chronowarden/config.yaml
+#          volumeMounts:
+#            - name: config
+#              mountPath: /etc/chronowarden
+#              readOnly: true
+#      volumes:
+#        - name: config
+#          configMap:
+#            name: chronowarden-config
+
+vaults:
+  - name: production
+    address: https://vault.production.example.com:8200
+    token_env: VAULT_PROD_TOKEN
+    namespace: app/chronowarden
+    mount_path: secret
+    verify_ssl: true
+
+  - name: staging
+    address: https://vault.staging.example.com:8200
+    token_env: VAULT_STAGING_TOKEN
+    mount_path: secret
+    verify_ssl: true

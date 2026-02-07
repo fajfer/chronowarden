@@ -1,0 +1,11 @@
+vaults:
+- name: dev-openbao
+  address: http://localhost:8200
+  token: s.yeECu4biujCG9Dh1JIaKtcou
+  mount_path: secret
+  verify_ssl: false
+- name: dev-vault
+  address: http://localhost:8201
+  token: hvs.RVH5gL3fHGnabKEn83cL5SDN
+  mount_path: secret
+  verify_ssl: false

@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+# Chronowarden Configuration
+#
+# This file can be used as:
+#   - A plain YAML config file (set CHRONOWARDEN_CONFIG env var or place at /etc/chronowarden/config.yaml)
+#   - A Kubernetes ConfigMap (mount at /etc/chronowarden/config.yaml)
+#   - Part of a Docker/Podman Compose setup (bind mount into container)
+#
+# Sensitive values (tokens) can be provided via:
+#   - token:      literal value (for development only)
+#   - token_env:  environment variable name (Docker Compose .env, K8s env from Secret)
+#   - token_file: file path (K8s Secret volume mount, Docker secret)
+#
+# Token resolution priority: token_file > token_env > token
+
+vaults:
+  # Production Vault cluster
+  - name: production
+    address: https://vault.production.example.com:8200
+    token_env: VAULT_PRODUCTION_TOKEN
+    namespace: app/chronowarden
+    mount_path: secret
+    verify_ssl: true
+    auth_method: token
+
+  # Staging Vault (OpenBao fork)
+  - name: staging
+    address: https://openbao.staging.example.com:8200
+    token_file: /run/secrets/staging-vault-token
+    mount_path: kv
+    verify_ssl: true
+    auth_method: token
+
+  # Local development Vault
+  - name: dev
+    address: http://localhost:8200
+    token: hvs.dev-only-token
+    mount_path: secret
+    verify_ssl: false
+    auth_method: token
