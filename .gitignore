@@ -49,7 +49,7 @@ htmlcov/
 config.yaml
 
 # Database
-chronowarden.db
+chronowarden.db*
 
 # Build artifacts
 *.log
