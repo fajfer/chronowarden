@@ -6,7 +6,7 @@
 
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -128,7 +128,7 @@ class Database:
                 entry.ttl,
                 entry.severity,
                 1 if entry.enabled else 0,
-                entry.last_synced or datetime.utcnow().isoformat(),
+                entry.last_synced or datetime.now(tz=timezone.utc).isoformat(),
             ),
         )
         self._conn.commit()
