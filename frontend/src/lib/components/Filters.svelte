@@ -3,11 +3,10 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import { filters, setSearch, toggleEngineType, toggleStatus, clearFilters } from '$lib/stores/filters';
-  import type { EngineType, SecretStatus } from '$lib/types';
+  import { filters, setSearch, toggleStatus, clearFilters } from '$lib/stores/filters';
+  import type { SecretStatus } from '$lib/types';
 
-  const engineTypes: EngineType[] = ['manual', 'azure_keyvault', 'hashicorp_vault', 'x509'];
-  const statuses: SecretStatus[] = ['healthy', 'warning', 'critical', 'expired'];
+  const statuses: SecretStatus[] = ['ok', 'warning', 'expired', 'no_ttl'];
 </script>
 
 <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-3">
@@ -18,7 +17,7 @@
 
   <input
     type="text"
-    placeholder="Search by name…"
+    placeholder="Search by path…"
     value={$filters.search}
     oninput={(e: Event) => setSearch((e.target as HTMLInputElement).value)}
     class="w-full px-3 py-2 text-sm bg-gray-900 border border-gray-600 rounded-lg text-gray-200
@@ -26,22 +25,6 @@
   />
 
   <div class="flex flex-wrap gap-4 text-xs">
-    <div>
-      <p class="text-gray-500 uppercase mb-1">Engine Type</p>
-      <div class="flex flex-wrap gap-1">
-        {#each engineTypes as et}
-          <button
-            onclick={() => toggleEngineType(et)}
-            class="px-2 py-1 rounded {$filters.engineTypes.includes(et)
-              ? 'bg-indigo-600 text-white'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}"
-          >
-            {et}
-          </button>
-        {/each}
-      </div>
-    </div>
-
     <div>
       <p class="text-gray-500 uppercase mb-1">Status</p>
       <div class="flex flex-wrap gap-1">

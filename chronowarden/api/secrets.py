@@ -1,153 +1,219 @@
-# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-"""API routes for secrets management."""
+"""API routes for secret metadata retrieval and management."""
 
-from datetime import datetime
-from typing import Optional
+import logging
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from chronowarden.models import EngineType, Secret, SecretCreate, SecretUpdate
+from chronowarden.database import SecretMetadataCache
+from chronowarden.models.secret import SecretMetadataResponse, SecretMetadataUpdate, SecretStatus
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 
-# NOTE: In-memory storage for demo purposes only.
-# In production, replace with persistent database (e.g., PostgreSQL, SQLite)
-_secrets_db: dict[int, Secret] = {}
-_next_id = 1
+logger = logging.getLogger(__name__)
 
 
-@router.get("/", response_model=list[Secret], summary="List all secrets")
-async def list_secrets(
-    engine_type: Optional[EngineType] = Query(None, description="Filter by engine type"),
-    is_public: Optional[bool] = Query(None, description="Filter by public visibility"),
-) -> list[Secret]:
+def _get_app_dependencies() -> tuple[Any, Any, Any]:
     """
-    List all secrets with optional filtering.
-
-    Args:
-        engine_type: Filter by secret engine type.
-        is_public: Filter by public visibility status.
+    Get the database, config, and vault manager from the app module.
 
     Returns:
-        List of secrets matching the filters.
+        Tuple of (Database, AppConfig, VaultManager).
     """
-    secrets = list(_secrets_db.values())
+    from chronowarden.app import app_config, db, vault_manager
 
-    if engine_type is not None:
-        secrets = [s for s in secrets if s.engine_type == engine_type]
-
-    if is_public is not None:
-        secrets = [s for s in secrets if s.is_public == is_public]
-
-    return secrets
+    return db, app_config, vault_manager
 
 
-@router.post("/", response_model=Secret, status_code=status.HTTP_201_CREATED, summary="Create a new secret")
-async def create_secret(secret_data: SecretCreate) -> Secret:
+def _compute_status(days_remaining: Optional[int]) -> SecretStatus:
     """
-    Create a new secret.
+    Compute the secret status from days remaining.
 
     Args:
-        secret_data: Secret creation data.
+        days_remaining: Number of days until expiry, or None.
 
     Returns:
-        The created secret.
+        The computed SecretStatus.
     """
-    global _next_id
+    if days_remaining is None:
+        return SecretStatus.NO_TTL
+    if days_remaining <= 0:
+        return SecretStatus.EXPIRED
+    if days_remaining <= 30:
+        return SecretStatus.WARNING
+    return SecretStatus.OK
 
-    secret = Secret(
-        id=_next_id,
-        created_at=datetime.now(),
-        **secret_data.model_dump(),
+
+def _enrich_secret(entry: SecretMetadataCache, config: Any) -> SecretMetadataResponse:
+    """
+    Build a SecretMetadataResponse from a cache entry with computed fields.
+
+    Args:
+        entry: The raw database cache entry.
+        config: Application configuration for severity/rotation lookups.
+
+    Returns:
+        Enriched response model.
+    """
+    from chronowarden.metadata import parse_date
+
+    severity = entry.severity or "default"
+    rotation_days = config.get_rotation_days(severity)
+    date_format = config.resolve_date_format(entry.vault_name)
+
+    ttl_date: Optional[datetime] = None
+    days_remaining: Optional[int] = None
+
+    if entry.ttl:
+        ttl_date = parse_date(entry.ttl, date_format)
+        if ttl_date is not None:
+            now = datetime.now(tz=timezone.utc)
+            if ttl_date.tzinfo is None:
+                ttl_date = ttl_date.replace(tzinfo=timezone.utc)
+            days_remaining = (ttl_date - now).days
+
+    last_synced: Optional[datetime] = None
+    if entry.last_synced:
+        last_synced = parse_date(entry.last_synced)
+
+    return SecretMetadataResponse(
+        id=entry.id or 0,
+        vault_name=entry.vault_name,
+        engine_id=entry.engine_id,
+        secret_path=entry.secret_path,
+        full_path=f"{entry.vault_name}/{entry.engine_id}/{entry.secret_path}",
+        ttl=entry.ttl,
+        ttl_date=ttl_date,
+        days_remaining=days_remaining,
+        severity=severity,
+        rotation_period_days=rotation_days,
+        enabled=entry.enabled,
+        last_synced=last_synced,
+        status=_compute_status(days_remaining),
     )
-    _secrets_db[_next_id] = secret
-    _next_id += 1
-
-    return secret
 
 
-@router.get("/{secret_id}", response_model=Secret, summary="Get a secret by ID")
-async def get_secret(secret_id: int) -> Secret:
+@router.get("/", response_model=list[SecretMetadataResponse], summary="List cached secret metadata")
+async def list_secrets(
+    vault_name: Optional[str] = Query(None, description="Filter by vault instance name"),
+    engine_id: Optional[str] = Query(None, description="Filter by engine mount path"),
+    severity: Optional[str] = Query(None, description="Filter by severity profile"),
+    enabled: Optional[bool] = Query(None, description="Filter by monitoring enabled/disabled"),
+) -> list[SecretMetadataResponse]:
     """
-    Retrieve a secret by its ID.
+    List all cached secret metadata with optional filtering.
 
     Args:
-        secret_id: The secret's unique identifier.
+        vault_name: Filter by vault instance name.
+        engine_id: Filter by engine mount path.
+        severity: Filter by severity profile.
+        enabled: Filter by monitoring enabled/disabled.
 
     Returns:
-        The requested secret.
-
-    Raises:
-        HTTPException: If secret not found.
+        List of enriched secret metadata entries.
     """
-    if secret_id not in _secrets_db:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Secret with id {secret_id} not found",
-        )
+    database, config, _ = _get_app_dependencies()
+    entries = database.list_all_secrets(
+        vault_name=vault_name,
+        engine_id=engine_id,
+        severity=severity,
+        enabled=enabled,
+    )
+    return [_enrich_secret(e, config) for e in entries]
 
-    return _secrets_db[secret_id]
 
-
-@router.put("/{secret_id}", response_model=Secret, summary="Update a secret")
-async def update_secret(secret_id: int, secret_update: SecretUpdate) -> Secret:
+@router.get("/{secret_id}", response_model=SecretMetadataResponse, summary="Get cached secret metadata by ID")
+async def get_secret(secret_id: int) -> SecretMetadataResponse:
     """
-    Update an existing secret.
+    Retrieve cached secret metadata by its database ID.
 
     Args:
-        secret_id: The secret's unique identifier.
-        secret_update: Fields to update.
+        secret_id: The secret metadata cache row ID.
 
     Returns:
-        The updated secret.
+        Enriched secret metadata.
 
     Raises:
-        HTTPException: If secret not found.
+        HTTPException: If secret not found in cache.
     """
-    if secret_id not in _secrets_db:
+    database, config, _ = _get_app_dependencies()
+    entry = database.get_secret_by_id(secret_id)
+
+    if entry is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Secret with id {secret_id} not found",
+            detail=f"Secret with id {secret_id} not found in cache",
         )
 
-    existing = _secrets_db[secret_id]
-    update_data = secret_update.model_dump(exclude_unset=True)
-
-    updated_secret = existing.model_copy(update=update_data)
-    _secrets_db[secret_id] = updated_secret
-
-    return updated_secret
+    return _enrich_secret(entry, config)
 
 
-@router.delete("/{secret_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a secret")
-async def delete_secret(secret_id: int) -> None:
+@router.patch("/{secret_id}", response_model=SecretMetadataResponse, summary="Update secret metadata")
+async def update_secret_metadata(secret_id: int, body: SecretMetadataUpdate) -> SecretMetadataResponse:
     """
-    Delete a secret by its ID.
+    Update Chronowarden-specific metadata fields for a cached secret.
+
+    Only severity and enabled can be modified. Changes are written to
+    both the local cache and the vault's custom_metadata.
 
     Args:
-        secret_id: The secret's unique identifier.
-
-    Raises:
-        HTTPException: If secret not found.
-    """
-    if secret_id not in _secrets_db:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Secret with id {secret_id} not found",
-        )
-
-    del _secrets_db[secret_id]
-
-
-@router.get("/public/", response_model=list[Secret], summary="List public secrets")
-async def list_public_secrets() -> list[Secret]:
-    """
-    List all publicly visible secrets (no authentication required).
+        secret_id: The secret metadata cache row ID.
+        body: Fields to update.
 
     Returns:
-        List of public secrets.
+        The updated secret metadata.
+
+    Raises:
+        HTTPException: If secret not found or vault is unavailable.
     """
-    return [s for s in _secrets_db.values() if s.is_public]
+    database, config, manager = _get_app_dependencies()
+    entry = database.get_secret_by_id(secret_id)
+
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Secret with id {secret_id} not found in cache",
+        )
+
+    vault = manager.get(entry.vault_name)
+    if not vault or not vault.is_connected():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Vault instance '{entry.vault_name}' is not connected",
+        )
+
+    metadata_fields: dict[str, str] = {}
+    if body.severity is not None:
+        metadata_fields["chronowarden_severity"] = body.severity
+    if body.enabled is not None:
+        metadata_fields["chronowarden_enabled"] = str(body.enabled).lower()
+
+    if metadata_fields:
+        try:
+            vault.write_secret_metadata(entry.secret_path, metadata_fields, mount_point=entry.engine_id)
+        except Exception:
+            logger.exception("Failed to write metadata to vault for secret %d", secret_id)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to update metadata in vault",
+            )
+
+    database.update_secret_metadata_fields(
+        secret_id,
+        severity=body.severity,
+        enabled=body.enabled,
+    )
+
+    updated = database.get_secret_by_id(secret_id)
+    if updated is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Secret with id {secret_id} not found after update",
+        )
+
+    return _enrich_secret(updated, config)

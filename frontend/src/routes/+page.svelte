@@ -7,8 +7,7 @@
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import SecretModal from '$lib/components/SecretModal.svelte';
   import { secretStats, criticalSecrets, secretsLoading, secretsError } from '$lib/stores/secrets';
-  import { formatDate, getDaysUntilExpiry } from '$lib/utils/dateFormat';
-  import { getStatusFromDays } from '$lib/utils/statusColor';
+  import { formatDate } from '$lib/utils/dateFormat';
   import type { Secret } from '$lib/types';
 
   let selectedSecret = $state<Secret | null>(null);
@@ -33,21 +32,21 @@
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <StatsCard title="Total Secrets" value={$secretStats.total} color="text-white" />
-      <StatsCard title="Healthy" value={$secretStats.healthy} color="text-green-400" bgColor="bg-green-900/20" />
+      <StatsCard title="OK" value={$secretStats.ok} color="text-green-400" bgColor="bg-green-900/20" />
       <StatsCard title="Warning" value={$secretStats.warning} color="text-yellow-400" bgColor="bg-yellow-900/20" />
-      <StatsCard title="Critical" value={$secretStats.critical} color="text-red-400" bgColor="bg-red-900/20" />
-      <StatsCard title="Expired" value={$secretStats.expired} color="text-gray-500" bgColor="bg-gray-800" />
+      <StatsCard title="Expired" value={$secretStats.expired} color="text-red-400" bgColor="bg-red-900/20" />
+      <StatsCard title="No TTL" value={$secretStats.noTtl} color="text-gray-500" bgColor="bg-gray-800" />
     </div>
 
     <!-- Critical Secrets Table -->
     <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
       <div class="px-6 py-4 border-b border-gray-700">
-        <h2 class="text-lg font-semibold text-white">Critical & Expired Secrets</h2>
+        <h2 class="text-lg font-semibold text-white">Warning & Expired Secrets</h2>
       </div>
 
       {#if $criticalSecrets.length === 0}
         <div class="px-6 py-12 text-center text-gray-500">
-          <p class="text-lg">🎉 No critical or expired secrets</p>
+          <p class="text-lg">🎉 No warning or expired secrets</p>
           <p class="text-sm mt-1">All secrets are healthy</p>
         </div>
       {:else}
@@ -55,27 +54,24 @@
           <table class="w-full text-sm">
             <thead>
               <tr class="text-gray-400 text-xs uppercase border-b border-gray-700">
-                <th class="px-4 py-3 text-left">Name</th>
-                <th class="px-4 py-3 text-left">Engine Type</th>
-                <th class="px-4 py-3 text-left">Owner ID</th>
-                <th class="px-4 py-3 text-left">Expiry</th>
+                <th class="px-4 py-3 text-left">Path</th>
+                <th class="px-4 py-3 text-left">Severity</th>
+                <th class="px-4 py-3 text-left">TTL</th>
                 <th class="px-4 py-3 text-left">Days</th>
                 <th class="px-4 py-3 text-left">Status</th>
               </tr>
             </thead>
             <tbody>
               {#each $criticalSecrets as secret}
-                {@const days = getDaysUntilExpiry(secret.expiry_date)}
                 <tr
                   class="border-b border-gray-700/50 hover:bg-gray-700/30 cursor-pointer transition-colors"
                   onclick={() => selectedSecret = secret}
                 >
-                  <td class="px-4 py-3 font-medium text-gray-200">{secret.name}</td>
-                  <td class="px-4 py-3 text-gray-400">{secret.engine_type}</td>
-                  <td class="px-4 py-3 text-gray-400">{secret.owner_id}</td>
-                  <td class="px-4 py-3 text-gray-400">{formatDate(secret.expiry_date)}</td>
-                  <td class="px-4 py-3 text-gray-200">{days ?? '—'}</td>
-                  <td class="px-4 py-3"><StatusBadge status={getStatusFromDays(days)} /></td>
+                  <td class="px-4 py-3 font-medium text-gray-200">{secret.full_path}</td>
+                  <td class="px-4 py-3 text-gray-400">{secret.severity}</td>
+                  <td class="px-4 py-3 text-gray-400">{formatDate(secret.ttl_date)}</td>
+                  <td class="px-4 py-3 text-gray-200">{secret.days_remaining ?? '—'}</td>
+                  <td class="px-4 py-3"><StatusBadge status={secret.status} /></td>
                 </tr>
               {/each}
             </tbody>
