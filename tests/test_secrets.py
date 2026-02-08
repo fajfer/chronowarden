@@ -420,7 +420,7 @@ class TestSecretsAPI:
             assert response.status_code == 405
 
     def test_removed_endpoints_public(self) -> None:
-        """Test that GET /secrets/public/ no longer exists."""
+        """Test that GET /secrets/public/ no longer exists (returns 422 since 'public' is not a valid int ID)."""
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),

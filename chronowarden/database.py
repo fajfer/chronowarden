@@ -358,12 +358,13 @@ class Database:
         _ALLOWED_COLUMNS = {"severity", "enabled"}
         updates = []
         params: list = []
-        field_map: dict = {"severity": severity, "enabled": (1 if enabled else 0) if enabled is not None else None}
 
-        for column, value in field_map.items():
-            if value is not None and column in _ALLOWED_COLUMNS:
-                updates.append(f"{column} = ?")
-                params.append(value)
+        if severity is not None:
+            updates.append("severity = ?")
+            params.append(severity)
+        if enabled is not None:
+            updates.append("enabled = ?")
+            params.append(1 if enabled else 0)
 
         if not updates:
             return False
