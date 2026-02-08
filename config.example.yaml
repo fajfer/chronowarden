@@ -43,7 +43,7 @@ expiry_profiles:
 #   3. Vault config (vaults[].severity)
 #   4. Global default ("default" profile / 365 days)
 #
-# Config is the source of truth - Vault metadata is written BY Chronowarden
+# Config is the source of truth - Vault metadata is written by Chronowarden
 
 vaults:
   # Production Vault cluster
