@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+env/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+
+# Development
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# CI/CD
+.github/
+
+# Documentation
+*.md
+docs/
+roadmap/
+
+# Test data
+tests/
+chronowarden.db
+chronowarden.db-shm
+chronowarden.db-wal
+config.yaml
+config.example.yaml
+
+# Deployment configs (user provides these)
+deploy/
+
+# Licenses (already in code headers)
+LICENSE
+LICENSES/

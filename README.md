@@ -5,6 +5,12 @@ SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 SPDX-License-Identifier: EUPL-1.2
 -->
 
+[![CI](https://github.com/fajfer/chronowarden/actions/workflows/ci.yml/badge.svg)](https://github.com/fajfer/chronowarden/actions/workflows/ci.yml)
+[![E2E Tests](https://github.com/fajfer/chronowarden/actions/workflows/e2e.yml/badge.svg)](https://github.com/fajfer/chronowarden/actions/workflows/e2e.yml)
+[![Docker](https://github.com/fajfer/chronowarden/actions/workflows/docker.yml/badge.svg)](https://github.com/fajfer/chronowarden/actions/workflows/docker.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/fajfer/chronowarden/badge)](https://securityscorecards.dev/viewer/?uri=github.com/fajfer/chronowarden)
+[![REUSE status](https://api.reuse.software/badge/github.com/fajfer/chronowarden)](https://api.reuse.software/info/github.com/fajfer/chronowarden)
+
 **Monitor and track expiring secrets across your Vault infrastructure**
 
 Chronowarden is a secret lifecycle observability service that syncs with your secret providers, tracking TTLs and rotation requirements through custom metadata. It provides a web UI and REST API to visualize secret health and alert on expiring credentials.
