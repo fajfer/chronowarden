@@ -1,8 +1,10 @@
-# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 #
 # SPDX-License-Identifier: EUPL-1.2
 
 """API routes for health and metrics."""
+
+from importlib.metadata import metadata, version
 
 from fastapi import APIRouter, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -19,6 +21,21 @@ async def health_check() -> dict[str, str]:
         Health status.
     """
     return {"status": "healthy"}
+
+
+@router.get("/info", summary="API information endpoint")
+async def api_info() -> dict[str, str]:
+    """
+    Return API name, version and documentation link.
+
+    Returns:
+        API information dictionary.
+    """
+    return {
+        "name": metadata("chronowarden")["Name"] + " API",
+        "version": version("chronowarden"),
+        "docs": "/docs",
+    }
 
 
 @router.get("/ready", summary="Readiness check endpoint")

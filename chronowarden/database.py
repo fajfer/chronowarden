@@ -94,6 +94,22 @@ class Database:
                 default_severity TEXT,
                 UNIQUE(vault_name, engine_id)
             );
+
+            CREATE TABLE IF NOT EXISTS owners (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS notification_routes (
+                id TEXT PRIMARY KEY,
+                owner_id TEXT NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+                type TEXT NOT NULL CHECK(type IN ('email', 'webhook')),
+                address TEXT NOT NULL,
+                message_template TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
         """)
         self._conn.commit()
 
@@ -294,4 +310,99 @@ class Database:
             """,
             (vault_name, engine_id, secret_path),
         )
+        self._conn.commit()
+
+    def create_owner(self, owner_id: str, name: str, email: str) -> None:
+        """Create a new owner profile."""
+        if self._conn is None:
+            logger.error("Database not connected")
+            return
+        self._conn.execute(
+            "INSERT INTO owners (id, name, email) VALUES (?, ?, ?)",
+            (owner_id, name, email),
+        )
+        self._conn.commit()
+
+    def get_owner(self, owner_id: str) -> Optional[dict]:
+        """Get an owner by ID."""
+        if self._conn is None:
+            logger.error("Database not connected")
+            return None
+        cursor = self._conn.execute("SELECT id, name, email, created_at FROM owners WHERE id = ?", (owner_id,))
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return dict(row)
+
+    def list_owners(self) -> list[dict]:
+        """List all owners."""
+        if self._conn is None:
+            logger.error("Database not connected")
+            return []
+        cursor = self._conn.execute("SELECT id, name, email, created_at FROM owners ORDER BY name")
+        return [dict(row) for row in cursor.fetchall()]
+
+    def update_owner(self, owner_id: str, name: Optional[str] = None, email: Optional[str] = None) -> None:
+        """Update an owner profile."""
+        if self._conn is None:
+            logger.error("Database not connected")
+            return
+
+        _ALLOWED_COLUMNS = {"name", "email"}
+        updates = []
+        params: list = []
+        field_map = {"name": name, "email": email}
+
+        for column, value in field_map.items():
+            if value is not None and column in _ALLOWED_COLUMNS:
+                updates.append(f"{column} = ?")
+                params.append(value)
+
+        if not updates:
+            return
+        params.append(owner_id)
+        query = "UPDATE owners SET " + ", ".join(updates) + " WHERE id = ?"
+        self._conn.execute(query, params)
+        self._conn.commit()
+
+    def delete_owner(self, owner_id: str) -> None:
+        """Delete an owner and their notification routes."""
+        if self._conn is None:
+            logger.error("Database not connected")
+            return
+        self._conn.execute("DELETE FROM notification_routes WHERE owner_id = ?", (owner_id,))
+        self._conn.execute("DELETE FROM owners WHERE id = ?", (owner_id,))
+        self._conn.commit()
+
+    def create_notification_route(
+        self, route_id: str, owner_id: str, route_type: str, address: str, message_template: str
+    ) -> None:
+        """Create a notification route for an owner."""
+        if self._conn is None:
+            logger.error("Database not connected")
+            return
+        self._conn.execute(
+            "INSERT INTO notification_routes (id, owner_id, type, address, message_template) VALUES (?, ?, ?, ?, ?)",
+            (route_id, owner_id, route_type, address, message_template),
+        )
+        self._conn.commit()
+
+    def list_notification_routes(self, owner_id: str) -> list[dict]:
+        """List notification routes for an owner."""
+        if self._conn is None:
+            logger.error("Database not connected")
+            return []
+        cursor = self._conn.execute(
+            "SELECT id, owner_id, type, address, message_template, created_at "
+            "FROM notification_routes WHERE owner_id = ?",
+            (owner_id,),
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    def delete_notification_route(self, route_id: str) -> None:
+        """Delete a notification route."""
+        if self._conn is None:
+            logger.error("Database not connected")
+            return
+        self._conn.execute("DELETE FROM notification_routes WHERE id = ?", (route_id,))
         self._conn.commit()

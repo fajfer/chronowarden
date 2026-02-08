@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 #
 # SPDX-License-Identifier: EUPL-1.2
 
@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -49,7 +49,10 @@ htmlcov/
 config.yaml
 
 # Database
-chronowarden.db
+chronowarden.db*
 
 # Build artifacts
 *.log
+
+# SvelteKit
+.svelte-kit/
