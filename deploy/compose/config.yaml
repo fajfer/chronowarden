@@ -14,6 +14,10 @@
 #         VAULT_TOKEN: hvs.your-vault-token
 #       volumes:
 #         - ./deploy/compose/config.yaml:/etc/chronowarden/config.yaml:ro
+#         - ./certs:/etc/chronowarden/certs:ro  # Mount custom CA certificates
+
+# Global CA certificates directory (uncomment for production with custom certs)
+# ca_certs_dir: /etc/chronowarden/certs
 
 vaults:
   - name: vault

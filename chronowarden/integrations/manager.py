@@ -5,6 +5,8 @@
 """Vault connection manager for multiple Vault instances."""
 
 import logging
+import tempfile
+from pathlib import Path
 from typing import Any, Optional
 
 from chronowarden.config import AppConfig, VaultConfig
@@ -20,6 +22,7 @@ class VaultManager:
     def __init__(self) -> None:
         """Initialize the Vault manager with empty connections."""
         self._vaults: dict[str, VaultIntegration] = {}
+        self._ca_bundle_path: Optional[str] = None
 
     @property
     def vault_names(self) -> list[str]:
@@ -45,6 +48,10 @@ class VaultManager:
         Args:
             config: Application configuration containing vault definitions.
         """
+        # Create global CA bundle if directory is configured
+        if config.ca_certs_dir:
+            self._ca_bundle_path = self._create_ca_bundle(config.ca_certs_dir)
+        
         for vault_config in config.vaults:
             self._connect_vault(vault_config)
 
@@ -67,6 +74,60 @@ class VaultManager:
             result[name] = health
         return result
 
+    def _create_ca_bundle(self, certs_dir: str) -> Optional[str]:
+        """
+        Create a CA bundle from all certificates in the specified directory.
+
+        Args:
+            certs_dir: Path to directory containing certificate files.
+
+        Returns:
+            Path to the created CA bundle file, or None if no valid certs found.
+        """
+        cert_dir = Path(certs_dir)
+        if not cert_dir.is_dir():
+            logger.warning("CA certs directory does not exist: %s", certs_dir)
+            return None
+        
+        # Find all certificate files
+        cert_files = []
+        for pattern in ["*.pem", "*.crt", "*.cert"]:
+            cert_files.extend(cert_dir.glob(pattern))
+        
+        if not cert_files:
+            logger.warning("No certificate files found in %s", certs_dir)
+            return None
+        
+        # Load all certificates
+        bundle_content = []
+        for cert_file in cert_files:
+            try:
+                content = cert_file.read_text()
+                bundle_content.append(content)
+                logger.info("Loaded CA certificate: %s", cert_file.name)
+            except OSError:
+                logger.exception("Failed to read certificate file: %s", cert_file)
+        
+        if not bundle_content:
+            logger.warning("No valid certificates loaded from %s", certs_dir)
+            return None
+        
+        # Create temporary bundle file
+        try:
+            fd, bundle_path = tempfile.mkstemp(suffix=".pem", prefix="chronowarden-ca-")
+            with open(fd, "w") as f:
+                f.write("\n\n".join(bundle_content))
+            logger.info(
+                "Created global CA bundle with %d certificate(s) from %s: %s",
+                len(bundle_content),
+                certs_dir,
+                bundle_path
+            )
+            return bundle_path
+        except OSError:
+            logger.exception("Failed to create CA bundle file")
+            return None
+
     def _connect_vault(self, vault_config: VaultConfig) -> None:
         """
         Connect to a single vault instance from config.
@@ -87,6 +148,7 @@ class VaultManager:
             namespace=vault_config.namespace,
             mount_path=vault_config.mount_path,
             verify_ssl=vault_config.verify_ssl,
+            ca_bundle=self._ca_bundle_path,
         )
 
         if integration.connect():

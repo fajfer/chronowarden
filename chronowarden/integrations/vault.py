@@ -5,6 +5,8 @@
 """HashiCorp Vault integration for Chronowarden."""
 
 import logging
+import tempfile
+from pathlib import Path
 from typing import Any, Optional
 
 import hvac
@@ -25,6 +27,7 @@ class VaultIntegration(BaseIntegration):
         namespace: Optional[str] = None,
         mount_path: str = "secret",
         verify_ssl: bool = True,
+        ca_bundle: Optional[str] = None,
     ) -> None:
         """
         Initialize Vault integration.
@@ -35,12 +38,14 @@ class VaultIntegration(BaseIntegration):
             namespace: Vault namespace (enterprise feature).
             mount_path: KV secrets engine mount path.
             verify_ssl: Whether to verify SSL certificates.
+            ca_bundle: Path to CA certificate bundle file (if global certs configured).
         """
         self._address = address
         self._token = token
         self._namespace = namespace
         self._mount_path = mount_path
         self._verify_ssl = verify_ssl
+        self._ca_bundle = ca_bundle
         self._client: Optional[hvac.Client] = None
 
     def connect(self) -> bool:
@@ -51,11 +56,17 @@ class VaultIntegration(BaseIntegration):
             bool: True if connection and authentication successful.
         """
         try:
+            verify: bool | str = self._verify_ssl
+            
+            # Use global CA bundle if provided
+            if self._verify_ssl and self._ca_bundle:
+                verify = self._ca_bundle
+            
             self._client = hvac.Client(
                 url=self._address,
                 token=self._token,
                 namespace=self._namespace,
-                verify=self._verify_ssl,
+                verify=verify,
             )
 
             if self._client.is_authenticated():
