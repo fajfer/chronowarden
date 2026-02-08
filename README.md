@@ -1,140 +1,228 @@
-## Chronowarden
+# Chronowarden
 <!--
-SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 
 SPDX-License-Identifier: EUPL-1.2
 -->
-Simple service to monitor expiring secrets
 
-## Vault Permissions
-Chronowarden manages (read/write) custom metadata on your Vault secrets to track expiry. It reads secret metadata (creation time, version) and writes custom metadata fields (`chronowarden_ttl`, `chronowarden_severity`, `chronowarden_enabled`). You don't need to expose your actual secret values to this tool.
+**Monitor and track expiring secrets across your Vault infrastructure**
 
-Example:
+Chronowarden is a secret lifecycle observability service that syncs with your secret providers, tracking TTLs and rotation requirements through custom metadata. It provides a web UI and REST API to visualize secret health and alert on expiring credentials.
 
-```hcl
-path "<secret_engine>/metadata/*" {
-  capabilities = ["read", "list", "update"]
-}
+This is very early work being built with focus on compliance for financial institutions ([PCI DSS 4.0](https://www.pcisecuritystandards.org/document_library/), [DORA](https://www.eiopa.europa.eu/digital-operational-resilience-act-dora_en)) and best practices ([NIST SP 800-63B-4](https://csrc.nist.gov/pubs/sp/800/63/b/4/final)) regarding credential rotation.
 
-# Optional: allow engine discovery
-path "sys/mounts" {
-  capabilities = ["read"]
-}
+Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and troubleshoot!
+
+## Features
+
+- **Vendor neutrality** - Connect to multiple backends instances simultaneously
+- **Credential Health Dashboard** - Visual status of secrets (OK, Warning, Expired, No TTL)
+- **Severity Levels** - Classify secrets by (user-defined) compliance requirements (PCI-DSS, Critical, Default)
+- **Secure** - Never reads actual secret values, only metadata
+- **Real-Time Sync** - Live and on-demand synchronization with backends
+- **Prometheus Metrics** - Built-in monitoring endpoint for alerting
+- **Modern Web UI** - SvelteKit frontend with dark mode
+
+## How does it work?
+
+```
+┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│   Vaults    │ ───► │ Chronowarden │ ───► │   Web UI    │
+│ (Multiple)  │      │   Backend    │      │  (Svelte)   │
+└─────────────┘      └──────────────┘      └─────────────┘
+                            │
+                            ▼
+                     ┌──────────────┐
+                     │   SQLite DB  │
+                     │  (Metadata)  │
+                     └──────────────┘
 ```
 
-```python
-class Secret(BaseModel):
-"""this is a base class for secrets from all engines"""
-  id: int
-  name: str
-  description: str
-  # Is the secret visible without logging?
-  is_public: Bool
-  # When the secret itself was created
-  created_at: timedate
-  # When to alert the user (eg. 30 days before)
-  expiry_time_alert: int
-  # How often to remind the user
-  # TODO: Prometheus-style metrics and turn this off
-  expiry_time_interval: int
-  # Who is responsible for management(renewal) of the secret
-  owner: Entity
-  # Who to forward the information to
-  routing: [Router]
-  # What backend does the Secret use
-  backend: SecretEngine
+## Quick Start
 
-class AzureKeyvaultSecret(Secret):
-    """example, didn't check the docs"""
-    subscription_id: int
-    resource_group: str
+### Prerequisites
 
-class Entity(BaseModel):
-    """this is a base class for:
-    - users
-    - technical users
-    - groups
-    """
+- Python 3.11+
+- Node.js 18+ (for frontend)
+- Docker (optional, for dev Vaults)
 
-class SecretEngine(BaseModel):
-    """this is a base class for secrets backend:
-    - manual - purely based on user input
-    - Azure KeyVault - connects to an Azure key vault 
-    - Hashicorp Vault
-    - X.509
-    """
+### Backend Setup
 
-class SecretTemplate(Secret):
-    """predefiniowane defaulty dla secretów"""
+1. **Install dependencies:**
+   ```bash
+   uv sync
+   ```
 
-class Router(BaseModel):
-    """TODO"""
-```
+2. **Configure vaults:**
+   
+   Copy the example config and add your Vault instances:
+   ```bash
+   cp config.example.yaml config.yaml
+   ```
 
-# Uprawnienia
-- Część funkcjonalności jest dostępna bez logowania
-  - Wszystkie secrety z atrybutem `is_public: true`
-  - Przydatne np. dla certyfikatów x509 
-- Rodzaje uprawnień na użytkowniku
-  - read-only
-  - read-write - edycja pól
-  - admin - zarządzanie uprawnieniami dla innych
-- Obiekt utworzony przez ownera jest widoczny tylko dla ownera, chyba, że zostaną zmodyfikowane uprawnienia
-  - Router - np. poświadczenia mailowe, konfiguracja webhooka
-  - SecretEngine - konkretne poświadczenia na danego użytkownika
-  - Secret
+   Edit `config.yaml`:
+   ```yaml
+   vaults:
+     production:
+       url: https://vault.example.com
+       token: your-vault-token
+       verify_ssl: true
+       max_versions_per_secret: 5
+   
+   severity_levels:
+     critical:
+       rotation_period_days: 30
+       alert_threshold_days: 7
+     pci-dss-4.0:
+       rotation_period_days: 90
+       alert_threshold_days: 14
+     default:
+       rotation_period_days: 365
+       alert_threshold_days: 30
+   ```
 
-# Mechanizm działania
-### Secret Engine - manual
-- Użytkownik tworzy secret
-- Chronowarden zostaje striggerowany, jeżeli zbliża się `Secret.expiry_time_alert`
-- Chronowarden do wszystkich obiektów `Secret.routing` wysyła informację o wygasającym secrecie
-- Chronowarden odczekuje `Secret.expiry_time_interval` i ponawia poprzedni krok, jeżeli po wyliczeniu `Secret.expiry_time_alert` warunek jest spełniony
+3. **Run the server:**
+   ```bash
+   uv run uvicorn chronowarden:app --reload
+   ```
 
-# Backend
-### Installation
+   API will be available at `http://localhost:8000`
 
-```bash
-uv sync
-```
+### Frontend Setup
 
-### Development Setup
+1. **Install dependencies:**
+   ```bash
+   cd frontend
+   npm install
+   ```
 
-For local development, use the provided setup script to ensure development Vault instances are running and create a config file:
+2. **Run development server:**
+   ```bash
+   npm run dev
+   ```
+
+   UI will be available at `http://localhost:5173`
+
+## Development Environment
+
+For local testing with dev Vault instances:
 
 ```bash
 python dev-setup.py
 ```
 
-This script will:
-- Check if `openbao-dev` (port 8200) and `dev-vault` (port 8201) containers are running
-- Start them if needed using the commands from the integration tests section
-- Extract root tokens from container logs
-- Create `config.yaml` with both vaults configured
+This script:
+- Starts OpenBao (port 8200) and Vault (ports 8201, 8202) containers
+- Extracts root tokens from logs
+- Creates `config.yaml` with all dev vaults configured
 
-Cleanup with:
+**Cleanup:**
 ```bash
-docker stop dev-vault-1.20.1 dev-vault-1.21.3 openbao-dev && docker rm dev-vault-1.20.1 dev-vault-1.21.3 openbao-dev
+docker stop dev-vault-1.20.1 dev-vault-1.21.3 openbao-dev
+docker rm dev-vault-1.20.1 dev-vault-1.21.3 openbao-dev
 ```
 
-### Running the server
+## Vault Permissions
 
-```bash
-uv run uvicorn chronowarden:app --reload
+Chronowarden requires read/write access to **secret metadata only**. It never reads actual secret values.
+
+**Required capabilities:**
+```hcl
+# For KV v2 engines
+path "secret/metadata/*" {
+  capabilities = ["read", "list", "update"]
+}
+
+# Optional: engine discovery
+path "sys/mounts" {
+  capabilities = ["read"]
+}
 ```
 
-### Unit tests
+**Custom metadata fields:**
+- `chronowarden_ttl` - Target rotation period (ISO8601 duration)
+- `chronowarden_severity` - Severity level (user-defined)
+- `chronowarden_enabled` - Whether to track this secret (true/false)
 
+## API Endpoints
+
+### Secrets
+- `GET /api/v1/secrets` - List all tracked secrets with metadata
+  - Query params: `vault_name`, `engine_id`, `severity`, `enabled`
+- `GET /api/v1/secrets/{id}` - Get secret metadata by ID
+- `PATCH /api/v1/secrets/{id}` - Update secret metadata (severity, enabled, ttl)
+
+### Sync
+- `POST /api/v1/sync` - Trigger synchronization with Vault instances
+  - Scans all configured vaults and updates local cache
+
+### Vaults
+- `GET /api/v1/vaults` - List configured Vault instances with connection status
+
+### Health
+- `GET /health` - Health check endpoint
+- `GET /metrics` - Prometheus metrics
+
+## Secret Status
+
+| Status | Description | Condition |
+|--------|-------------|-----------|
+| 🟢 OK | Secret is healthy | `days_remaining > alert_threshold` |
+| 🟡 Warning | Rotation needed soon | `0 < days_remaining ≤ alert_threshold` |
+| 🔴 Expired | Rotation overdue | `days_remaining ≤ 0` |
+| ⚪ No TTL | No rotation configured | `chronowarden_ttl` not set |
+
+## Testing
+
+**Unit tests:**
 ```bash
 uv run pytest
 ```
 
-# Integration tests
+**With coverage:**
+```bash
+uv run pytest --cov=chronowarden --cov-report=html
+```
 
-The idea is to test on both of these platforms to maintain compatibility, even though [OpenBao intends to remain API compatible with HashiCorp Vault](https://openbao.org/api-docs/libraries/).
+## Integration Testing
 
-### https://openbao.org/docs/install/#container-registries
-`docker run -p 127.0.0.1:8200:8200 --name openbao-dev --detach quay.io/openbao/openbao`
+Test compatibility with both HashiCorp Vault and OpenBao:
 
-### https://hub.docker.com/r/hashicorp/vault
-`docker run -p 127.0.0.1:8201:8201 --cap-add=IPC_LOCK -e 'VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8201' -d --name=dev-vault hashicorp/vault`
+**OpenBao (port 8200):**
+```bash
+docker run -p 127.0.0.1:8200:8200 --name openbao-dev --detach quay.io/openbao/openbao
+```
+
+**HashiCorp Vault (port 8201):**
+```bash
+docker run -p 127.0.0.1:8201:8201 --cap-add=IPC_LOCK \
+  -e 'VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8201' \
+  -d --name=dev-vault hashicorp/vault
+```
+
+Chronowarden maintains compatibility with both platforms as [OpenBao intends to remain API compatible](https://openbao.org/api-docs/libraries/).
+
+## Deployment
+
+See [deploy/](deploy/) for:
+- Docker Compose setup (`deploy/compose/`)
+- Kubernetes manifests (`deploy/kubernetes/`)
+
+## Roadmap
+
+- RBAC support
+- Support assigning each secret/engine/provider with internal systems
+- Generate automatic reports from Chronowarden for internal systems
+- Better support for routing alerts
+- Support additional backends for public cloud providers and their vaults
+
+## License
+
+Licensed under the [EUPL-1.2](LICENSE) - see [LICENSES/](LICENSES/) for full text.
+
+## Support
+
+Community support is available through [Matrix](https://matrix.to/#/#gcups:fsfe.org) channel as well as issues on GitHub
+
+For commercial support, consultations and training feel free to reach me via email at damian (at) fajfer.org to discuss your needs and get a custom quote.
+
