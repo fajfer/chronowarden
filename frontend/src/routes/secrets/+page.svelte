@@ -77,8 +77,11 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="text-gray-400 text-xs uppercase border-b border-gray-700">
-              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('full_path')}>
-                Path {sortIcon('full_path')}
+              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('secret_path')}>
+                Path {sortIcon('secret_path')}
+              </th>
+              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('vault_name')}>
+                Vault {sortIcon('vault_name')}
               </th>
               <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('severity')}>
                 Severity {sortIcon('severity')}
@@ -96,10 +99,12 @@
             {#each filteredSecrets as secret (secret.id)}
               <tr class="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                 <td class="px-4 py-3">
-                  <button onclick={() => selectedSecret = secret} class="font-medium text-indigo-400 hover:text-indigo-300 text-left">
-                    {secret.full_path}
+                  <button onclick={() => selectedSecret = secret} class="font-medium text-indigo-400 hover:text-indigo-300 text-left block">
+                    {secret.secret_path}
+                    <div class="text-xs text-gray-500 font-normal">{secret.engine_id}</div>
                   </button>
                 </td>
+                <td class="px-4 py-3 text-gray-400">{secret.vault_name}</td>
                 <td class="px-4 py-3 text-gray-400">{secret.severity}</td>
                 <td class="px-4 py-3 text-gray-400">{secret.enabled ? '✓' : '—'}</td>
                 <td class="px-4 py-3 text-gray-400">{formatDate(secret.ttl_date)}</td>
