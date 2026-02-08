@@ -33,6 +33,22 @@ VALID_SEVERITY_VALUES = {"default", "critical", "pci-dss-4.0", "none"}
 _DURATION_PATTERN = re.compile(r"^(\d+)([dmy])$")
 
 
+def _validate_severity_value(v: Optional[str], context: str) -> Optional[str]:
+    """
+    Validate a severity value against known profiles.
+
+    Args:
+        v: The severity value to validate.
+        context: Description of where the value comes from (for logging).
+
+    Returns:
+        The validated severity value.
+    """
+    if v is not None and v not in VALID_SEVERITY_VALUES:
+        logger.warning("Invalid severity value '%s' in %s, will use 'default'", v, context)
+    return v
+
+
 def parse_duration_to_days(duration: str) -> int:
     """
     Parse a duration string (e.g. '365d', '6m', '1y') to number of days.
@@ -81,8 +97,35 @@ class ExpiryProfile(BaseModel):
         return parse_duration_to_days(self.rotation_period)
 
 
+class SecretConfig(BaseModel):
+    """Per-secret severity override in config.yaml."""
+
+    path: str = Field(description="Exact secret path within the engine")
+    severity: str = Field(description="Severity override for this specific secret")
+
+    @field_validator("severity")
+    @classmethod
+    def validate_severity(cls, v: str) -> str:
+        """Validate severity value."""
+        return _validate_severity_value(v, "secret config") or v
+
+
+class EngineConfigNested(BaseModel):
+    """Per-engine configuration nested within a vault."""
+
+    name: str = Field(description="Engine name (mount point)")
+    severity: Optional[str] = Field(default=None, description="Severity override for this engine")
+    secrets: list[SecretConfig] = Field(default_factory=list, description="Per-secret overrides")
+
+    @field_validator("severity")
+    @classmethod
+    def validate_severity(cls, v: Optional[str]) -> Optional[str]:
+        """Validate severity value."""
+        return _validate_severity_value(v, "engine config")
+
+
 class EngineConfig(BaseModel):
-    """Per-engine configuration."""
+    """Per-engine configuration (legacy top-level format)."""
 
     id: str = Field(description="Engine identifier (e.g. 'secret/my-app')")
     default_severity: Optional[str] = Field(default=None, description="Default severity for all secrets in this engine")
@@ -91,9 +134,7 @@ class EngineConfig(BaseModel):
     @classmethod
     def validate_severity(cls, v: Optional[str]) -> Optional[str]:
         """Validate severity value."""
-        if v is not None and v not in VALID_SEVERITY_VALUES:
-            logger.warning("Invalid severity value '%s' in engine config, will use 'default'", v)
-        return v
+        return _validate_severity_value(v, "engine config")
 
 
 class VaultConfig(BaseModel):
@@ -109,7 +150,28 @@ class VaultConfig(BaseModel):
     verify_ssl: bool = Field(default=True, description="Whether to verify TLS certificates")
     auth_method: str = Field(default="token", description="Vault authentication method")
     date_format: Optional[str] = Field(default=None, description="Date format override for this vault (YYYY-MM-DD)")
-    default_severity: Optional[str] = Field(default=None, description="Default severity for secrets in this vault")
+    severity: Optional[str] = Field(default=None, description="Default severity for all secrets in this vault")
+    default_severity: Optional[str] = Field(
+        default=None, description="Deprecated: use 'severity' instead", exclude=True
+    )
+    engines: list[EngineConfigNested] = Field(
+        default_factory=list, description="Nested engine configurations with optional overrides"
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_default_severity(cls, data: dict) -> dict:
+        """Migrate deprecated default_severity to severity."""
+        if isinstance(data, dict):
+            if "default_severity" in data:
+                logger.warning(
+                    "Deprecated: 'default_severity' in vault config. Use 'severity' instead."
+                )
+                if "severity" not in data or data["severity"] is None:
+                    data["severity"] = data.pop("default_severity")
+                else:
+                    data.pop("default_severity")
+        return data
 
     @model_validator(mode="after")
     def validate_token_source(self) -> "VaultConfig":
@@ -118,13 +180,45 @@ class VaultConfig(BaseModel):
             raise ValueError(f"Vault '{self.name}': at least one of token, token_env, or token_file must be set")
         return self
 
-    @field_validator("default_severity")
+    @field_validator("severity")
     @classmethod
     def validate_severity(cls, v: Optional[str]) -> Optional[str]:
         """Validate severity value."""
-        if v is not None and v not in VALID_SEVERITY_VALUES:
-            logger.warning("Invalid severity value '%s' in vault config, will use 'default'", v)
-        return v
+        return _validate_severity_value(v, "vault config")
+
+    def get_engine_config(self, engine_name: str) -> Optional[EngineConfigNested]:
+        """
+        Get nested engine configuration by name.
+
+        Args:
+            engine_name: The engine name (mount point).
+
+        Returns:
+            The engine config, or None if not found.
+        """
+        for engine in self.engines:
+            if engine.name == engine_name:
+                return engine
+        return None
+
+    def get_secret_config(self, engine_name: str, secret_path: str) -> Optional[SecretConfig]:
+        """
+        Get secret-specific configuration from nested engines.
+
+        Args:
+            engine_name: The engine name (mount point).
+            secret_path: The exact secret path.
+
+        Returns:
+            The secret config, or None if not found.
+        """
+        engine = self.get_engine_config(engine_name)
+        if engine is None:
+            return None
+        for secret in engine.secrets:
+            if secret.path == secret_path:
+                return secret
+        return None
 
     def resolve_token(self) -> Optional[str]:
         """
@@ -167,7 +261,9 @@ class AppConfig(BaseModel):
         },
         description="Expiry profiles mapping severity names to rotation periods",
     )
-    engines: list[EngineConfig] = Field(default_factory=list, description="Per-engine configuration overrides")
+    engines: list[EngineConfig] = Field(
+        default_factory=list, description="Deprecated: use nested engines within vaults instead"
+    )
 
     @model_validator(mode="after")
     def validate_unique_names(self) -> "AppConfig":
@@ -176,11 +272,30 @@ class AppConfig(BaseModel):
         duplicates = [n for n in names if names.count(n) > 1]
         if duplicates:
             raise ValueError(f"Duplicate vault names: {', '.join(set(duplicates))}")
+        if self.engines:
+            logger.warning(
+                "Deprecated: top-level 'engines' array. Move engine configs into vaults[].engines instead."
+            )
         return self
+
+    def _get_vault_config(self, vault_name: str) -> Optional[VaultConfig]:
+        """
+        Get vault configuration by name.
+
+        Args:
+            vault_name: The vault instance name.
+
+        Returns:
+            The vault config, or None if not found.
+        """
+        for vault in self.vaults:
+            if vault.name == vault_name:
+                return vault
+        return None
 
     def get_engine_config(self, engine_id: str) -> Optional[EngineConfig]:
         """
-        Get engine configuration by ID.
+        Get legacy top-level engine configuration by ID.
 
         Args:
             engine_id: The engine identifier.
@@ -198,37 +313,93 @@ class AppConfig(BaseModel):
         secret_severity: Optional[str],
         engine_id: Optional[str],
         vault_name: Optional[str],
+        secret_path: Optional[str] = None,
     ) -> str:
         """
         Resolve severity using the configuration cascade.
 
-        Priority: secret → engine → vault → global default.
+        Priority (highest to lowest):
+            1. Secret-specific config (vaults[].engines[].secrets[])
+            2. Engine config (vaults[].engines[].severity)
+            3. Legacy top-level engine config (engines[].default_severity)
+            4. Vault config (vaults[].severity)
+            5. Global default ("default" profile / 365 days)
 
         Args:
-            secret_severity: Severity from Vault custom_metadata.
+            secret_severity: Severity from Vault custom_metadata (used in legacy mode).
             engine_id: Engine identifier for engine-level override.
             vault_name: Vault name for vault-level override.
+            secret_path: Secret path for secret-level config override.
 
         Returns:
             Resolved severity string.
         """
+        vault_config = self._get_vault_config(vault_name) if vault_name else None
+
+        if vault_config and engine_id and secret_path:
+            secret_config = vault_config.get_secret_config(engine_id, secret_path)
+            if secret_config:
+                return secret_config.severity
+
         if secret_severity is not None and secret_severity in VALID_SEVERITY_VALUES:
             return secret_severity
 
         if secret_severity is not None:
             logger.warning("Invalid severity '%s', falling through to cascade", secret_severity)
 
-        if engine_id is not None:
-            engine_config = self.get_engine_config(engine_id)
-            if engine_config and engine_config.default_severity:
-                return engine_config.default_severity
+        if vault_config and engine_id:
+            engine_config = vault_config.get_engine_config(engine_id)
+            if engine_config and engine_config.severity:
+                return engine_config.severity
 
-        if vault_name is not None:
-            for vault in self.vaults:
-                if vault.name == vault_name and vault.default_severity:
-                    return vault.default_severity
+        if engine_id is not None:
+            legacy_engine = self.get_engine_config(engine_id)
+            if legacy_engine and legacy_engine.default_severity:
+                return legacy_engine.default_severity
+
+        if vault_config and vault_config.severity:
+            return vault_config.severity
 
         return "default"
+
+    def resolve_severity_source(
+        self,
+        engine_id: Optional[str],
+        vault_name: Optional[str],
+        secret_path: Optional[str] = None,
+    ) -> tuple[str, str]:
+        """
+        Resolve severity and return the source that determined it.
+
+        Args:
+            engine_id: Engine identifier.
+            vault_name: Vault name.
+            secret_path: Secret path.
+
+        Returns:
+            Tuple of (severity, source) where source describes the cascade level.
+        """
+        vault_config = self._get_vault_config(vault_name) if vault_name else None
+
+        if vault_config and engine_id and secret_path:
+            secret_config = vault_config.get_secret_config(engine_id, secret_path)
+            if secret_config:
+                return secret_config.severity, "secret_config"
+
+        if vault_config and engine_id:
+            engine_config = vault_config.get_engine_config(engine_id)
+            if engine_config and engine_config.severity:
+                return engine_config.severity, "engine_config"
+
+        if engine_id is not None:
+            legacy_engine = self.get_engine_config(engine_id)
+            if legacy_engine and legacy_engine.default_severity:
+                return legacy_engine.default_severity, "legacy_engine_config"
+
+        if vault_config and vault_config.severity:
+            return vault_config.severity, "vault_config"
+
+        return "default", "global_default"
 
     def get_rotation_days(self, severity: str) -> int:
         """

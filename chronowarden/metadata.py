@@ -153,11 +153,18 @@ def resolve_secret_severity(
     vault_name: Optional[str],
     config: AppConfig,
     db: Optional[Database] = None,
+    secret_path: Optional[str] = None,
 ) -> str:
     """
     Resolve the severity for a secret using the configuration cascade.
 
-    Priority: secret custom_metadata → engine config (DB) → engine config (YAML) → vault → global.
+    Config is the source of truth. Priority (highest to lowest):
+        1. Secret-specific config (vaults[].engines[].secrets[])
+        2. Engine config (vaults[].engines[].severity)
+        3. Legacy top-level engine config (engines[].default_severity)
+        4. DB engine override (if present)
+        5. Vault config (vaults[].severity)
+        6. Global default ("default")
 
     Args:
         custom_metadata: The custom_metadata dict from Vault.
@@ -165,19 +172,24 @@ def resolve_secret_severity(
         vault_name: Vault instance name.
         config: Application configuration.
         db: Optional database for engine-level overrides.
+        secret_path: Secret path for secret-level config lookup.
 
     Returns:
         Resolved severity string.
     """
     secret_severity = custom_metadata.get("chronowarden_severity")
 
+    resolved = config.resolve_severity(secret_severity, engine_id, vault_name, secret_path=secret_path)
+
+    if resolved != "default" or secret_severity is not None:
+        return resolved
+
     if db is not None and engine_id is not None and vault_name is not None:
         db_engine = db.get_engine_config(vault_name, engine_id)
         if db_engine and db_engine.default_severity:
-            if secret_severity is None:
-                return db_engine.default_severity
+            return db_engine.default_severity
 
-    return config.resolve_severity(secret_severity, engine_id, vault_name)
+    return resolved
 
 
 def sync_secret_metadata(
@@ -190,6 +202,8 @@ def sync_secret_metadata(
 ) -> Optional[SecretMetadataCache]:
     """
     Synchronize metadata for a single secret between Vault and internal state.
+
+    Config is the source of truth. Vault metadata is written BY Chronowarden.
 
     Args:
         vault: The VaultIntegration instance.
@@ -210,30 +224,31 @@ def sync_secret_metadata(
     custom_metadata = vault_metadata.get("custom_metadata") or {}
     updated_time = vault_metadata.get("updated_time", "")
 
-    enabled = is_secret_enabled(custom_metadata)
-    severity_raw = custom_metadata.get("chronowarden_severity")
+    severity = resolve_secret_severity(
+        custom_metadata, engine_id, vault_name, config, db, secret_path=secret_path
+    )
 
-    if severity_raw == "none":
-        enabled = False
-
-    if not enabled:
+    if severity == "none":
         entry = SecretMetadataCache(
             vault_name=vault_name,
             engine_id=engine_id,
             secret_path=secret_path,
             updated_time=updated_time,
-            ttl=custom_metadata.get("chronowarden_ttl"),
-            severity=severity_raw,
-            enabled=False,
+            ttl=None,
+            severity="none",
+            enabled=True,
             last_synced=datetime.now(tz=timezone.utc).isoformat(),
         )
+        metadata_fields = {
+            "chronowarden_severity": "none",
+        }
+        vault.write_secret_metadata(secret_path, metadata_fields, mount_point=engine_id)
         db.upsert_secret_metadata(entry)
         return entry
 
-    severity = resolve_secret_severity(custom_metadata, engine_id, vault_name, config, db)
-
     cached = db.get_secret_metadata(vault_name, engine_id, secret_path)
     vault_ttl = custom_metadata.get("chronowarden_ttl")
+    vault_severity = custom_metadata.get("chronowarden_severity")
 
     needs_recalculate = False
     if vault_ttl is None:
@@ -247,6 +262,15 @@ def sync_secret_metadata(
             secret_path,
             cached.updated_time,
             updated_time,
+        )
+    elif vault_severity != severity:
+        needs_recalculate = True
+        logger.info(
+            "Severity changed for %s/%s (%s -> %s), recalculating TTL",
+            engine_id,
+            secret_path,
+            vault_severity,
+            severity,
         )
 
     if needs_recalculate:
@@ -263,7 +287,7 @@ def sync_secret_metadata(
             vault_ttl = new_ttl
     elif cached is not None and vault_ttl is not None and cached.ttl != vault_ttl:
         logger.info(
-            "TTL mismatch for %s/%s (cached=%s, vault=%s), trusting Vault",
+            "TTL mismatch for %s/%s (cached=%s, vault=%s), trusting config",
             engine_id,
             secret_path,
             cached.ttl,

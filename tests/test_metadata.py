@@ -162,3 +162,66 @@ class TestResolveSeverity:
             {"chronowarden_severity": "none"}, "apps", "vault", config
         )
         assert result == "none"
+
+    def test_secret_config_wins_over_metadata(self) -> None:
+        """Secret-specific config overrides vault metadata."""
+        from chronowarden.config import EngineConfigNested, SecretConfig, VaultConfig
+
+        config = AppConfig(
+            vaults=[
+                VaultConfig(
+                    name="prod",
+                    address="http://localhost:8200",
+                    token="test",
+                    severity="critical",
+                    engines=[
+                        EngineConfigNested(
+                            name="certs",
+                            severity="pci-dss-4.0",
+                            secrets=[SecretConfig(path="root-ca", severity="none")],
+                        ),
+                    ],
+                ),
+            ],
+        )
+        result = resolve_secret_severity(
+            {"chronowarden_severity": "critical"}, "certs", "prod", config, secret_path="root-ca"
+        )
+        assert result == "none"
+
+    def test_engine_config_inherited(self) -> None:
+        """Secrets inherit engine severity when not specifically overridden."""
+        from chronowarden.config import EngineConfigNested, VaultConfig
+
+        config = AppConfig(
+            vaults=[
+                VaultConfig(
+                    name="prod",
+                    address="http://localhost:8200",
+                    token="test",
+                    severity="default",
+                    engines=[
+                        EngineConfigNested(name="certs", severity="pci-dss-4.0"),
+                    ],
+                ),
+            ],
+        )
+        result = resolve_secret_severity({}, "certs", "prod", config, secret_path="any-cert")
+        assert result == "pci-dss-4.0"
+
+    def test_vault_severity_inherited(self) -> None:
+        """Secrets in unlisted engines inherit vault severity."""
+        from chronowarden.config import VaultConfig
+
+        config = AppConfig(
+            vaults=[
+                VaultConfig(
+                    name="prod",
+                    address="http://localhost:8200",
+                    token="test",
+                    severity="critical",
+                ),
+            ],
+        )
+        result = resolve_secret_severity({}, "any-engine", "prod", config, secret_path="any-secret")
+        assert result == "critical"

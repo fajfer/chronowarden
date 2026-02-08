@@ -9,7 +9,9 @@ import pytest
 from chronowarden.config import (
     AppConfig,
     EngineConfig,
+    EngineConfigNested,
     ExpiryProfile,
+    SecretConfig,
     VaultConfig,
     parse_duration_to_days,
 )
@@ -86,7 +88,7 @@ class TestAppConfigDefaults:
 
 
 class TestConfigCascade:
-    """Tests for the configuration cascade (secret → engine → vault → global)."""
+    """Tests for the configuration cascade (secret config → engine → vault → global)."""
 
     @pytest.fixture()
     def config(self) -> AppConfig:
@@ -97,7 +99,7 @@ class TestConfigCascade:
                     name="prod",
                     address="http://localhost:8200",
                     token="test",
-                    default_severity="critical",
+                    severity="critical",
                 ),
                 VaultConfig(
                     name="dev",
@@ -148,6 +150,182 @@ class TestConfigCascade:
         assert config.resolve_date_format(None) == "YYYY-MM-DD"
 
 
+class TestNestedConfigCascade:
+    """Tests for the new nested configuration cascade."""
+
+    @pytest.fixture()
+    def config(self) -> AppConfig:
+        """Create a config with nested engines and secret overrides."""
+        return AppConfig(
+            vaults=[
+                VaultConfig(
+                    name="prod",
+                    address="http://localhost:8200",
+                    token="test",
+                    severity="critical",
+                    engines=[
+                        EngineConfigNested(
+                            name="certificates",
+                            severity="pci-dss-4.0",
+                            secrets=[
+                                SecretConfig(path="root-ca-key", severity="none"),
+                                SecretConfig(path="test-cert", severity="default"),
+                            ],
+                        ),
+                        EngineConfigNested(
+                            name="temporary-tokens",
+                            severity="default",
+                        ),
+                    ],
+                ),
+                VaultConfig(
+                    name="dev",
+                    address="http://localhost:8201",
+                    token="test",
+                    severity="default",
+                ),
+            ],
+        )
+
+    def test_secret_config_wins(self, config: AppConfig) -> None:
+        """Secret-specific config overrides everything."""
+        result = config.resolve_severity(None, "certificates", "prod", secret_path="root-ca-key")
+        assert result == "none"
+
+    def test_secret_config_overrides_vault_metadata(self, config: AppConfig) -> None:
+        """Secret config wins even when vault metadata has a different severity."""
+        result = config.resolve_severity("critical", "certificates", "prod", secret_path="root-ca-key")
+        assert result == "none"
+
+    def test_engine_severity_override(self, config: AppConfig) -> None:
+        """Engine severity overrides vault severity."""
+        result = config.resolve_severity(None, "certificates", "prod")
+        assert result == "pci-dss-4.0"
+
+    def test_vault_severity_for_unlisted_engine(self, config: AppConfig) -> None:
+        """Unlisted engines inherit vault severity."""
+        result = config.resolve_severity(None, "databases", "prod")
+        assert result == "critical"
+
+    def test_dev_vault_default(self, config: AppConfig) -> None:
+        """Dev vault with no engines listed uses vault severity."""
+        result = config.resolve_severity(None, "any-engine", "dev")
+        assert result == "default"
+
+    def test_secret_config_test_cert(self, config: AppConfig) -> None:
+        """Another secret override works."""
+        result = config.resolve_severity(None, "certificates", "prod", secret_path="test-cert")
+        assert result == "default"
+
+    def test_unlisted_secret_inherits_engine(self, config: AppConfig) -> None:
+        """A secret not listed in config inherits engine severity."""
+        result = config.resolve_severity(None, "certificates", "prod", secret_path="other-cert")
+        assert result == "pci-dss-4.0"
+
+    def test_temporary_tokens_engine_override(self, config: AppConfig) -> None:
+        """Temporary tokens engine has its own severity."""
+        result = config.resolve_severity(None, "temporary-tokens", "prod")
+        assert result == "default"
+
+
+class TestResolveSeveritySource:
+    """Tests for resolve_severity_source method."""
+
+    @pytest.fixture()
+    def config(self) -> AppConfig:
+        """Create a config for source resolution testing."""
+        return AppConfig(
+            vaults=[
+                VaultConfig(
+                    name="prod",
+                    address="http://localhost:8200",
+                    token="test",
+                    severity="critical",
+                    engines=[
+                        EngineConfigNested(
+                            name="certs",
+                            severity="pci-dss-4.0",
+                            secrets=[
+                                SecretConfig(path="root-ca", severity="none"),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+    def test_source_secret_config(self, config: AppConfig) -> None:
+        severity, source = config.resolve_severity_source("certs", "prod", secret_path="root-ca")
+        assert severity == "none"
+        assert source == "secret_config"
+
+    def test_source_engine_config(self, config: AppConfig) -> None:
+        severity, source = config.resolve_severity_source("certs", "prod")
+        assert severity == "pci-dss-4.0"
+        assert source == "engine_config"
+
+    def test_source_vault_config(self, config: AppConfig) -> None:
+        severity, source = config.resolve_severity_source("unknown", "prod")
+        assert severity == "critical"
+        assert source == "vault_config"
+
+    def test_source_global_default(self, config: AppConfig) -> None:
+        severity, source = config.resolve_severity_source("unknown", "unknown")
+        assert severity == "default"
+        assert source == "global_default"
+
+
+class TestBackwardCompatibility:
+    """Tests for backward compatibility with old config format."""
+
+    def test_default_severity_migrated_to_severity(self) -> None:
+        """Old default_severity field is migrated to severity."""
+        vc = VaultConfig(name="test", address="http://localhost", token="t", default_severity="critical")
+        assert vc.severity == "critical"
+
+    def test_severity_wins_over_default_severity(self) -> None:
+        """New severity field takes precedence over deprecated default_severity."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", token="t",
+            severity="pci-dss-4.0", default_severity="critical"
+        )
+        assert vc.severity == "pci-dss-4.0"
+
+    def test_legacy_top_level_engines(self) -> None:
+        """Old top-level engines array still works."""
+        config = AppConfig(
+            vaults=[
+                VaultConfig(name="v1", address="http://localhost", token="t", severity="critical"),
+            ],
+            engines=[
+                EngineConfig(id="apps", default_severity="pci-dss-4.0"),
+            ],
+        )
+        result = config.resolve_severity(None, "apps", "v1")
+        assert result == "pci-dss-4.0"
+
+    def test_nested_engine_wins_over_legacy(self) -> None:
+        """Nested engine config takes precedence over legacy top-level config."""
+        config = AppConfig(
+            vaults=[
+                VaultConfig(
+                    name="v1",
+                    address="http://localhost",
+                    token="t",
+                    severity="default",
+                    engines=[
+                        EngineConfigNested(name="apps", severity="critical"),
+                    ],
+                ),
+            ],
+            engines=[
+                EngineConfig(id="apps", default_severity="pci-dss-4.0"),
+            ],
+        )
+        result = config.resolve_severity(None, "apps", "v1")
+        assert result == "critical"
+
+
 class TestGetRotationDays:
     """Tests for AppConfig.get_rotation_days."""
 
@@ -175,11 +353,95 @@ class TestVaultConfigExtensions:
         vc = VaultConfig(name="test", address="http://localhost", token="t", date_format="YYYY-DD-MM")
         assert vc.date_format == "YYYY-DD-MM"
 
-    def test_vault_with_default_severity(self) -> None:
-        vc = VaultConfig(name="test", address="http://localhost", token="t", default_severity="critical")
-        assert vc.default_severity == "critical"
+    def test_vault_with_severity(self) -> None:
+        vc = VaultConfig(name="test", address="http://localhost", token="t", severity="critical")
+        assert vc.severity == "critical"
 
     def test_vault_optional_fields_default_none(self) -> None:
         vc = VaultConfig(name="test", address="http://localhost", token="t")
         assert vc.date_format is None
-        assert vc.default_severity is None
+        assert vc.severity is None
+
+    def test_vault_with_nested_engines(self) -> None:
+        vc = VaultConfig(
+            name="test",
+            address="http://localhost",
+            token="t",
+            engines=[
+                EngineConfigNested(name="apps", severity="critical"),
+            ],
+        )
+        assert len(vc.engines) == 1
+        assert vc.engines[0].name == "apps"
+        assert vc.engines[0].severity == "critical"
+
+    def test_vault_get_engine_config(self) -> None:
+        vc = VaultConfig(
+            name="test",
+            address="http://localhost",
+            token="t",
+            engines=[
+                EngineConfigNested(name="apps", severity="critical"),
+            ],
+        )
+        engine = vc.get_engine_config("apps")
+        assert engine is not None
+        assert engine.severity == "critical"
+        assert vc.get_engine_config("nonexistent") is None
+
+    def test_vault_get_secret_config(self) -> None:
+        vc = VaultConfig(
+            name="test",
+            address="http://localhost",
+            token="t",
+            engines=[
+                EngineConfigNested(
+                    name="certs",
+                    severity="critical",
+                    secrets=[SecretConfig(path="root-ca", severity="none")],
+                ),
+            ],
+        )
+        secret = vc.get_secret_config("certs", "root-ca")
+        assert secret is not None
+        assert secret.severity == "none"
+        assert vc.get_secret_config("certs", "other") is None
+        assert vc.get_secret_config("nonexistent", "root-ca") is None
+
+
+class TestSecretConfig:
+    """Tests for SecretConfig model."""
+
+    def test_valid_secret_config(self) -> None:
+        sc = SecretConfig(path="my-secret", severity="critical")
+        assert sc.path == "my-secret"
+        assert sc.severity == "critical"
+
+    def test_none_severity(self) -> None:
+        sc = SecretConfig(path="static-data", severity="none")
+        assert sc.severity == "none"
+
+
+class TestEngineConfigNested:
+    """Tests for EngineConfigNested model."""
+
+    def test_engine_with_severity(self) -> None:
+        ec = EngineConfigNested(name="apps", severity="critical")
+        assert ec.name == "apps"
+        assert ec.severity == "critical"
+        assert ec.secrets == []
+
+    def test_engine_with_secrets(self) -> None:
+        ec = EngineConfigNested(
+            name="certs",
+            severity="pci-dss-4.0",
+            secrets=[
+                SecretConfig(path="root-ca", severity="none"),
+            ],
+        )
+        assert len(ec.secrets) == 1
+        assert ec.secrets[0].path == "root-ca"
+
+    def test_engine_no_severity(self) -> None:
+        ec = EngineConfigNested(name="apps")
+        assert ec.severity is None
