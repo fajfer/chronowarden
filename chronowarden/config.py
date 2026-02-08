@@ -42,10 +42,10 @@ def _validate_severity_value(v: Optional[str], context: str) -> Optional[str]:
         context: Description of where the value comes from (for logging).
 
     Returns:
-        The validated severity value.
+        The original severity value (validation is logged as warning only).
     """
     if v is not None and v not in VALID_SEVERITY_VALUES:
-        logger.warning("Invalid severity value '%s' in %s, will use 'default'", v, context)
+        logger.warning("Invalid severity value '%s' in %s, falling through to cascade", v, context)
     return v
 
 

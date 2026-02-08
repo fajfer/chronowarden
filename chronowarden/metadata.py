@@ -203,7 +203,8 @@ def sync_secret_metadata(
     """
     Synchronize metadata for a single secret between Vault and internal state.
 
-    Config is the source of truth. Vault metadata is written BY Chronowarden.
+    Config is the source of truth. Vault metadata is written by Chronowarden.
+    When severity is 'none', the secret is monitored but never rotated (TTL is null).
 
     Args:
         vault: The VaultIntegration instance.
