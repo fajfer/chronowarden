@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 
 test('API health endpoint responds', async ({ request }) => {
-	const health = await request.get('http://localhost:8000/health');
+	const health = await request.get('http://localhost:8000/api/v1/health');
 	expect(health.ok()).toBeTruthy();
 });
 

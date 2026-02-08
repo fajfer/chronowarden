@@ -35,8 +35,9 @@ frontend/build/
 # CI/CD
 .github/
 
-# Documentation
+# Documentation (keep README.md for pyproject.toml)
 *.md
+!README.md
 docs/
 roadmap/
 

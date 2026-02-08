@@ -18,7 +18,7 @@ export default defineConfig({
 	webServer: [
 		{
 			command: 'cd .. && uv run uvicorn chronowarden:app',
-			url: 'http://localhost:8000/health',
+			url: 'http://localhost:8000/api/v1/health',
 			timeout: 30 * 1000,
 			reuseExistingServer: !process.env.CI
 		},
