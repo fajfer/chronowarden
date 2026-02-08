@@ -152,21 +152,18 @@ def create_dev_config(approle_tokens: dict[str, str]) -> None:
                 "name": "dev-openbao",
                 "address": "http://localhost:8200",
                 "token": approle_tokens.get("openbao-dev", "REPLACE_WITH_ACTUAL_TOKEN"),
-                "mount_path": "apps",
                 "verify_ssl": False,
             },
             {
                 "name": "dev-vault-1.21.3",
                 "address": "http://localhost:8201",
                 "token": approle_tokens.get("dev-vault-1.21.3", "REPLACE_WITH_ACTUAL_TOKEN"),
-                "mount_path": "apps",
                 "verify_ssl": False,
             },
             {
                 "name": "dev-vault-1.20.1",
                 "address": "http://localhost:8202",
                 "token": approle_tokens.get("dev-vault-1.20.1", "REPLACE_WITH_ACTUAL_TOKEN"),
-                "mount_path": "apps",
                 "verify_ssl": False,
             },
         ]
