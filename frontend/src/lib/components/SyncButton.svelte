@@ -50,7 +50,6 @@
     class="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors
            {syncing ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}"
   >
-    <span>{syncing ? '⏳' : '🔄'}</span>
     <span>Sync</span>
   </button>
 
