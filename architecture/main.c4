@@ -29,7 +29,7 @@ model {
 
     component metadata {
       technology 'Python'
-      description 'Metadata management module for TTL calculation, date parsing, and sync'
+      description 'Metadata management module for TTL calculation, date parsing, and sync with severity cascade resolution'
     }
 
     // User uses the UI

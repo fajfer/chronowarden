@@ -25,6 +25,7 @@ polling_interval: "6h"     # Global polling interval for all vaults (e.g. '6h', 
 
 # Expiry profiles: define rotation periods per severity level
 # Supports: d (days), m (months), y (years)
+# Users can override these defaults or add custom profiles
 expiry_profiles:
   default:
     rotation_period: "365d"  # 1 year
@@ -32,6 +33,17 @@ expiry_profiles:
     rotation_period: "6m"    # 6 months (~180 days)
   pci-dss-4.0:
     rotation_period: "90d"   # 90 days
+  # Example custom profile:
+  # monthly:
+  #   rotation_period: "30d"
+
+# Severity Cascade (highest to lowest priority):
+#   1. Secret-specific config (vaults[].engines[].secrets[].severity)
+#   2. Engine config (vaults[].engines[].severity)
+#   3. Vault config (vaults[].severity)
+#   4. Global default ("default" profile / 365 days)
+#
+# Config is the source of truth - Vault metadata is written BY Chronowarden
 
 vaults:
   # Production Vault cluster
@@ -42,8 +54,28 @@ vaults:
     mount_path: secret
     verify_ssl: true
     auth_method: token
-    # date_format: "YYYY-DD-MM"   # optional per-vault override
-    # default_severity: "critical" # optional vault-level default severity
+    # date_format: "YYYY-DD-MM"  # optional per-vault override
+
+    # Vault-wide default severity (applies to ALL engines automatically)
+    severity: critical
+
+    # OPTIONAL: Only list engines that need overrides
+    # All discovered engines automatically inherit vault severity
+    engines:
+      # Override: temporary tokens rotate annually
+      - name: temporary-tokens
+        severity: default
+
+      # Override with specific secret exceptions
+      - name: certificates
+        severity: pci-dss-4.0
+
+        # Individual secret overrides (highest priority)
+        secrets:
+          - path: root-ca-key
+            severity: none   # Monitor but never rotate
+          - path: test-cert
+            severity: default  # Less critical
 
   # Staging Vault (OpenBao fork)
   - name: staging
@@ -52,6 +84,7 @@ vaults:
     mount_path: kv
     verify_ssl: true
     auth_method: token
+    severity: critical
 
   # Local development Vault
   - name: dev
@@ -60,8 +93,6 @@ vaults:
     mount_path: secret
     verify_ssl: false
     auth_method: token
-
-# Per-engine configuration (auto-discovered from Vault, can be overridden here)
-engines:
-  # - id: secret/my-app
-  #   default_severity: "pci-dss-4.0"  # optional engine-level override
+    # Dev vault - longer rotation by default
+    severity: default
+    # No engines listed = all engines inherit "default" severity
