@@ -8,12 +8,11 @@
   import Filters from '$lib/components/Filters.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import SecretModal from '$lib/components/SecretModal.svelte';
-  import { formatDate, getDaysUntilExpiry } from '$lib/utils/dateFormat';
-  import { getStatusFromDays } from '$lib/utils/statusColor';
+  import { formatDate } from '$lib/utils/dateFormat';
   import type { Secret } from '$lib/types';
 
   let selectedSecret = $state<Secret | null>(null);
-  let sortField = $state<string>('name');
+  let sortField = $state<string>('full_path');
   let sortDir = $state<'asc' | 'desc'>('asc');
 
   const filteredSecrets = $derived.by(() => {
@@ -22,20 +21,10 @@
 
     if (f.search) {
       const search = f.search.toLowerCase();
-      result = result.filter((s) => s.name.toLowerCase().includes(search));
-    }
-    if (f.engineTypes.length > 0) {
-      result = result.filter((s) => f.engineTypes.includes(s.engine_type));
+      result = result.filter((s) => s.full_path.toLowerCase().includes(search));
     }
     if (f.statuses.length > 0) {
-      result = result.filter((s) => {
-        const days = getDaysUntilExpiry(s.expiry_date);
-        const status = getStatusFromDays(days);
-        return f.statuses.includes(status);
-      });
-    }
-    if (f.isPublic !== null) {
-      result = result.filter((s) => s.is_public === f.isPublic);
+      result = result.filter((s) => f.statuses.includes(s.status));
     }
 
     result.sort((a, b) => {
@@ -88,16 +77,18 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="text-gray-400 text-xs uppercase border-b border-gray-700">
-              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('name')}>
-                Name {sortIcon('name')}
+              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('secret_path')}>
+                Path {sortIcon('secret_path')}
               </th>
-              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('engine_type')}>
-                Engine {sortIcon('engine_type')}
+              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('vault_name')}>
+                Vault {sortIcon('vault_name')}
               </th>
-              <th class="px-4 py-3 text-left">Owner ID</th>
-              <th class="px-4 py-3 text-left">Public</th>
-              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('expiry_date')}>
-                Expiry {sortIcon('expiry_date')}
+              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('severity')}>
+                Severity {sortIcon('severity')}
+              </th>
+              <th class="px-4 py-3 text-left">Enabled</th>
+              <th class="px-4 py-3 text-left cursor-pointer hover:text-gray-200" onclick={() => toggleSort('ttl_date')}>
+                TTL {sortIcon('ttl_date')}
               </th>
               <th class="px-4 py-3 text-left">Days</th>
               <th class="px-4 py-3 text-left">Status</th>
@@ -106,22 +97,19 @@
           </thead>
           <tbody>
             {#each filteredSecrets as secret (secret.id)}
-              {@const days = getDaysUntilExpiry(secret.expiry_date)}
               <tr class="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                 <td class="px-4 py-3">
-                  <button onclick={() => selectedSecret = secret} class="font-medium text-indigo-400 hover:text-indigo-300 text-left">
-                    {secret.name}
+                  <button onclick={() => selectedSecret = secret} class="font-medium text-indigo-400 hover:text-indigo-300 text-left block">
+                    {secret.secret_path}
+                    <div class="text-xs text-gray-500 font-normal">{secret.engine_id}</div>
                   </button>
-                  {#if secret.description}
-                    <div class="text-xs text-gray-500">{secret.description}</div>
-                  {/if}
                 </td>
-                <td class="px-4 py-3 text-gray-400">{secret.engine_type}</td>
-                <td class="px-4 py-3 text-gray-400">{secret.owner_id}</td>
-                <td class="px-4 py-3 text-gray-400">{secret.is_public ? '✓' : '—'}</td>
-                <td class="px-4 py-3 text-gray-400">{formatDate(secret.expiry_date)}</td>
-                <td class="px-4 py-3 text-gray-200">{days ?? '—'}</td>
-                <td class="px-4 py-3"><StatusBadge status={getStatusFromDays(days)} /></td>
+                <td class="px-4 py-3 text-gray-400">{secret.vault_name}</td>
+                <td class="px-4 py-3 text-gray-400">{secret.severity}</td>
+                <td class="px-4 py-3 text-gray-400">{secret.enabled ? '✓' : '—'}</td>
+                <td class="px-4 py-3 text-gray-400">{formatDate(secret.ttl_date)}</td>
+                <td class="px-4 py-3 text-gray-200">{secret.days_remaining ?? '—'}</td>
+                <td class="px-4 py-3"><StatusBadge status={secret.status} /></td>
                 <td class="px-4 py-3">
                   <button onclick={() => selectedSecret = secret} class="text-gray-400 hover:text-white" title="View Details">⋮</button>
                 </td>

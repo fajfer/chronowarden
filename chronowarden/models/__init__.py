@@ -24,13 +24,9 @@ from chronowarden.models.owner import (
 )
 from chronowarden.models.router import EmailRouter, Router, RouterType, WebhookRouter
 from chronowarden.models.secret import (
-    AzureKeyVaultSecret,
-    HashicorpVaultSecret,
-    Secret,
-    SecretBase,
-    SecretCreate,
-    SecretTemplate,
-    SecretUpdate,
+    SecretMetadataResponse,
+    SecretMetadataUpdate,
+    SecretStatus,
 )
 
 __all__ = [
@@ -61,11 +57,7 @@ __all__ = [
     "OwnerCreate",
     "OwnerUpdate",
     # Secret
-    "AzureKeyVaultSecret",
-    "HashicorpVaultSecret",
-    "Secret",
-    "SecretBase",
-    "SecretCreate",
-    "SecretTemplate",
-    "SecretUpdate",
+    "SecretMetadataResponse",
+    "SecretMetadataUpdate",
+    "SecretStatus",
 ]

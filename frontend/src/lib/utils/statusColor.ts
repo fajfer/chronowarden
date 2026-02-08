@@ -8,11 +8,10 @@ import type { SecretStatus } from '$lib/types';
  * Determine status from days until expiry.
  */
 export function getStatusFromDays(days: number | null | undefined): SecretStatus {
-  if (days == null) return 'expired';
-  if (days < 0) return 'expired';
-  if (days < 14) return 'critical';
+  if (days == null) return 'no_ttl';
+  if (days <= 0) return 'expired';
   if (days <= 30) return 'warning';
-  return 'healthy';
+  return 'ok';
 }
 
 /**
@@ -20,10 +19,10 @@ export function getStatusFromDays(days: number | null | undefined): SecretStatus
  */
 export function getStatusColor(status: SecretStatus): string {
   switch (status) {
-    case 'healthy': return 'text-green-400';
+    case 'ok': return 'text-green-400';
     case 'warning': return 'text-yellow-400';
-    case 'critical': return 'text-red-400';
-    case 'expired': return 'text-gray-500';
+    case 'expired': return 'text-red-400';
+    case 'no_ttl': return 'text-gray-500';
   }
 }
 
@@ -32,10 +31,10 @@ export function getStatusColor(status: SecretStatus): string {
  */
 export function getStatusBgColor(status: SecretStatus): string {
   switch (status) {
-    case 'healthy': return 'bg-green-500/20';
+    case 'ok': return 'bg-green-500/20';
     case 'warning': return 'bg-yellow-500/20';
-    case 'critical': return 'bg-red-500/20';
-    case 'expired': return 'bg-gray-500/20';
+    case 'expired': return 'bg-red-500/20';
+    case 'no_ttl': return 'bg-gray-500/20';
   }
 }
 
@@ -44,10 +43,10 @@ export function getStatusBgColor(status: SecretStatus): string {
  */
 export function getStatusIcon(status: SecretStatus): string {
   switch (status) {
-    case 'healthy': return '🟢';
+    case 'ok': return '🟢';
     case 'warning': return '🟡';
-    case 'critical': return '🔴';
-    case 'expired': return '⚫';
+    case 'expired': return '🔴';
+    case 'no_ttl': return '⚫';
   }
 }
 

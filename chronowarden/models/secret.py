@@ -1,77 +1,45 @@
-# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-"""Secret model definitions for Chronowarden."""
+"""Secret metadata response models for Chronowarden."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from chronowarden.models.engine import EngineType
+
+class SecretStatus(str, Enum):
+    """Computed status of a secret based on TTL and days remaining."""
+
+    EXPIRED = "expired"
+    WARNING = "warning"
+    OK = "ok"
+    NO_TTL = "no_ttl"
 
 
-class SecretBase(BaseModel):
-    """Base class for secrets from all engines."""
-
-    name: str
-    description: Optional[str] = None
-    is_public: bool = False
-    expiry_time_alert: int = Field(default=30, description="Days before expiry to alert")
-    expiry_time_interval: int = Field(default=7, description="Days between reminder alerts")
-    owner_id: int
-    routing_ids: list[int] = Field(default_factory=list)
-    backend_id: int
-
-
-class Secret(SecretBase):
-    """Full secret model with database fields."""
+class SecretMetadataResponse(BaseModel):
+    """Response model for secret metadata from the cache."""
 
     id: int
-    created_at: datetime
-    expiry_date: Optional[datetime] = None
-    engine_type: EngineType
-
-
-class SecretCreate(SecretBase):
-    """Schema for creating a new secret."""
-
-    expiry_date: Optional[datetime] = None
-    engine_type: EngineType
-
-
-class SecretUpdate(BaseModel):
-    """Schema for updating a secret."""
-
-    name: Optional[str] = None
-    description: Optional[str] = None
-    is_public: Optional[bool] = None
-    expiry_time_alert: Optional[int] = None
-    expiry_time_interval: Optional[int] = None
-    routing_ids: Optional[list[int]] = None
-    expiry_date: Optional[datetime] = None
-
-
-class SecretTemplate(SecretBase):
-    """Predefined defaults for secrets."""
-
-    id: int
-    template_name: str
-    default_expiry_days: int = 365
-
-
-class AzureKeyVaultSecret(Secret):
-    """Secret stored in Azure Key Vault."""
-
-    subscription_id: str
-    resource_group: str
     vault_name: str
-    secret_name: str
+    engine_id: str
+    secret_path: str
+    full_path: str = Field(description="Computed: vault_name/engine_id/secret_path")
+    ttl: Optional[str] = None
+    ttl_date: Optional[datetime] = None
+    days_remaining: Optional[int] = None
+    severity: str = "default"
+    rotation_period_days: int = 365
+    enabled: bool = True
+    last_synced: Optional[datetime] = None
+    status: SecretStatus = SecretStatus.NO_TTL
 
 
-class HashicorpVaultSecret(Secret):
-    """Secret stored in HashiCorp Vault."""
+class SecretMetadataUpdate(BaseModel):
+    """Request body for updating Chronowarden-specific metadata fields."""
 
-    vault_path: str
-    secret_key: str
+    severity: Optional[str] = Field(default=None, description="Override severity profile")
+    enabled: Optional[bool] = Field(default=None, description="Enable/disable monitoring")

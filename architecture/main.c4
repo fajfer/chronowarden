@@ -33,7 +33,7 @@ model {
     }
 
     // User uses the UI
-    user -> chronowarden.frontend 'CRUD operations on secrets and owner management'
+    user -> chronowarden.frontend 'Views secret metadata, manages owners, triggers sync'
     // Frontend interacts with the database
     chronowarden.frontend -[api]-> chronowarden.backend 'Triggers API through frontend'
     // Backend interacts with the database

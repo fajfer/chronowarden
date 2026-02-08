@@ -55,7 +55,7 @@ class Database:
 
     def connect(self) -> None:
         """Open the database connection and create tables if needed."""
-        self._conn = sqlite3.connect(str(self._db_path))
+        self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._create_tables()
@@ -233,6 +233,147 @@ class Database:
             )
             for row in cursor.fetchall()
         ]
+
+    def get_secret_by_id(self, secret_id: int) -> Optional[SecretMetadataCache]:
+        """
+        Retrieve a cached secret metadata entry by its primary key.
+
+        Args:
+            secret_id: The database row ID.
+
+        Returns:
+            The cached metadata entry, or None if not found.
+        """
+        if self._conn is None:
+            logger.error("Database not connected")
+            return None
+
+        cursor = self._conn.execute(
+            """
+            SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
+                   severity, enabled, last_synced
+            FROM secret_metadata_cache
+            WHERE id = ?
+            """,
+            (secret_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+
+        return SecretMetadataCache(
+            id=row["id"],
+            vault_name=row["vault_name"],
+            engine_id=row["engine_id"],
+            secret_path=row["secret_path"],
+            updated_time=row["updated_time"],
+            ttl=row["ttl"],
+            severity=row["severity"],
+            enabled=bool(row["enabled"]),
+            last_synced=row["last_synced"],
+        )
+
+    def list_all_secrets(
+        self,
+        vault_name: Optional[str] = None,
+        engine_id: Optional[str] = None,
+        severity: Optional[str] = None,
+        enabled: Optional[bool] = None,
+    ) -> list[SecretMetadataCache]:
+        """
+        List all cached secrets with optional filtering.
+
+        Args:
+            vault_name: Filter by vault instance name.
+            engine_id: Filter by engine mount path.
+            severity: Filter by severity profile.
+            enabled: Filter by monitoring enabled/disabled.
+
+        Returns:
+            List of cached metadata entries matching the filters.
+        """
+        if self._conn is None:
+            logger.error("Database not connected")
+            return []
+
+        query = """
+            SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
+                   severity, enabled, last_synced
+            FROM secret_metadata_cache
+            WHERE 1=1
+        """
+        params: list = []
+
+        if vault_name is not None:
+            query += " AND vault_name = ?"
+            params.append(vault_name)
+        if engine_id is not None:
+            query += " AND engine_id = ?"
+            params.append(engine_id)
+        if severity is not None:
+            query += " AND severity = ?"
+            params.append(severity)
+        if enabled is not None:
+            query += " AND enabled = ?"
+            params.append(1 if enabled else 0)
+
+        cursor = self._conn.execute(query, params)
+
+        return [
+            SecretMetadataCache(
+                id=row["id"],
+                vault_name=row["vault_name"],
+                engine_id=row["engine_id"],
+                secret_path=row["secret_path"],
+                updated_time=row["updated_time"],
+                ttl=row["ttl"],
+                severity=row["severity"],
+                enabled=bool(row["enabled"]),
+                last_synced=row["last_synced"],
+            )
+            for row in cursor.fetchall()
+        ]
+
+    def update_secret_metadata_fields(
+        self,
+        secret_id: int,
+        severity: Optional[str] = None,
+        enabled: Optional[bool] = None,
+    ) -> bool:
+        """
+        Update specific Chronowarden metadata fields for a cached secret.
+
+        Args:
+            secret_id: The database row ID.
+            severity: New severity override.
+            enabled: New enabled flag.
+
+        Returns:
+            True if a row was updated, False otherwise.
+        """
+        if self._conn is None:
+            logger.error("Database not connected")
+            return False
+
+        _ALLOWED_COLUMNS = {"severity", "enabled"}
+        updates = []
+        params: list = []
+
+        if severity is not None:
+            updates.append("severity = ?")
+            params.append(severity)
+        if enabled is not None:
+            updates.append("enabled = ?")
+            params.append(1 if enabled else 0)
+
+        if not updates:
+            return False
+
+        params.append(secret_id)
+        query = "UPDATE secret_metadata_cache SET " + ", ".join(updates) + " WHERE id = ?"
+        cursor = self._conn.execute(query, params)
+        self._conn.commit()
+        return cursor.rowcount > 0
 
     def upsert_engine_config(self, entry: EngineConfigRow) -> None:
         """

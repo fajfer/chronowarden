@@ -2,39 +2,31 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-import { apiGet, apiPost, apiPut, apiDelete } from './client';
-import type { Secret, SecretCreate, SecretUpdate, EngineType } from '$lib/types';
+import { apiGet, apiPatch } from './client';
+import type { Secret, SecretMetadataUpdate } from '$lib/types';
 
-/** GET /api/v1/secrets/ — list all secrets with optional filters. */
-export function fetchSecrets(engineType?: EngineType, isPublic?: boolean): Promise<Secret[]> {
+/** GET /api/v1/secrets/ — list cached secret metadata with optional filters. */
+export function fetchSecrets(
+  vaultName?: string,
+  engineId?: string,
+  severity?: string,
+  enabled?: boolean,
+): Promise<Secret[]> {
   const params = new URLSearchParams();
-  if (engineType) params.set('engine_type', engineType);
-  if (isPublic !== undefined) params.set('is_public', String(isPublic));
+  if (vaultName) params.set('vault_name', vaultName);
+  if (engineId) params.set('engine_id', engineId);
+  if (severity) params.set('severity', severity);
+  if (enabled !== undefined) params.set('enabled', String(enabled));
   const qs = params.toString();
   return apiGet<Secret[]>(`/secrets/${qs ? `?${qs}` : ''}`);
 }
 
-/** GET /api/v1/secrets/public/ — list public secrets only. */
-export function fetchPublicSecrets(): Promise<Secret[]> {
-  return apiGet<Secret[]>('/secrets/public/');
-}
-
-/** GET /api/v1/secrets/:id — fetch a single secret. */
+/** GET /api/v1/secrets/:id — fetch a single cached secret. */
 export function fetchSecret(id: number): Promise<Secret> {
   return apiGet<Secret>(`/secrets/${id}`);
 }
 
-/** POST /api/v1/secrets/ — create a secret. */
-export function createSecret(data: SecretCreate): Promise<Secret> {
-  return apiPost<Secret>('/secrets/', data);
-}
-
-/** PUT /api/v1/secrets/:id — update a secret. */
-export function updateSecret(id: number, data: SecretUpdate): Promise<Secret> {
-  return apiPut<Secret>(`/secrets/${id}`, data);
-}
-
-/** DELETE /api/v1/secrets/:id — delete a secret. */
-export function deleteSecret(id: number): Promise<void> {
-  return apiDelete(`/secrets/${id}`);
+/** PATCH /api/v1/secrets/:id — update Chronowarden metadata fields. */
+export function updateSecretMetadata(id: number, data: SecretMetadataUpdate): Promise<Secret> {
+  return apiPatch<Secret>(`/secrets/${id}`, data);
 }
