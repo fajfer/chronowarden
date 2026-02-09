@@ -173,7 +173,7 @@ def create_dev_config(approle_credentials: dict[str, tuple[str, str]]) -> None:
                 "role_id": approle_credentials.get("dev-vault-1.20.1", ("", ""))[0],
                 "secret_id": approle_credentials.get("dev-vault-1.20.1", ("", ""))[1],
                 "verify_ssl": False,
-                "severity": "default",
+                "severity": "none",
             },
         ]
     }
