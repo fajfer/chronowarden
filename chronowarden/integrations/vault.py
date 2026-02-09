@@ -167,7 +167,10 @@ class VaultIntegration(BaseIntegration):
 
             return []
         except InvalidPath:
-            logger.warning("Path not found: %s", path)
+            if path == "":
+                logger.warning(f"Secrets not found under mount_point {mount}")
+            else:
+                logger.warning(f"Path not found: {path}")
             return []
         except VaultError:
             logger.exception("Error listing secrets from Vault")
