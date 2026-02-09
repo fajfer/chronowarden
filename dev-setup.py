@@ -159,12 +159,14 @@ def create_dev_config(approle_tokens: dict[str, str]) -> None:
                 "address": "http://localhost:8201",
                 "token": approle_tokens.get("dev-vault-1.21.3", "REPLACE_WITH_ACTUAL_TOKEN"),
                 "verify_ssl": False,
+                "severity": "critical"
             },
             {
                 "name": "dev-vault-1.20.1",
                 "address": "http://localhost:8202",
                 "token": approle_tokens.get("dev-vault-1.20.1", "REPLACE_WITH_ACTUAL_TOKEN"),
                 "verify_ssl": False,
+                "severity": "none"
             },
         ]
     }
