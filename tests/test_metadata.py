@@ -137,30 +137,56 @@ class TestIsSecretEnabled:
 class TestResolveSeverity:
     """Tests for resolve_secret_severity function."""
 
-    def test_secret_metadata_wins(self) -> None:
-        config = AppConfig()
-        result = resolve_secret_severity(
-            {"chronowarden_severity": "critical"}, "apps", "vault", config
+    def test_config_wins_over_metadata(self) -> None:
+        """Config always wins, vault metadata is irrelevant."""
+        from chronowarden.config import VaultConfig
+
+        config = AppConfig(
+            vaults=[
+                VaultConfig(
+                    name="vault",
+                    address="http://localhost:8200",
+                    token="test",
+                    severity="critical",
+                ),
+            ],
         )
+        result = resolve_secret_severity("apps", "vault", config)
         assert result == "critical"
 
     def test_falls_through_to_engine(self) -> None:
         from chronowarden.config import EngineConfig
 
         config = AppConfig(engines=[EngineConfig(id="apps", default_severity="pci-dss-4.0")])
-        result = resolve_secret_severity({}, "apps", "vault", config)
+        result = resolve_secret_severity("apps", "vault", config)
         assert result == "pci-dss-4.0"
 
     def test_falls_through_to_default(self) -> None:
         config = AppConfig()
-        result = resolve_secret_severity({}, None, None, config)
+        result = resolve_secret_severity(None, None, config)
         assert result == "default"
 
-    def test_none_severity_valid(self) -> None:
-        config = AppConfig()
-        result = resolve_secret_severity(
-            {"chronowarden_severity": "none"}, "apps", "vault", config
+    def test_none_severity_from_secret_config(self) -> None:
+        """severity: none is resolved from config, not metadata."""
+        from chronowarden.config import EngineConfigNested, SecretConfig, VaultConfig
+
+        config = AppConfig(
+            vaults=[
+                VaultConfig(
+                    name="vault",
+                    address="http://localhost:8200",
+                    token="test",
+                    severity="critical",
+                    engines=[
+                        EngineConfigNested(
+                            name="apps",
+                            secrets=[SecretConfig(path="static", severity="none")],
+                        ),
+                    ],
+                ),
+            ],
         )
+        result = resolve_secret_severity("apps", "vault", config, secret_path="static")
         assert result == "none"
 
     def test_secret_config_wins_over_metadata(self) -> None:
@@ -184,9 +210,7 @@ class TestResolveSeverity:
                 ),
             ],
         )
-        result = resolve_secret_severity(
-            {"chronowarden_severity": "critical"}, "certs", "prod", config, secret_path="root-ca"
-        )
+        result = resolve_secret_severity("certs", "prod", config, secret_path="root-ca")
         assert result == "none"
 
     def test_engine_config_inherited(self) -> None:
@@ -206,7 +230,7 @@ class TestResolveSeverity:
                 ),
             ],
         )
-        result = resolve_secret_severity({}, "certs", "prod", config, secret_path="any-cert")
+        result = resolve_secret_severity("certs", "prod", config, secret_path="any-cert")
         assert result == "pci-dss-4.0"
 
     def test_vault_severity_inherited(self) -> None:
@@ -223,5 +247,5 @@ class TestResolveSeverity:
                 ),
             ],
         )
-        result = resolve_secret_severity({}, "any-engine", "prod", config, secret_path="any-secret")
+        result = resolve_secret_severity("any-engine", "prod", config, secret_path="any-secret")
         assert result == "critical"

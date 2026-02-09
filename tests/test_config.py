@@ -113,29 +113,25 @@ class TestConfigCascade:
             ],
         )
 
-    def test_secret_severity_wins(self, config: AppConfig) -> None:
-        """Secret-level severity overrides all."""
-        assert config.resolve_severity("pci-dss-4.0", "apps", "prod") == "pci-dss-4.0"
-
     def test_engine_cascade(self, config: AppConfig) -> None:
-        """Engine severity used when secret has none."""
-        assert config.resolve_severity(None, "apps", "prod") == "pci-dss-4.0"
+        """Legacy engine severity used for matching engine."""
+        assert config.resolve_severity("apps", "prod") == "pci-dss-4.0"
+
+    def test_engine_cascade_no_secret(self, config: AppConfig) -> None:
+        """Engine severity used when no secret path provided."""
+        assert config.resolve_severity("apps", "prod") == "pci-dss-4.0"
 
     def test_vault_cascade(self, config: AppConfig) -> None:
-        """Vault severity used when secret and engine have none."""
-        assert config.resolve_severity(None, "unknown-engine", "prod") == "critical"
+        """Vault severity used when engine has no override."""
+        assert config.resolve_severity("unknown-engine", "prod") == "critical"
 
     def test_global_cascade(self, config: AppConfig) -> None:
         """Global default used when nothing else matches."""
-        assert config.resolve_severity(None, "unknown-engine", "dev") == "default"
+        assert config.resolve_severity("unknown-engine", "dev") == "default"
 
-    def test_invalid_severity_falls_through(self, config: AppConfig) -> None:
-        """Invalid severity falls through cascade."""
-        assert config.resolve_severity("invalid-value", None, None) == "default"
-
-    def test_none_severity_disabled(self, config: AppConfig) -> None:
-        """Severity 'none' is a valid value."""
-        assert config.resolve_severity("none", "apps", "prod") == "none"
+    def test_global_cascade_no_vault(self, config: AppConfig) -> None:
+        """Global default used when vault is unknown."""
+        assert config.resolve_severity(None, None) == "default"
 
     def test_date_format_vault_override(self, config: AppConfig) -> None:
         """Vault-level date format overrides global."""
@@ -189,42 +185,42 @@ class TestNestedConfigCascade:
 
     def test_secret_config_wins(self, config: AppConfig) -> None:
         """Secret-specific config overrides everything."""
-        result = config.resolve_severity(None, "certificates", "prod", secret_path="root-ca-key")
+        result = config.resolve_severity("certificates", "prod", secret_path="root-ca-key")
         assert result == "none"
 
     def test_secret_config_overrides_vault_metadata(self, config: AppConfig) -> None:
-        """Secret config wins even when vault metadata has a different severity."""
-        result = config.resolve_severity("critical", "certificates", "prod", secret_path="root-ca-key")
+        """Secret config wins regardless of what vault metadata says."""
+        result = config.resolve_severity("certificates", "prod", secret_path="root-ca-key")
         assert result == "none"
 
     def test_engine_severity_override(self, config: AppConfig) -> None:
         """Engine severity overrides vault severity."""
-        result = config.resolve_severity(None, "certificates", "prod")
+        result = config.resolve_severity("certificates", "prod")
         assert result == "pci-dss-4.0"
 
     def test_vault_severity_for_unlisted_engine(self, config: AppConfig) -> None:
         """Unlisted engines inherit vault severity."""
-        result = config.resolve_severity(None, "databases", "prod")
+        result = config.resolve_severity("databases", "prod")
         assert result == "critical"
 
     def test_dev_vault_default(self, config: AppConfig) -> None:
         """Dev vault with no engines listed uses vault severity."""
-        result = config.resolve_severity(None, "any-engine", "dev")
+        result = config.resolve_severity("any-engine", "dev")
         assert result == "default"
 
     def test_secret_config_test_cert(self, config: AppConfig) -> None:
         """Another secret override works."""
-        result = config.resolve_severity(None, "certificates", "prod", secret_path="test-cert")
+        result = config.resolve_severity("certificates", "prod", secret_path="test-cert")
         assert result == "default"
 
     def test_unlisted_secret_inherits_engine(self, config: AppConfig) -> None:
         """A secret not listed in config inherits engine severity."""
-        result = config.resolve_severity(None, "certificates", "prod", secret_path="other-cert")
+        result = config.resolve_severity("certificates", "prod", secret_path="other-cert")
         assert result == "pci-dss-4.0"
 
     def test_temporary_tokens_engine_override(self, config: AppConfig) -> None:
         """Temporary tokens engine has its own severity."""
-        result = config.resolve_severity(None, "temporary-tokens", "prod")
+        result = config.resolve_severity("temporary-tokens", "prod")
         assert result == "default"
 
 
@@ -301,7 +297,7 @@ class TestBackwardCompatibility:
                 EngineConfig(id="apps", default_severity="pci-dss-4.0"),
             ],
         )
-        result = config.resolve_severity(None, "apps", "v1")
+        result = config.resolve_severity("apps", "v1")
         assert result == "pci-dss-4.0"
 
     def test_nested_engine_wins_over_legacy(self) -> None:
@@ -322,7 +318,7 @@ class TestBackwardCompatibility:
                 EngineConfig(id="apps", default_severity="pci-dss-4.0"),
             ],
         )
-        result = config.resolve_severity(None, "apps", "v1")
+        result = config.resolve_severity("apps", "v1")
         assert result == "critical"
 
 
