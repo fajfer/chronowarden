@@ -4,6 +4,8 @@
 
 """Tests for configuration loading, expiry profiles, and cascade logic."""
 
+import pathlib
+
 import pytest
 
 from chronowarden.config import (
@@ -441,3 +443,195 @@ class TestEngineConfigNested:
     def test_engine_no_severity(self) -> None:
         ec = EngineConfigNested(name="apps")
         assert ec.severity is None
+
+
+class TestAppRoleConfig:
+    """Tests for AppRole authentication configuration."""
+
+    def test_approle_auth_method_valid(self) -> None:
+        """AppRole auth_method accepted with valid credentials."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="test-role-id", secret_id="test-secret-id",
+        )
+        assert vc.auth_method == "approle"
+        assert vc.role_id == "test-role-id"
+        assert vc.secret_id == "test-secret-id"
+
+    def test_approle_missing_role_id(self) -> None:
+        """Validation fails when role_id is missing for approle auth."""
+        with pytest.raises(ValueError, match="role_id"):
+            VaultConfig(
+                name="test", address="http://localhost", auth_method="approle",
+                secret_id="test-secret-id",
+            )
+
+    def test_approle_missing_secret_id(self) -> None:
+        """Validation fails when secret_id is missing for approle auth."""
+        with pytest.raises(ValueError, match="secret_id"):
+            VaultConfig(
+                name="test", address="http://localhost", auth_method="approle",
+                role_id="test-role-id",
+            )
+
+    def test_approle_with_env_vars(self) -> None:
+        """AppRole config with environment variable sources is valid."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id_env="VAULT_ROLE_ID", secret_id_env="VAULT_SECRET_ID",
+        )
+        assert vc.role_id_env == "VAULT_ROLE_ID"
+        assert vc.secret_id_env == "VAULT_SECRET_ID"
+
+    def test_approle_with_file_paths(self) -> None:
+        """AppRole config with file path sources is valid."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id_file="/run/secrets/role-id", secret_id_file="/run/secrets/secret-id",
+        )
+        assert vc.role_id_file == "/run/secrets/role-id"
+        assert vc.secret_id_file == "/run/secrets/secret-id"
+
+    def test_invalid_auth_method(self) -> None:
+        """Validation fails for unknown auth_method."""
+        with pytest.raises(ValueError, match="auth_method must be 'token' or 'approle'"):
+            VaultConfig(
+                name="test", address="http://localhost", auth_method="ldap",
+                token="t",
+            )
+
+    def test_token_auth_still_requires_token(self) -> None:
+        """Token auth still requires at least one token source."""
+        with pytest.raises(ValueError, match="token, token_env, or token_file"):
+            VaultConfig(name="test", address="http://localhost", auth_method="token")
+
+    def test_approle_no_token_required(self) -> None:
+        """AppRole auth does not require token fields."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="rid", secret_id="sid",
+        )
+        assert vc.token is None
+
+    def test_resolve_role_id_literal(self) -> None:
+        """resolve_role_id returns literal role_id."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="literal-role-id", secret_id="sid",
+        )
+        assert vc.resolve_role_id() == "literal-role-id"
+
+    def test_resolve_secret_id_literal(self) -> None:
+        """resolve_secret_id returns literal secret_id."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="rid", secret_id="literal-secret-id",
+        )
+        assert vc.resolve_secret_id() == "literal-secret-id"
+
+    def test_resolve_role_id_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """resolve_role_id reads from environment variable."""
+        monkeypatch.setenv("TEST_ROLE_ID", "env-role-id")
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id_env="TEST_ROLE_ID", secret_id="sid",
+        )
+        assert vc.resolve_role_id() == "env-role-id"
+
+    def test_resolve_secret_id_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """resolve_secret_id reads from environment variable."""
+        monkeypatch.setenv("TEST_SECRET_ID", "env-secret-id")
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="rid", secret_id_env="TEST_SECRET_ID",
+        )
+        assert vc.resolve_secret_id() == "env-secret-id"
+
+    def test_resolve_role_id_file(self, tmp_path: "pathlib.Path") -> None:
+        """resolve_role_id reads from file."""
+        role_file = tmp_path / "role_id"
+        role_file.write_text("file-role-id\n")
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id_file=str(role_file), secret_id="sid",
+        )
+        assert vc.resolve_role_id() == "file-role-id"
+
+    def test_resolve_secret_id_file(self, tmp_path: "pathlib.Path") -> None:
+        """resolve_secret_id reads from file."""
+        secret_file = tmp_path / "secret_id"
+        secret_file.write_text("file-secret-id\n")
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="rid", secret_id_file=str(secret_file),
+        )
+        assert vc.resolve_secret_id() == "file-secret-id"
+
+    def test_resolve_role_id_file_priority(
+        self, tmp_path: "pathlib.Path", monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """File has highest priority for role_id resolution."""
+        role_file = tmp_path / "role_id"
+        role_file.write_text("file-role-id\n")
+        monkeypatch.setenv("TEST_ROLE_ID", "env-role-id")
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="literal", role_id_env="TEST_ROLE_ID",
+            role_id_file=str(role_file), secret_id="sid",
+        )
+        assert vc.resolve_role_id() == "file-role-id"
+
+    def test_resolve_secret_id_file_priority(
+        self, tmp_path: "pathlib.Path", monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """File has highest priority for secret_id resolution."""
+        secret_file = tmp_path / "secret_id"
+        secret_file.write_text("file-secret-id\n")
+        monkeypatch.setenv("TEST_SECRET_ID", "env-secret-id")
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="rid", secret_id="literal", secret_id_env="TEST_SECRET_ID",
+            secret_id_file=str(secret_file),
+        )
+        assert vc.resolve_secret_id() == "file-secret-id"
+
+    def test_resolve_role_id_env_over_literal(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Environment variable has higher priority than literal for role_id."""
+        monkeypatch.setenv("TEST_ROLE_ID", "env-role-id")
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="literal", role_id_env="TEST_ROLE_ID", secret_id="sid",
+        )
+        assert vc.resolve_role_id() == "env-role-id"
+
+    def test_resolve_role_id_missing_file(self, tmp_path: "pathlib.Path") -> None:
+        """resolve_role_id returns None when file does not exist."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id_file=str(tmp_path / "nonexistent"), secret_id="sid",
+        )
+        assert vc.resolve_role_id() is None
+
+    def test_resolve_secret_id_missing_file(self, tmp_path: "pathlib.Path") -> None:
+        """resolve_secret_id returns None when file does not exist."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="rid", secret_id_file=str(tmp_path / "nonexistent"),
+        )
+        assert vc.resolve_secret_id() is None
+
+    def test_resolve_role_id_missing_env(self) -> None:
+        """resolve_role_id returns None when env var is not set."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id_env="NONEXISTENT_ROLE_VAR", secret_id="sid",
+        )
+        assert vc.resolve_role_id() is None
+
+    def test_resolve_secret_id_missing_env(self) -> None:
+        """resolve_secret_id returns None when env var is not set."""
+        vc = VaultConfig(
+            name="test", address="http://localhost", auth_method="approle",
+            role_id="rid", secret_id_env="NONEXISTENT_SECRET_VAR",
+        )
+        assert vc.resolve_secret_id() is None

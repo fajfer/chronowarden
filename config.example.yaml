@@ -15,6 +15,13 @@
 #   - token_file: file path (K8s Secret volume mount, Docker secret)
 #
 # Token resolution priority: token_file > token_env > token
+#
+# AppRole credentials can be provided via:
+#   - role_id / secret_id:         literal values (for development only)
+#   - role_id_env / secret_id_env: environment variable names
+#   - role_id_file / secret_id_file: file paths (K8s Secret volume mount)
+#
+# AppRole resolution priority: *_file > *_env > literal
 
 # Global CA certificates directory (optional)
 # All .pem, .crt, and .cert files in this directory will be trusted for all vaults
@@ -96,3 +103,18 @@ vaults:
     # Dev vault - longer rotation by default
     severity: default
     # No engines listed = all engines inherit "default" severity
+
+  # AppRole authentication example
+  # Recommended for production - avoids long-lived static tokens
+  # - name: approle-vault
+  #   address: https://vault.prod.example.com:8200
+  #   auth_method: approle
+  #   # Store credentials securely in files (recommended for Kubernetes)
+  #   role_id_file: /run/secrets/vault-role-id
+  #   secret_id_file: /run/secrets/vault-secret-id
+  #   # Or via environment variables
+  #   # role_id_env: VAULT_ROLE_ID
+  #   # secret_id_env: VAULT_SECRET_ID
+  #   namespace: admin/chronowarden
+  #   verify_ssl: true
+  #   severity: critical

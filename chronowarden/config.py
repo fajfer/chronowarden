@@ -142,13 +142,24 @@ class VaultConfig(BaseModel):
 
     name: str = Field(description="Unique identifier for this Vault instance")
     address: str = Field(description="Vault server address (e.g. https://vault.example.com:8200)")
+    auth_method: str = Field(default="token", description="Authentication method: 'token' or 'approle'")
+
+    # Token auth fields
     token: Optional[str] = Field(default=None, description="Vault token (prefer token_env or token_file)")
     token_env: Optional[str] = Field(default=None, description="Environment variable containing the Vault token")
     token_file: Optional[str] = Field(default=None, description="Path to file containing the Vault token")
+
+    # AppRole auth fields
+    role_id: Optional[str] = Field(default=None, description="AppRole role ID")
+    role_id_env: Optional[str] = Field(default=None, description="Environment variable containing role ID")
+    role_id_file: Optional[str] = Field(default=None, description="Path to file containing role ID")
+    secret_id: Optional[str] = Field(default=None, description="AppRole secret ID")
+    secret_id_env: Optional[str] = Field(default=None, description="Environment variable containing secret ID")
+    secret_id_file: Optional[str] = Field(default=None, description="Path to file containing secret ID")
+
     namespace: Optional[str] = Field(default=None, description="Vault namespace (enterprise feature)")
     mount_path: str = Field(default="secret", description="KV secrets engine mount path")
     verify_ssl: bool = Field(default=True, description="Whether to verify TLS certificates")
-    auth_method: str = Field(default="token", description="Vault authentication method")
     date_format: Optional[str] = Field(default=None, description="Date format override for this vault (YYYY-MM-DD)")
     severity: Optional[str] = Field(default=None, description="Default severity for all secrets in this vault")
     default_severity: Optional[str] = Field(
@@ -174,10 +185,32 @@ class VaultConfig(BaseModel):
         return data
 
     @model_validator(mode="after")
-    def validate_token_source(self) -> "VaultConfig":
-        """Ensure at least one token source is configured."""
-        if not self.token and not self.token_env and not self.token_file:
-            raise ValueError(f"Vault '{self.name}': at least one of token, token_env, or token_file must be set")
+    def validate_auth_config(self) -> "VaultConfig":
+        """Validate authentication configuration based on auth_method."""
+        if self.auth_method not in {"token", "approle"}:
+            raise ValueError(
+                f"Vault '{self.name}': auth_method must be 'token' or 'approle', got '{self.auth_method}'"
+            )
+
+        if self.auth_method == "token":
+            if not any([self.token, self.token_env, self.token_file]):
+                raise ValueError(
+                    f"Vault '{self.name}': when auth_method='token', at least one of "
+                    "token, token_env, or token_file must be set"
+                )
+
+        elif self.auth_method == "approle":
+            if not any([self.role_id, self.role_id_env, self.role_id_file]):
+                raise ValueError(
+                    f"Vault '{self.name}': when auth_method='approle', at least one of "
+                    "role_id, role_id_env, or role_id_file must be set"
+                )
+            if not any([self.secret_id, self.secret_id_env, self.secret_id_file]):
+                raise ValueError(
+                    f"Vault '{self.name}': when auth_method='approle', at least one of "
+                    "secret_id, secret_id_env, or secret_id_file must be set"
+                )
+
         return self
 
     @field_validator("severity")
@@ -243,6 +276,54 @@ class VaultConfig(BaseModel):
             return value
 
         return self.token
+
+    def resolve_role_id(self) -> Optional[str]:
+        """
+        Resolve the AppRole role_id from the configured source.
+
+        Priority: role_id_file > role_id_env > role_id (literal).
+
+        Returns:
+            The resolved role_id string, or None if resolution fails.
+        """
+        if self.role_id_file:
+            try:
+                return pathlib.Path(self.role_id_file).read_text().strip()
+            except OSError:
+                logger.exception("Failed to read role_id file for vault '%s'", self.name)
+                return None
+
+        if self.role_id_env:
+            value = os.environ.get(self.role_id_env)
+            if value is None:
+                logger.warning("Environment variable '%s' not set for vault '%s'", self.role_id_env, self.name)
+            return value
+
+        return self.role_id
+
+    def resolve_secret_id(self) -> Optional[str]:
+        """
+        Resolve the AppRole secret_id from the configured source.
+
+        Priority: secret_id_file > secret_id_env > secret_id (literal).
+
+        Returns:
+            The resolved secret_id string, or None if resolution fails.
+        """
+        if self.secret_id_file:
+            try:
+                return pathlib.Path(self.secret_id_file).read_text().strip()
+            except OSError:
+                logger.exception("Failed to read secret_id file for vault '%s'", self.name)
+                return None
+
+        if self.secret_id_env:
+            value = os.environ.get(self.secret_id_env)
+            if value is None:
+                logger.warning("Environment variable '%s' not set for vault '%s'", self.secret_id_env, self.name)
+            return value
+
+        return self.secret_id
 
 
 class AppConfig(BaseModel):

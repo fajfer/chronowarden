@@ -135,21 +135,46 @@ class VaultManager:
         Args:
             vault_config: Configuration for the vault instance.
         """
-        token = vault_config.resolve_token()
-        if token is None:
-            logger.error("Cannot resolve token for vault '%s', skipping", vault_config.name)
-            VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
-            INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
-            return
+        if vault_config.auth_method == "approle":
+            role_id = vault_config.resolve_role_id()
+            secret_id = vault_config.resolve_secret_id()
+            if role_id is None:
+                logger.error("Cannot resolve role_id for vault '%s', skipping", vault_config.name)
+                VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
+                INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
+                return
+            if secret_id is None:
+                logger.error("Cannot resolve secret_id for vault '%s', skipping", vault_config.name)
+                VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
+                INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
+                return
 
-        integration = VaultIntegration(
-            address=vault_config.address,
-            token=token,
-            namespace=vault_config.namespace,
-            mount_path=vault_config.mount_path,
-            verify_ssl=vault_config.verify_ssl,
-            ca_bundle=self._ca_bundle_path,
-        )
+            integration = VaultIntegration(
+                address=vault_config.address,
+                namespace=vault_config.namespace,
+                mount_path=vault_config.mount_path,
+                verify_ssl=vault_config.verify_ssl,
+                ca_bundle=self._ca_bundle_path,
+                auth_method="approle",
+                role_id=role_id,
+                secret_id=secret_id,
+            )
+        else:
+            token = vault_config.resolve_token()
+            if token is None:
+                logger.error("Cannot resolve token for vault '%s', skipping", vault_config.name)
+                VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
+                INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
+                return
+
+            integration = VaultIntegration(
+                address=vault_config.address,
+                token=token,
+                namespace=vault_config.namespace,
+                mount_path=vault_config.mount_path,
+                verify_ssl=vault_config.verify_ssl,
+                ca_bundle=self._ca_bundle_path,
+            )
 
         if integration.connect():
             self._vaults[vault_config.name] = integration

@@ -4,6 +4,7 @@
 
 // Vault integration reads/writes custom_metadata (chronowarden_ttl, chronowarden_severity, chronowarden_owner)
 // and discovers KV v2 secret engines for monitoring
+// Authentication supports token-based (token, token_env, token_file) and AppRole (role_id, secret_id) methods
 // Config is the source of truth - severity cascade: secret config → engine config → vault severity → global default
 // Owner profiles support notification routing via email and webhook channels
 // Secrets API reads from the database cache populated by sync, not from an in-memory store

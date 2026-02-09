@@ -142,8 +142,8 @@ def extract_token_from_logs(name: str, token_pattern: str) -> Optional[str]:
     return None
 
 
-def create_dev_config(approle_tokens: dict[str, str]) -> None:
-    """Create a development config.yaml with AppRole tokens."""
+def create_dev_config(approle_credentials: dict[str, tuple[str, str]]) -> None:
+    """Create a development config.yaml with AppRole authentication."""
     config_path = Path("config.yaml")
 
     config = {
@@ -151,22 +151,29 @@ def create_dev_config(approle_tokens: dict[str, str]) -> None:
             {
                 "name": "dev-openbao",
                 "address": "http://localhost:8200",
-                "token": approle_tokens.get("openbao-dev", "REPLACE_WITH_ACTUAL_TOKEN"),
+                "auth_method": "approle",
+                "role_id": approle_credentials.get("openbao-dev", ("", ""))[0],
+                "secret_id": approle_credentials.get("openbao-dev", ("", ""))[1],
                 "verify_ssl": False,
+                "severity": "default",
             },
             {
                 "name": "dev-vault-1.21.3",
                 "address": "http://localhost:8201",
-                "token": approle_tokens.get("dev-vault-1.21.3", "REPLACE_WITH_ACTUAL_TOKEN"),
+                "auth_method": "approle",
+                "role_id": approle_credentials.get("dev-vault-1.21.3", ("", ""))[0],
+                "secret_id": approle_credentials.get("dev-vault-1.21.3", ("", ""))[1],
                 "verify_ssl": False,
-                "severity": "critical"
+                "severity": "critical",
             },
             {
                 "name": "dev-vault-1.20.1",
                 "address": "http://localhost:8202",
-                "token": approle_tokens.get("dev-vault-1.20.1", "REPLACE_WITH_ACTUAL_TOKEN"),
+                "auth_method": "approle",
+                "role_id": approle_credentials.get("dev-vault-1.20.1", ("", ""))[0],
+                "secret_id": approle_credentials.get("dev-vault-1.20.1", ("", ""))[1],
                 "verify_ssl": False,
-                "severity": "none"
+                "severity": "none",
             },
         ]
     }
@@ -343,7 +350,7 @@ def main():
     logger.info("Setting up Chronowarden development environment...")
 
     root_tokens = {}
-    approle_tokens = {}
+    approle_credentials: dict[str, tuple[str, str]] = {}
 
     vault_addresses = {
         "openbao-dev": "http://localhost:8200",
@@ -395,19 +402,14 @@ def main():
                 # Create policy and AppRole
                 create_chronowarden_policy(client)
                 role_id, secret_id = setup_approle(client)
-                
-                # Login with AppRole to get client token
-                approle_token = login_with_approle(address, role_id, secret_id)
-                if approle_token:
-                    approle_tokens[container_name] = approle_token
-                else:
-                    logger.error(f"Failed to get AppRole token for {container_name}")
+                approle_credentials[container_name] = (role_id, secret_id)
+                logger.info(f"AppRole credentials stored for {container_name}")
                     
             except Exception:
                 logger.exception(f"Error setting up AppRole for {container_name}")
 
-    # Create config with AppRole tokens
-    create_dev_config(approle_tokens)
+    # Create config with AppRole credentials
+    create_dev_config(approle_credentials)
 
     logger.info("\n" + "="*70)
     logger.info("Development setup complete!")
@@ -415,7 +417,8 @@ def main():
     logger.info("\nRoot tokens (for emergency access only):")
     for container_name, root_token in root_tokens.items():
         logger.info(f"  {container_name}: {root_token}")
-    logger.info("\nConfig file created with AppRole tokens for secure access.")
+    logger.info("\nConfig file created with AppRole credentials for secure access.")
+    logger.info("Vaults configured with auth_method: approle (direct role_id/secret_id).")
     logger.info("You can now run: uv run uvicorn chronowarden:app --reload")
     logger.info("="*70 + "\n")
 
