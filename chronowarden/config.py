@@ -310,7 +310,6 @@ class AppConfig(BaseModel):
 
     def resolve_severity(
         self,
-        secret_severity: Optional[str],
         engine_id: Optional[str],
         vault_name: Optional[str],
         secret_path: Optional[str] = None,
@@ -318,7 +317,7 @@ class AppConfig(BaseModel):
         """
         Resolve severity using the configuration cascade.
 
-        Priority (highest to lowest):
+        Config is the source of truth. Priority (highest to lowest):
             1. Secret-specific config (vaults[].engines[].secrets[])
             2. Engine config (vaults[].engines[].severity)
             3. Legacy top-level engine config (engines[].default_severity)
@@ -326,7 +325,6 @@ class AppConfig(BaseModel):
             5. Global default ("default" profile / 365 days)
 
         Args:
-            secret_severity: Severity from Vault custom_metadata (used in legacy mode).
             engine_id: Engine identifier for engine-level override.
             vault_name: Vault name for vault-level override.
             secret_path: Secret path for secret-level config override.
@@ -340,12 +338,6 @@ class AppConfig(BaseModel):
             secret_config = vault_config.get_secret_config(engine_id, secret_path)
             if secret_config:
                 return secret_config.severity
-
-        if secret_severity is not None and secret_severity in VALID_SEVERITY_VALUES:
-            return secret_severity
-
-        if secret_severity is not None:
-            logger.warning("Invalid severity '%s', falling through to cascade", secret_severity)
 
         if vault_config and engine_id:
             engine_config = vault_config.get_engine_config(engine_id)

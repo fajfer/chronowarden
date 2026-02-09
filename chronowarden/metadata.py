@@ -148,48 +148,32 @@ def is_secret_enabled(custom_metadata: dict[str, Any]) -> bool:
 
 
 def resolve_secret_severity(
-    custom_metadata: dict[str, Any],
     engine_id: Optional[str],
     vault_name: Optional[str],
     config: AppConfig,
-    db: Optional[Database] = None,
     secret_path: Optional[str] = None,
 ) -> str:
     """
     Resolve the severity for a secret using the configuration cascade.
 
-    Config is the source of truth. Priority (highest to lowest):
+    Config is the source of truth. Vault metadata is not consulted.
+    Priority (highest to lowest):
         1. Secret-specific config (vaults[].engines[].secrets[])
         2. Engine config (vaults[].engines[].severity)
         3. Legacy top-level engine config (engines[].default_severity)
-        4. DB engine override (if present)
-        5. Vault config (vaults[].severity)
-        6. Global default ("default")
+        4. Vault config (vaults[].severity)
+        5. Global default ("default")
 
     Args:
-        custom_metadata: The custom_metadata dict from Vault.
         engine_id: Engine identifier.
         vault_name: Vault instance name.
         config: Application configuration.
-        db: Optional database for engine-level overrides.
         secret_path: Secret path for secret-level config lookup.
 
     Returns:
         Resolved severity string.
     """
-    secret_severity = custom_metadata.get("chronowarden_severity")
-
-    resolved = config.resolve_severity(secret_severity, engine_id, vault_name, secret_path=secret_path)
-
-    if resolved != "default" or secret_severity is not None:
-        return resolved
-
-    if db is not None and engine_id is not None and vault_name is not None:
-        db_engine = db.get_engine_config(vault_name, engine_id)
-        if db_engine and db_engine.default_severity:
-            return db_engine.default_severity
-
-    return resolved
+    return config.resolve_severity(engine_id, vault_name, secret_path=secret_path)
 
 
 def sync_secret_metadata(
@@ -203,7 +187,12 @@ def sync_secret_metadata(
     """
     Synchronize metadata for a single secret between Vault and internal state.
 
-    Config is the source of truth. Vault metadata is written by Chronowarden.
+    Config is the source of truth. During sync:
+        1. Read remote metadata from Vault backend (updated_time, custom_metadata).
+        2. Resolve severity purely from config cascade (config always wins).
+        3. Compare remote backend state and internal DB against desired config state.
+        4. Write back to Vault backend and update internal DB when they diverge.
+
     When severity is 'none', the secret is monitored but never rotated (TTL is null).
 
     Args:
@@ -225,87 +214,84 @@ def sync_secret_metadata(
     custom_metadata = vault_metadata.get("custom_metadata") or {}
     updated_time = vault_metadata.get("updated_time", "")
 
-    severity = resolve_secret_severity(
-        custom_metadata, engine_id, vault_name, config, db, secret_path=secret_path
-    )
+    # Resolve severity purely from config — never from Vault metadata
+    severity = resolve_secret_severity(engine_id, vault_name, config, secret_path=secret_path)
 
-    if severity == "none":
-        entry = SecretMetadataCache(
-            vault_name=vault_name,
-            engine_id=engine_id,
-            secret_path=secret_path,
-            updated_time=updated_time,
-            ttl=None,
-            severity="none",
-            enabled=True,
-            last_synced=datetime.now(tz=timezone.utc).isoformat(),
-        )
-        metadata_fields = {
-            "chronowarden_severity": "none",
-        }
-        vault.write_secret_metadata(secret_path, metadata_fields, mount_point=engine_id)
-        db.upsert_secret_metadata(entry)
-        return entry
+    # Read what the remote backend currently has
+    remote_severity = custom_metadata.get("chronowarden_severity")
+    remote_ttl = custom_metadata.get("chronowarden_ttl")
 
+    # Read what the internal database currently has
     cached = db.get_secret_metadata(vault_name, engine_id, secret_path)
-    vault_ttl = custom_metadata.get("chronowarden_ttl")
-    vault_severity = custom_metadata.get("chronowarden_severity")
 
-    needs_recalculate = False
-    if vault_ttl is None:
-        needs_recalculate = True
-        logger.info("No chronowarden_ttl found for %s/%s, calculating", engine_id, secret_path)
-    elif cached is not None and cached.updated_time != updated_time:
-        needs_recalculate = True
+    # Calculate the desired TTL from config
+    desired_ttl = calculate_ttl(updated_time, severity, config)
+
+    # Determine if the remote backend needs updating
+    remote_needs_update = False
+    if remote_severity != severity:
+        remote_needs_update = True
         logger.info(
-            "Secret %s/%s updated_time changed (%s -> %s), recalculating TTL",
+            "Remote severity mismatch for %s/%s (%s -> %s), updating backend",
             engine_id,
             secret_path,
-            cached.updated_time,
-            updated_time,
-        )
-    elif vault_severity != severity:
-        needs_recalculate = True
-        logger.info(
-            "Severity changed for %s/%s (%s -> %s), recalculating TTL",
-            engine_id,
-            secret_path,
-            vault_severity,
+            remote_severity,
             severity,
         )
+    if remote_ttl != desired_ttl:
+        remote_needs_update = True
+        if remote_severity == severity:
+            logger.info(
+                "Remote TTL mismatch for %s/%s (%s -> %s), updating backend",
+                engine_id,
+                secret_path,
+                remote_ttl,
+                desired_ttl,
+            )
 
-    if needs_recalculate:
-        new_ttl = calculate_ttl(updated_time, severity, config)
-        if new_ttl is not None:
-            metadata_fields = {
-                "chronowarden_ttl": new_ttl,
-                "chronowarden_severity": severity,
-            }
-            if vault.write_secret_metadata(secret_path, metadata_fields, mount_point=engine_id):
-                logger.info("Wrote TTL %s for %s/%s", new_ttl, engine_id, secret_path)
-            else:
-                logger.warning("Failed to write metadata for %s/%s", engine_id, secret_path)
-            vault_ttl = new_ttl
-    elif cached is not None and vault_ttl is not None and cached.ttl != vault_ttl:
-        logger.info(
-            "TTL mismatch for %s/%s (cached=%s, vault=%s), trusting config",
-            engine_id,
-            secret_path,
-            cached.ttl,
-            vault_ttl,
-        )
+    # Determine if the internal database needs updating
+    db_needs_update = False
+    if cached is None:
+        db_needs_update = True
+    elif cached.severity != severity or cached.ttl != desired_ttl or cached.updated_time != updated_time:
+        db_needs_update = True
+        if cached.updated_time != updated_time:
+            logger.info(
+                "Secret %s/%s updated_time changed (%s -> %s)",
+                engine_id,
+                secret_path,
+                cached.updated_time,
+                updated_time,
+            )
 
+    # Write to remote backend if it diverges from config
+    if remote_needs_update:
+        metadata_fields: dict[str, str] = {
+            "chronowarden_severity": severity,
+        }
+        if desired_ttl is not None:
+            metadata_fields["chronowarden_ttl"] = desired_ttl
+        if vault.write_secret_metadata(secret_path, metadata_fields, mount_point=engine_id):
+            logger.info("Updated backend metadata for %s/%s (severity=%s, ttl=%s)", engine_id, secret_path, severity, desired_ttl)
+        else:
+            logger.warning("Failed to write metadata for %s/%s", engine_id, secret_path)
+
+    # Always build the authoritative entry from config + remote updated_time
     entry = SecretMetadataCache(
         vault_name=vault_name,
         engine_id=engine_id,
         secret_path=secret_path,
         updated_time=updated_time,
-        ttl=vault_ttl,
+        ttl=desired_ttl,
         severity=severity,
         enabled=True,
         last_synced=datetime.now(tz=timezone.utc).isoformat(),
     )
-    db.upsert_secret_metadata(entry)
+
+    # Update internal database if it diverges from desired state
+    if db_needs_update:
+        db.upsert_secret_metadata(entry)
+
     return entry
 
 
