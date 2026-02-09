@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 
 from chronowarden.api import health_router, owners_router, secrets_router, sync_router, vault_router
 from chronowarden.config import AppConfig, load_config
@@ -106,3 +108,22 @@ async def root() -> dict[str, str]:
         "version": version("chronowarden"),
         "docs": "/docs",
     }
+
+
+# Serve SvelteKit static frontend in production.
+# The build directory is created by `npm run build` with adapter-static.
+_FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "build"
+
+if _FRONTEND_DIR.is_dir():
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str) -> FileResponse:
+        """Serve SvelteKit SPA with fallback to index.html for client-side routing."""
+        file_path = _FRONTEND_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(_FRONTEND_DIR / "index.html")
+
+    app.mount("/_app", StaticFiles(directory=_FRONTEND_DIR / "_app"), name="frontend-assets")
+    logger.info("Frontend served from %s", _FRONTEND_DIR)
+else:
+    logger.warning("Frontend build not found at %s — UI will not be served", _FRONTEND_DIR)
