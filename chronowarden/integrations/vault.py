@@ -1,12 +1,10 @@
-# SPDX-FileCopyrightText: 2025 Damian Fajfer <damian@fajfer.org>
+# SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 #
 # SPDX-License-Identifier: EUPL-1.2
 
 """HashiCorp Vault integration for Chronowarden."""
 
 import logging
-import tempfile
-from pathlib import Path
 from typing import Any, Optional
 
 import hvac
@@ -28,6 +26,9 @@ class VaultIntegration(BaseIntegration):
         mount_path: str = "secret",
         verify_ssl: bool = True,
         ca_bundle: Optional[str] = None,
+        auth_method: str = "token",
+        role_id: Optional[str] = None,
+        secret_id: Optional[str] = None,
     ) -> None:
         """
         Initialize Vault integration.
@@ -39,6 +40,9 @@ class VaultIntegration(BaseIntegration):
             mount_path: KV secrets engine mount path.
             verify_ssl: Whether to verify SSL certificates.
             ca_bundle: Path to CA certificate bundle file (if global certs configured).
+            auth_method: Authentication method ('token' or 'approle').
+            role_id: AppRole role ID (when auth_method='approle').
+            secret_id: AppRole secret ID (when auth_method='approle').
         """
         self._address = address
         self._token = token
@@ -46,6 +50,9 @@ class VaultIntegration(BaseIntegration):
         self._mount_path = mount_path
         self._verify_ssl = verify_ssl
         self._ca_bundle = ca_bundle
+        self._auth_method = auth_method
+        self._role_id = role_id
+        self._secret_id = secret_id
         self._client: Optional[hvac.Client] = None
 
     def connect(self) -> bool:
@@ -62,12 +69,28 @@ class VaultIntegration(BaseIntegration):
             if self._verify_ssl and self._ca_bundle:
                 verify = self._ca_bundle
             
-            self._client = hvac.Client(
-                url=self._address,
-                token=self._token,
-                namespace=self._namespace,
-                verify=verify,
-            )
+            if self._auth_method == "approle":
+                # Create unauthenticated client for AppRole login
+                self._client = hvac.Client(
+                    url=self._address,
+                    namespace=self._namespace,
+                    verify=verify,
+                )
+
+                response = self._client.auth.approle.login(
+                    role_id=self._role_id,
+                    secret_id=self._secret_id,
+                )
+                self._client.token = response["auth"]["client_token"]
+                logger.info("Authenticated to Vault at %s using AppRole", self._address)
+            else:
+                # Token-based authentication
+                self._client = hvac.Client(
+                    url=self._address,
+                    token=self._token,
+                    namespace=self._namespace,
+                    verify=verify,
+                )
 
             if self._client.is_authenticated():
                 logger.info("Successfully connected to Vault at %s", self._address)
