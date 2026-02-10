@@ -53,7 +53,7 @@ jobs:
           docker run -d --name smoke-test -p 8000:8000 chronowarden:smoke-test
           echo "Waiting for container to start..."
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:8000/api/v1/health; then
+            if curl -sf http://localhost:8000/api/v1/health 2>/dev/null; then
               echo ""
               echo "Health check passed!"
               docker rm -f smoke-test
@@ -62,6 +62,9 @@ jobs:
             sleep 1
           done
           echo "Health check failed after 30 seconds"
+          echo "--- Last curl attempt ---"
+          curl -v http://localhost:8000/api/v1/health || true
+          echo "--- Container logs ---"
           docker logs smoke-test
           docker rm -f smoke-test
           exit 1
