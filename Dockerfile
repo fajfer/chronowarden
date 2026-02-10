@@ -62,18 +62,31 @@ CMD ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--re
 # ============================================================================
 # Stage 3b: Production image  (default target)
 # ============================================================================
-FROM gcr.io/distroless/python3-debian12:nonroot AS production
+FROM python:3.12-slim AS production
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -u 1000 chronowarden
 
 WORKDIR /app
 
-COPY --from=backend-builder /app/.venv/lib/python3.12/site-packages /app/.venv/lib/python3.12/site-packages
+COPY --from=backend-builder /app/.venv /app/.venv
 COPY chronowarden/ /app/chronowarden/
 COPY --from=frontend-builder /app/frontend/build /app/frontend/build
 
-ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:/app" \
+RUN mkdir -p /data && chown -R chronowarden:chronowarden /app /data
+
+ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     CHRONOWARDEN_CONFIG=/data/config.yaml
 
 EXPOSE 8000
 
-ENTRYPOINT ["python", "-m", "uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["curl", "-f", "http://localhost:8000/api/v1/health"]
+
+USER chronowarden
+
+ENTRYPOINT ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000"]

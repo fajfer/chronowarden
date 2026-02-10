@@ -39,11 +39,39 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
 
-      - name: Build and push (production target)
+      - name: Build production image for smoke test
         uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          load: true
+          tags: chronowarden:smoke-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test production container
+        run: |
+          docker run -d --name smoke-test -p 8000:8000 chronowarden:smoke-test
+          echo "Waiting for container to start..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/api/v1/health; then
+              echo ""
+              echo "Health check passed!"
+              docker rm -f smoke-test
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Health check failed after 30 seconds"
+          docker logs smoke-test
+          docker rm -f smoke-test
+          exit 1
+
+      - name: Build and push (production target)
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
+        with:
+          context: .
+          push: true
           tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
@@ -51,11 +79,12 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push (dev target)
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
         with:
           context: .
           target: dev
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}-dev
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
