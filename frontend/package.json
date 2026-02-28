@@ -18,7 +18,7 @@
 		"@tailwindcss/vite": "^4.1.18",
 		"flowbite": "^4.0.1",
 		"flowbite-svelte": "^1.31.0",
-		"svelte": "^5.49.2",
+		"svelte": "^5.53.6",
 		"svelte-check": "^4.3.6",
 		"tailwindcss": "^4.1.18",
 		"typescript": "^5.9.3",
