@@ -51,7 +51,7 @@ class VaultManager:
         # Create global CA bundle if directory is configured
         if config.ca_certs_dir:
             self._ca_bundle_path = self._create_ca_bundle(config.ca_certs_dir)
-        
+
         for vault_config in config.vaults:
             self._connect_vault(vault_config)
 
@@ -88,16 +88,16 @@ class VaultManager:
         if not cert_dir.is_dir():
             logger.warning("CA certs directory does not exist: %s", certs_dir)
             return None
-        
+
         # Find all certificate files
         cert_files = []
         for pattern in ["*.pem", "*.crt", "*.cert"]:
             cert_files.extend(cert_dir.glob(pattern))
-        
+
         if not cert_files:
             logger.warning("No certificate files found in %s", certs_dir)
             return None
-        
+
         # Load all certificates
         bundle_content = []
         for cert_file in cert_files:
@@ -107,11 +107,11 @@ class VaultManager:
                 logger.info("Loaded CA certificate: %s", cert_file.name)
             except OSError:
                 logger.exception("Failed to read certificate file: %s", cert_file)
-        
+
         if not bundle_content:
             logger.warning("No valid certificates loaded from %s", certs_dir)
             return None
-        
+
         # Create temporary bundle file
         try:
             fd, bundle_path = tempfile.mkstemp(suffix=".pem", prefix="chronowarden-ca-")
@@ -121,7 +121,7 @@ class VaultManager:
                 "Created global CA bundle with %d certificate(s) from %s: %s",
                 len(bundle_content),
                 certs_dir,
-                bundle_path
+                bundle_path,
             )
             return bundle_path
         except OSError:

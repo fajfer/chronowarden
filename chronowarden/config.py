@@ -175,9 +175,7 @@ class VaultConfig(BaseModel):
         """Migrate deprecated default_severity to severity."""
         if isinstance(data, dict):
             if "default_severity" in data:
-                logger.warning(
-                    "Deprecated: 'default_severity' in vault config. Use 'severity' instead."
-                )
+                logger.warning("Deprecated: 'default_severity' in vault config. Use 'severity' instead.")
                 if "severity" not in data or data["severity"] is None:
                     data["severity"] = data.pop("default_severity")
                 else:
@@ -188,9 +186,7 @@ class VaultConfig(BaseModel):
     def validate_auth_config(self) -> "VaultConfig":
         """Validate authentication configuration based on auth_method."""
         if self.auth_method not in {"token", "approle"}:
-            raise ValueError(
-                f"Vault '{self.name}': auth_method must be 'token' or 'approle', got '{self.auth_method}'"
-            )
+            raise ValueError(f"Vault '{self.name}': auth_method must be 'token' or 'approle', got '{self.auth_method}'")
 
         if self.auth_method == "token":
             if not any([self.token, self.token_env, self.token_file]):
@@ -330,16 +326,13 @@ class AppConfig(BaseModel):
     """Root application configuration."""
 
     ca_certs_dir: Optional[str] = Field(
-        default=None,
-        description="Directory containing CA certificates (all .pem, .crt, .cert files will be loaded)"
+        default=None, description="Directory containing CA certificates (all .pem, .crt, .cert files will be loaded)"
     )
     vaults: list[VaultConfig] = Field(default_factory=list, description="List of Vault instances to connect to")
     date_format: str = Field(default="YYYY-MM-DD", description="Global date format for chronowarden_ttl")
     polling_interval: str = Field(default="6h", description="Global polling interval for change detection")
     expiry_profiles: dict[str, ExpiryProfile] = Field(
-        default_factory=lambda: {
-            name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()
-        },
+        default_factory=lambda: {name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()},
         description="Expiry profiles mapping severity names to rotation periods",
     )
     engines: list[EngineConfig] = Field(
@@ -354,9 +347,7 @@ class AppConfig(BaseModel):
         if duplicates:
             raise ValueError(f"Duplicate vault names: {', '.join(set(duplicates))}")
         if self.engines:
-            logger.warning(
-                "Deprecated: top-level 'engines' array. Move engine configs into vaults[].engines instead."
-            )
+            logger.warning("Deprecated: top-level 'engines' array. Move engine configs into vaults[].engines instead.")
         return self
 
     def _get_vault_config(self, vault_name: str) -> Optional[VaultConfig]:
@@ -389,14 +380,14 @@ class AppConfig(BaseModel):
                 return engine
         return None
 
-    def resolve_severity(
+    def _resolve_severity_with_source(
         self,
         engine_id: Optional[str],
         vault_name: Optional[str],
         secret_path: Optional[str] = None,
-    ) -> str:
+    ) -> tuple[str, str]:
         """
-        Resolve severity using the configuration cascade.
+        Resolve severity and its source using the configuration cascade.
 
         Config is the source of truth. Priority (highest to lowest):
             1. Secret-specific config (vaults[].engines[].secrets[])
@@ -409,45 +400,6 @@ class AppConfig(BaseModel):
             engine_id: Engine identifier for engine-level override.
             vault_name: Vault name for vault-level override.
             secret_path: Secret path for secret-level config override.
-
-        Returns:
-            Resolved severity string.
-        """
-        vault_config = self._get_vault_config(vault_name) if vault_name else None
-
-        if vault_config and engine_id and secret_path:
-            secret_config = vault_config.get_secret_config(engine_id, secret_path)
-            if secret_config:
-                return secret_config.severity
-
-        if vault_config and engine_id:
-            engine_config = vault_config.get_engine_config(engine_id)
-            if engine_config and engine_config.severity:
-                return engine_config.severity
-
-        if engine_id is not None:
-            legacy_engine = self.get_engine_config(engine_id)
-            if legacy_engine and legacy_engine.default_severity:
-                return legacy_engine.default_severity
-
-        if vault_config and vault_config.severity:
-            return vault_config.severity
-
-        return "default"
-
-    def resolve_severity_source(
-        self,
-        engine_id: Optional[str],
-        vault_name: Optional[str],
-        secret_path: Optional[str] = None,
-    ) -> tuple[str, str]:
-        """
-        Resolve severity and return the source that determined it.
-
-        Args:
-            engine_id: Engine identifier.
-            vault_name: Vault name.
-            secret_path: Secret path.
 
         Returns:
             Tuple of (severity, source) where source describes the cascade level.
@@ -473,6 +425,45 @@ class AppConfig(BaseModel):
             return vault_config.severity, "vault_config"
 
         return "default", "global_default"
+
+    def resolve_severity(
+        self,
+        engine_id: Optional[str],
+        vault_name: Optional[str],
+        secret_path: Optional[str] = None,
+    ) -> str:
+        """
+        Resolve severity using the configuration cascade.
+
+        Args:
+            engine_id: Engine identifier for engine-level override.
+            vault_name: Vault name for vault-level override.
+            secret_path: Secret path for secret-level config override.
+
+        Returns:
+            Resolved severity string.
+        """
+        severity, _ = self._resolve_severity_with_source(engine_id, vault_name, secret_path)
+        return severity
+
+    def resolve_severity_source(
+        self,
+        engine_id: Optional[str],
+        vault_name: Optional[str],
+        secret_path: Optional[str] = None,
+    ) -> tuple[str, str]:
+        """
+        Resolve severity and return the source that determined it.
+
+        Args:
+            engine_id: Engine identifier.
+            vault_name: Vault name.
+            secret_path: Secret path.
+
+        Returns:
+            Tuple of (severity, source) where source describes the cascade level.
+        """
+        return self._resolve_severity_with_source(engine_id, vault_name, secret_path)
 
     def get_rotation_days(self, severity: str) -> int:
         """

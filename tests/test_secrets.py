@@ -8,12 +8,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from chronowarden.config import AppConfig
 from chronowarden.database import Database, SecretMetadataCache
-from chronowarden.models.secret import SecretMetadataResponse, SecretStatus
 
 
 class TestSecretsDatabaseMethods:
@@ -159,9 +157,9 @@ class TestSecretsAPI:
 
     def _get_client(self) -> TestClient:
         """Build a TestClient with patched app dependencies."""
-        from chronowarden.api.secrets import router
-
         from fastapi import FastAPI
+
+        from chronowarden.api.secrets import router
 
         app = FastAPI()
         app.include_router(router, prefix="/api/v1")
@@ -201,9 +199,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -219,9 +217,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -247,9 +245,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -267,9 +265,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -286,9 +284,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -304,9 +302,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -325,9 +323,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -344,9 +342,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -375,9 +373,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -393,9 +391,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -409,9 +407,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")
@@ -425,9 +423,9 @@ class TestSecretsAPI:
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from chronowarden.api.secrets import router
-
             from fastapi import FastAPI
+
+            from chronowarden.api.secrets import router
 
             app = FastAPI()
             app.include_router(router, prefix="/api/v1")

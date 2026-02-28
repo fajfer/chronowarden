@@ -64,11 +64,11 @@ class VaultIntegration(BaseIntegration):
         """
         try:
             verify: bool | str = self._verify_ssl
-            
+
             # Use global CA bundle if provided
             if self._verify_ssl and self._ca_bundle:
                 verify = self._ca_bundle
-            
+
             if self._auth_method == "approle":
                 # Create unauthenticated client for AppRole login
                 self._client = hvac.Client(
@@ -124,7 +124,9 @@ class VaultIntegration(BaseIntegration):
             logger.exception("Error checking Vault connection")
             return False
 
-    def get_secret(self, path: str, key: Optional[str] = None, mount_point: Optional[str] = None) -> Optional[dict[str, Any]]:
+    def get_secret(
+        self, path: str, key: Optional[str] = None, mount_point: Optional[str] = None
+    ) -> Optional[dict[str, Any]]:
         """
         Retrieve a secret from Vault KV v2 engine.
 
@@ -191,9 +193,9 @@ class VaultIntegration(BaseIntegration):
             return []
         except InvalidPath:
             if path == "":
-                logger.warning(f"Secrets not found under mount_point {mount}")
+                logger.warning("Secrets not found under mount_point %s", mount)
             else:
-                logger.warning(f"Path not found: {path}")
+                logger.warning("Path not found: %s", path)
             return []
         except VaultError:
             logger.exception("Error listing secrets from Vault")
@@ -318,12 +320,14 @@ class VaultIntegration(BaseIntegration):
                 options = details.get("options", {}) or {}
                 version = options.get("version", "")
                 if engine_type == "kv" and version == "2":
-                    engines.append({
-                        "path": mount_path.rstrip("/"),
-                        "type": "kv",
-                        "version": "2",
-                        "description": details.get("description", ""),
-                    })
+                    engines.append(
+                        {
+                            "path": mount_path.rstrip("/"),
+                            "type": "kv",
+                            "version": "2",
+                            "description": details.get("description", ""),
+                        }
+                    )
             return engines
         except VaultError:
             logger.exception("Error discovering secret engines")

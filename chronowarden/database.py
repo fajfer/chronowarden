@@ -355,7 +355,6 @@ class Database:
             logger.error("Database not connected")
             return False
 
-        _ALLOWED_COLUMNS = {"severity", "enabled"}
         updates = []
         params: list = []
 
@@ -489,15 +488,15 @@ class Database:
             logger.error("Database not connected")
             return
 
-        _ALLOWED_COLUMNS = {"name", "email"}
         updates = []
         params: list = []
-        field_map = {"name": name, "email": email}
 
-        for column, value in field_map.items():
-            if value is not None and column in _ALLOWED_COLUMNS:
-                updates.append(f"{column} = ?")
-                params.append(value)
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if email is not None:
+            updates.append("email = ?")
+            params.append(email)
 
         if not updates:
             return
