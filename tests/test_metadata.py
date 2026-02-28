@@ -10,7 +10,6 @@ from chronowarden.metadata import (
     format_date,
     is_secret_enabled,
     parse_date,
-    resolve_secret_severity,
 )
 
 
@@ -135,7 +134,7 @@ class TestIsSecretEnabled:
 
 
 class TestResolveSeverity:
-    """Tests for resolve_secret_severity function."""
+    """Tests for config.resolve_severity cascade."""
 
     def test_config_wins_over_metadata(self) -> None:
         """Config always wins, vault metadata is irrelevant."""
@@ -151,19 +150,19 @@ class TestResolveSeverity:
                 ),
             ],
         )
-        result = resolve_secret_severity("apps", "vault", config)
+        result = config.resolve_severity("apps", "vault")
         assert result == "critical"
 
     def test_falls_through_to_engine(self) -> None:
         from chronowarden.config import EngineConfig
 
         config = AppConfig(engines=[EngineConfig(id="apps", default_severity="pci-dss-4.0")])
-        result = resolve_secret_severity("apps", "vault", config)
+        result = config.resolve_severity("apps", "vault")
         assert result == "pci-dss-4.0"
 
     def test_falls_through_to_default(self) -> None:
         config = AppConfig()
-        result = resolve_secret_severity(None, None, config)
+        result = config.resolve_severity(None, None)
         assert result == "default"
 
     def test_none_severity_from_secret_config(self) -> None:
@@ -186,7 +185,7 @@ class TestResolveSeverity:
                 ),
             ],
         )
-        result = resolve_secret_severity("apps", "vault", config, secret_path="static")
+        result = config.resolve_severity("apps", "vault", secret_path="static")
         assert result == "none"
 
     def test_secret_config_wins_over_metadata(self) -> None:
@@ -210,7 +209,7 @@ class TestResolveSeverity:
                 ),
             ],
         )
-        result = resolve_secret_severity("certs", "prod", config, secret_path="root-ca")
+        result = config.resolve_severity("certs", "prod", secret_path="root-ca")
         assert result == "none"
 
     def test_engine_config_inherited(self) -> None:
@@ -230,7 +229,7 @@ class TestResolveSeverity:
                 ),
             ],
         )
-        result = resolve_secret_severity("certs", "prod", config, secret_path="any-cert")
+        result = config.resolve_severity("certs", "prod", secret_path="any-cert")
         assert result == "pci-dss-4.0"
 
     def test_vault_severity_inherited(self) -> None:
@@ -247,5 +246,5 @@ class TestResolveSeverity:
                 ),
             ],
         )
-        result = resolve_secret_severity("any-engine", "prod", config, secret_path="any-secret")
+        result = config.resolve_severity("any-engine", "prod", secret_path="any-secret")
         assert result == "critical"

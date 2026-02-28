@@ -5,7 +5,6 @@
 """Main FastAPI application for Chronowarden."""
 
 import logging
-import re
 from contextlib import asynccontextmanager
 from importlib.metadata import metadata, version
 from pathlib import Path
@@ -25,34 +24,6 @@ logger = logging.getLogger(__name__)
 vault_manager = VaultManager()
 db = Database()
 app_config = AppConfig()
-
-_POLLING_INTERVAL_PATTERN = re.compile(r"^(\d+)([hms])$")
-
-
-def _parse_polling_interval_seconds(interval: str) -> int:
-    """
-    Parse a polling interval string to seconds.
-
-    Args:
-        interval: Interval string (e.g. '6h', '30m', '60s').
-
-    Returns:
-        Interval in seconds.
-    """
-    match = _POLLING_INTERVAL_PATTERN.match(interval.strip().lower())
-    if not match:
-        logger.warning("Invalid polling interval '%s', defaulting to 6h", interval)
-        return 21600
-
-    value = int(match.group(1))
-    unit = match.group(2)
-
-    if unit == "h":
-        return value * 3600
-    elif unit == "m":
-        return value * 60
-    else:
-        return value
 
 
 @asynccontextmanager
@@ -115,6 +86,7 @@ async def root() -> dict[str, str]:
 _FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "build"
 
 if _FRONTEND_DIR.is_dir():
+
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str) -> FileResponse:
         """Serve SvelteKit SPA with fallback to index.html for client-side routing."""

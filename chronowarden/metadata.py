@@ -15,9 +15,7 @@ from chronowarden.integrations.vault import VaultIntegration
 
 logger = logging.getLogger(__name__)
 
-_ISO_8601_PATTERN = re.compile(
-    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"
-)
+_ISO_8601_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 
 
 def parse_date(date_str: str, format_hint: str = "YYYY-MM-DD") -> Optional[datetime]:
@@ -147,35 +145,6 @@ def is_secret_enabled(custom_metadata: dict[str, Any]) -> bool:
     return bool(enabled_value)
 
 
-def resolve_secret_severity(
-    engine_id: Optional[str],
-    vault_name: Optional[str],
-    config: AppConfig,
-    secret_path: Optional[str] = None,
-) -> str:
-    """
-    Resolve the severity for a secret using the configuration cascade.
-
-    Config is the source of truth. Vault metadata is not consulted.
-    Priority (highest to lowest):
-        1. Secret-specific config (vaults[].engines[].secrets[])
-        2. Engine config (vaults[].engines[].severity)
-        3. Legacy top-level engine config (engines[].default_severity)
-        4. Vault config (vaults[].severity)
-        5. Global default ("default")
-
-    Args:
-        engine_id: Engine identifier.
-        vault_name: Vault instance name.
-        config: Application configuration.
-        secret_path: Secret path for secret-level config lookup.
-
-    Returns:
-        Resolved severity string.
-    """
-    return config.resolve_severity(engine_id, vault_name, secret_path=secret_path)
-
-
 def sync_secret_metadata(
     vault: VaultIntegration,
     vault_name: str,
@@ -215,7 +184,7 @@ def sync_secret_metadata(
     updated_time = vault_metadata.get("updated_time", "")
 
     # Resolve severity purely from config — never from Vault metadata
-    severity = resolve_secret_severity(engine_id, vault_name, config, secret_path=secret_path)
+    severity = config.resolve_severity(engine_id, vault_name, secret_path=secret_path)
 
     # Read what the remote backend currently has
     remote_severity = custom_metadata.get("chronowarden_severity")
@@ -272,7 +241,13 @@ def sync_secret_metadata(
         if desired_ttl is not None:
             metadata_fields["chronowarden_ttl"] = desired_ttl
         if vault.write_secret_metadata(secret_path, metadata_fields, mount_point=engine_id):
-            logger.info("Updated backend metadata for %s/%s (severity=%s, ttl=%s)", engine_id, secret_path, severity, desired_ttl)
+            logger.info(
+                "Updated backend metadata for %s/%s (severity=%s, ttl=%s)",
+                engine_id,
+                secret_path,
+                severity,
+                desired_ttl,
+            )
         else:
             logger.warning("Failed to write metadata for %s/%s", engine_id, secret_path)
 
