@@ -8,10 +8,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from chronowarden.api.secrets import router
 from chronowarden.config import AppConfig
 from chronowarden.database import Database, SecretMetadataCache
+from chronowarden.models.secret import SecretStatus
 
 
 class TestSecretsDatabaseMethods:
@@ -155,20 +158,11 @@ class TestSecretsAPI:
         """Clean up test database."""
         self.db.close()
 
-    def _get_client(self) -> TestClient:
-        """Build a TestClient with patched app dependencies."""
-        from fastapi import FastAPI
-
-        from chronowarden.api.secrets import router
-
+    def _build_client(self) -> TestClient:
+        """Build a TestClient for the secrets API router."""
         app = FastAPI()
         app.include_router(router, prefix="/api/v1")
-
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            return TestClient(app)
+        return TestClient(app)
 
     def _insert_secret(
         self,
@@ -195,17 +189,11 @@ class TestSecretsAPI:
 
     def test_list_secrets_empty(self) -> None:
         """Test listing secrets when cache is empty."""
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/")
             assert response.status_code == 200
             assert response.json() == []
@@ -213,17 +201,11 @@ class TestSecretsAPI:
     def test_list_secrets_with_data(self) -> None:
         """Test listing secrets with data in cache."""
         self._insert_secret()
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/")
             assert response.status_code == 200
             data = response.json()
@@ -241,17 +223,11 @@ class TestSecretsAPI:
         """Test listing secrets filtered by vault name."""
         self._insert_secret(vault_name="vault-a", secret_path="key-1")
         self._insert_secret(vault_name="vault-b", secret_path="key-2")
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/", params={"vault_name": "vault-a"})
             assert response.status_code == 200
             data = response.json()
@@ -261,17 +237,11 @@ class TestSecretsAPI:
     def test_get_secret_by_id(self) -> None:
         """Test getting a single secret by ID."""
         self._insert_secret()
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/1")
             assert response.status_code == 200
             data = response.json()
@@ -280,17 +250,11 @@ class TestSecretsAPI:
 
     def test_get_secret_not_found(self) -> None:
         """Test getting a nonexistent secret returns 404."""
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/999")
             assert response.status_code == 404
 
@@ -298,17 +262,11 @@ class TestSecretsAPI:
         """Test that a secret far from expiry has OK status."""
         future_date = (datetime.now(tz=timezone.utc) + timedelta(days=100)).strftime("%Y-%m-%d")
         self._insert_secret(ttl=future_date)
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/1")
             data = response.json()
             assert data["status"] == "ok"
@@ -319,17 +277,11 @@ class TestSecretsAPI:
         """Test that a secret close to expiry has WARNING status."""
         warning_date = (datetime.now(tz=timezone.utc) + timedelta(days=15)).strftime("%Y-%m-%d")
         self._insert_secret(ttl=warning_date)
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/1")
             data = response.json()
             assert data["status"] == "warning"
@@ -338,17 +290,11 @@ class TestSecretsAPI:
         """Test that an expired secret has EXPIRED status."""
         past_date = (datetime.now(tz=timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d")
         self._insert_secret(ttl=past_date)
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/1")
             data = response.json()
             assert data["status"] == "expired"
@@ -369,17 +315,11 @@ class TestSecretsAPI:
                 last_synced=datetime.now(tz=timezone.utc).isoformat(),
             )
         )
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/1")
             data = response.json()
             assert data["status"] == "no_ttl"
@@ -387,48 +327,198 @@ class TestSecretsAPI:
 
     def test_removed_endpoints_post(self) -> None:
         """Test that POST /secrets/ no longer exists."""
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.post("/api/v1/secrets/", json={})
             assert response.status_code == 405
 
     def test_removed_endpoints_delete(self) -> None:
         """Test that DELETE /secrets/:id no longer exists."""
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.delete("/api/v1/secrets/1")
             assert response.status_code == 405
 
     def test_removed_endpoints_public(self) -> None:
         """Test that GET /secrets/public/ no longer exists (returns 422 since 'public' is not a valid int ID)."""
+        client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
-            from fastapi import FastAPI
-
-            from chronowarden.api.secrets import router
-
-            app = FastAPI()
-            app.include_router(router, prefix="/api/v1")
-            client = TestClient(app)
             response = client.get("/api/v1/secrets/public/")
             assert response.status_code == 422
+
+    def test_patch_secret_severity(self) -> None:
+        """Test PATCH endpoint updates severity in cache and vault."""
+        self._insert_secret()
+        mock_vault = MagicMock()
+        mock_vault.is_connected.return_value = True
+        mock_vault.write_secret_metadata.return_value = True
+        self.vault_manager.get.return_value = mock_vault
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
+            assert response.status_code == 200
+            data = response.json()
+            assert data["severity"] == "critical"
+            assert data["rotation_period_days"] == 180
+            mock_vault.write_secret_metadata.assert_called_once()
+
+    def test_patch_secret_enabled(self) -> None:
+        """Test PATCH endpoint updates enabled flag in cache and vault."""
+        self._insert_secret()
+        mock_vault = MagicMock()
+        mock_vault.is_connected.return_value = True
+        mock_vault.write_secret_metadata.return_value = True
+        self.vault_manager.get.return_value = mock_vault
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/1", json={"enabled": False})
+            assert response.status_code == 200
+            data = response.json()
+            assert data["enabled"] is False
+
+    def test_patch_secret_not_found(self) -> None:
+        """Test PATCH returns 404 for nonexistent secret."""
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/999", json={"severity": "critical"})
+            assert response.status_code == 404
+
+    def test_patch_secret_vault_disconnected(self) -> None:
+        """Test PATCH returns 503 when vault is not connected."""
+        self._insert_secret()
+        mock_vault = MagicMock()
+        mock_vault.is_connected.return_value = False
+        self.vault_manager.get.return_value = mock_vault
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
+            assert response.status_code == 503
+
+    def test_patch_secret_vault_not_found(self) -> None:
+        """Test PATCH returns 503 when vault instance is not registered."""
+        self._insert_secret()
+        self.vault_manager.get.return_value = None
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
+            assert response.status_code == 503
+
+    def test_patch_secret_vault_write_failure(self) -> None:
+        """Test PATCH returns 503 when vault write raises an exception."""
+        self._insert_secret()
+        mock_vault = MagicMock()
+        mock_vault.is_connected.return_value = True
+        mock_vault.write_secret_metadata.side_effect = Exception("connection lost")
+        self.vault_manager.get.return_value = mock_vault
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
+            assert response.status_code == 503
+
+    def test_list_secrets_filter_engine(self) -> None:
+        """Test listing secrets filtered by engine ID via API."""
+        self._insert_secret(engine_id="apps", secret_path="key-1")
+        self._insert_secret(engine_id="databases", secret_path="key-2")
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.get("/api/v1/secrets/", params={"engine_id": "apps"})
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 1
+            assert data[0]["engine_id"] == "apps"
+
+    def test_list_secrets_filter_severity(self) -> None:
+        """Test listing secrets filtered by severity via API."""
+        self._insert_secret(severity="critical", secret_path="key-1")
+        self._insert_secret(severity="default", secret_path="key-2")
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.get("/api/v1/secrets/", params={"severity": "critical"})
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 1
+            assert data[0]["severity"] == "critical"
+
+    def test_list_secrets_filter_enabled(self) -> None:
+        """Test listing secrets filtered by enabled status via API."""
+        self._insert_secret(enabled=True, secret_path="key-1")
+        self._insert_secret(enabled=False, secret_path="key-2")
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.get("/api/v1/secrets/", params={"enabled": True})
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 1
+            assert data[0]["enabled"] is True
+
+
+class TestComputeStatus:
+    """Tests for the _compute_status helper."""
+
+    def test_none_returns_no_ttl(self) -> None:
+        """None days remaining means no TTL is set."""
+        from chronowarden.api.secrets import _compute_status
+
+        assert _compute_status(None) == SecretStatus.NO_TTL
+
+    def test_negative_returns_expired(self) -> None:
+        """Negative days remaining means the secret is expired."""
+        from chronowarden.api.secrets import _compute_status
+
+        assert _compute_status(-5) == SecretStatus.EXPIRED
+
+    def test_zero_returns_expired(self) -> None:
+        """Zero days remaining means the secret is expired."""
+        from chronowarden.api.secrets import _compute_status
+
+        assert _compute_status(0) == SecretStatus.EXPIRED
+
+    def test_under_threshold_returns_warning(self) -> None:
+        """Days remaining within 30-day window returns warning."""
+        from chronowarden.api.secrets import _compute_status
+
+        assert _compute_status(1) == SecretStatus.WARNING
+        assert _compute_status(30) == SecretStatus.WARNING
+
+    def test_above_threshold_returns_ok(self) -> None:
+        """Days remaining above 30-day window returns ok."""
+        from chronowarden.api.secrets import _compute_status
+
+        assert _compute_status(31) == SecretStatus.OK
+        assert _compute_status(365) == SecretStatus.OK
