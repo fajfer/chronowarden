@@ -4,6 +4,8 @@
 
 """Tests for date parsing, TTL calculation, and metadata logic."""
 
+from typing import Any
+
 from chronowarden.config import AppConfig
 from chronowarden.metadata import (
     calculate_ttl,
@@ -44,7 +46,8 @@ class TestParseDate:
         assert parse_date("") is None
 
     def test_none_input(self) -> None:
-        assert parse_date(None) is None
+        none_value: Any = None
+        assert parse_date(none_value) is None
 
     def test_invalid_date(self) -> None:
         assert parse_date("not-a-date") is None
@@ -62,13 +65,22 @@ class TestFormatDate:
 
     def test_yyyy_mm_dd(self) -> None:
         dt = parse_date("2026-02-07T00:00:00Z")
+        assert dt is not None
         result = format_date(dt, "YYYY-MM-DD")
         assert result == "2026-02-07"
 
     def test_yyyy_dd_mm(self) -> None:
         dt = parse_date("2026-02-07T00:00:00Z")
+        assert dt is not None
         result = format_date(dt, "YYYY-DD-MM")
         assert result == "2026-07-02"
+
+    def test_default_format_is_yyyy_mm_dd(self) -> None:
+        """Calling format_date without explicit format uses YYYY-MM-DD."""
+        dt = parse_date("2026-12-25T00:00:00Z")
+        assert dt is not None
+        result = format_date(dt)
+        assert result == "2026-12-25"
 
 
 class TestCalculateTTL:
@@ -103,6 +115,38 @@ class TestCalculateTTL:
         config = AppConfig()
         result = calculate_ttl("2026-02-07T14:02:00.859376388Z", "default", config)
         assert result == "2027-02-07"
+
+    def test_custom_expiry_profile(self) -> None:
+        """Test calculate_ttl with a user-defined expiry profile."""
+        from chronowarden.config import ExpiryProfile
+
+        config = AppConfig(
+            expiry_profiles={
+                "default": ExpiryProfile(rotation_period="365d"),
+                "weekly": ExpiryProfile(rotation_period="7d"),
+            },
+        )
+        result = calculate_ttl("2026-01-01T00:00:00Z", "weekly", config)
+        assert result == "2026-01-08"
+
+    def test_unknown_severity_falls_back_to_default(self) -> None:
+        """Unknown severity uses the default profile rotation period."""
+        config = AppConfig()
+        result = calculate_ttl("2026-02-07T14:02:00Z", "unknown-profile", config)
+        assert result == "2027-02-07"
+
+    def test_empty_updated_time(self) -> None:
+        """Empty string updated_time returns None."""
+        config = AppConfig()
+        result = calculate_ttl("", "default", config)
+        assert result is None
+
+    def test_none_updated_time(self) -> None:
+        """None updated_time returns None."""
+        config = AppConfig()
+        none_value: Any = None
+        result = calculate_ttl(none_value, "default", config)
+        assert result is None
 
 
 class TestIsSecretEnabled:
