@@ -156,6 +156,7 @@ class VaultConfig(BaseModel):
     secret_id: Optional[str] = Field(default=None, description="AppRole secret ID")
     secret_id_env: Optional[str] = Field(default=None, description="Environment variable containing secret ID")
     secret_id_file: Optional[str] = Field(default=None, description="Path to file containing secret ID")
+    approle_mount_point: str = Field(default="approle", description="AppRole auth method mount point")
 
     namespace: Optional[str] = Field(default=None, description="Vault namespace (enterprise feature)")
     mount_path: str = Field(default="secret", description="KV secrets engine mount path")

@@ -158,6 +158,7 @@ class VaultManager:
                 auth_method="approle",
                 role_id=role_id,
                 secret_id=secret_id,
+                approle_mount_point=vault_config.approle_mount_point,
             )
         else:
             token = vault_config.resolve_token()

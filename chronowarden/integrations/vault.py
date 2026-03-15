@@ -29,6 +29,7 @@ class VaultIntegration(BaseIntegration):
         auth_method: str = "token",
         role_id: Optional[str] = None,
         secret_id: Optional[str] = None,
+        approle_mount_point: str = "approle",
     ) -> None:
         """
         Initialize Vault integration.
@@ -43,6 +44,7 @@ class VaultIntegration(BaseIntegration):
             auth_method: Authentication method ('token' or 'approle').
             role_id: AppRole role ID (when auth_method='approle').
             secret_id: AppRole secret ID (when auth_method='approle').
+            approle_mount_point: AppRole auth method mount point (when auth_method='approle').
         """
         self._address = address
         self._token = token
@@ -53,6 +55,7 @@ class VaultIntegration(BaseIntegration):
         self._auth_method = auth_method
         self._role_id = role_id
         self._secret_id = secret_id
+        self._approle_mount_point = approle_mount_point
         self._client: Optional[hvac.Client] = None
 
     def connect(self) -> bool:
@@ -80,6 +83,7 @@ class VaultIntegration(BaseIntegration):
                 response = self._client.auth.approle.login(
                     role_id=self._role_id,
                     secret_id=self._secret_id,
+                    mount_point=self._approle_mount_point,
                 )
                 self._client.token = response["auth"]["client_token"]
                 logger.info("Authenticated to Vault at %s using AppRole", self._address)
