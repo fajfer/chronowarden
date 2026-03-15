@@ -698,3 +698,26 @@ class TestAppRoleConfig:
             secret_id_env="NONEXISTENT_SECRET_VAR",
         )
         assert vc.resolve_secret_id() is None
+
+    def test_approle_mount_point_default(self) -> None:
+        """AppRole mount point defaults to 'approle'."""
+        vc = VaultConfig(
+            name="test",
+            address="http://localhost",
+            auth_method="approle",
+            role_id="test-role-id",
+            secret_id="test-secret-id",
+        )
+        assert vc.approle_mount_point == "approle"
+
+    def test_approle_mount_point_custom(self) -> None:
+        """AppRole mount point can be customized."""
+        vc = VaultConfig(
+            name="test",
+            address="http://localhost",
+            auth_method="approle",
+            role_id="test-role-id",
+            secret_id="test-secret-id",
+            approle_mount_point="my-approle",
+        )
+        assert vc.approle_mount_point == "my-approle"

@@ -20,6 +20,7 @@
 #   - role_id / secret_id:         literal values (for development only)
 #   - role_id_env / secret_id_env: environment variable names
 #   - role_id_file / secret_id_file: file paths (K8s Secret volume mount)
+#   - approle_mount_point:         custom auth method mount point (default: "approle")
 #
 # AppRole resolution priority: *_file > *_env > literal
 
@@ -115,6 +116,8 @@ vaults:
   #   # Or via environment variables
   #   # role_id_env: VAULT_ROLE_ID
   #   # secret_id_env: VAULT_SECRET_ID
+  #   # Custom AppRole mount point (default: "approle")
+  #   # approle_mount_point: my-approle
   #   namespace: admin/chronowarden
   #   verify_ssl: true
   #   severity: critical
