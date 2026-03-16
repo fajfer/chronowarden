@@ -124,7 +124,7 @@ Development — full shell, git, --reload, 286MB \
 For local testing with dev Vault instances:
 
 ```bash
-python dev-setup.py
+uv run python dev-setup.py
 ```
 
 This script:

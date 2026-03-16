@@ -152,6 +152,7 @@ def create_dev_config(approle_credentials: dict[str, tuple[str, str]]) -> None:
                 "name": "dev-openbao",
                 "address": "http://localhost:8200",
                 "auth_method": "approle",
+                "approle_mount_point": "chronowarden",
                 "role_id": approle_credentials.get("openbao-dev", ("", ""))[0],
                 "secret_id": approle_credentials.get("openbao-dev", ("", ""))[1],
                 "verify_ssl": False,
@@ -161,6 +162,7 @@ def create_dev_config(approle_credentials: dict[str, tuple[str, str]]) -> None:
                 "name": "dev-vault-1.21.3",
                 "address": "http://localhost:8201",
                 "auth_method": "approle",
+                "approle_mount_point": "chronowarden",
                 "role_id": approle_credentials.get("dev-vault-1.21.3", ("", ""))[0],
                 "secret_id": approle_credentials.get("dev-vault-1.21.3", ("", ""))[1],
                 "verify_ssl": False,
@@ -170,6 +172,7 @@ def create_dev_config(approle_credentials: dict[str, tuple[str, str]]) -> None:
                 "name": "dev-vault-1.20.1",
                 "address": "http://localhost:8202",
                 "auth_method": "approle",
+                "approle_mount_point": "chronowarden",
                 "role_id": approle_credentials.get("dev-vault-1.20.1", ("", ""))[0],
                 "secret_id": approle_credentials.get("dev-vault-1.20.1", ("", ""))[1],
                 "verify_ssl": False,
@@ -246,12 +249,12 @@ def setup_approle(client: hvac.Client) -> tuple[str, str]:
     Returns:
         Tuple of (role_id, secret_id) for AppRole authentication
     """
-    # Enable AppRole auth method
+    # Enable AppRole auth method at the "chronowarden" mount point
     try:
-        client.sys.enable_auth_method("approle")
-        logger.info("  Enabled AppRole auth method")
+        client.sys.enable_auth_method("approle", path="chronowarden")
+        logger.info("  Enabled AppRole auth method at mount point 'chronowarden'")
     except hvac.exceptions.InvalidRequest:
-        logger.info("  AppRole auth method already enabled")
+        logger.info("  AppRole auth method at mount point 'chronowarden' already enabled")
 
     # Create the AppRole
     client.auth.approle.create_or_update_approle(
@@ -262,14 +265,15 @@ def setup_approle(client: hvac.Client) -> tuple[str, str]:
         secret_id_ttl="0",
         secret_id_num_uses=0,
         bind_secret_id=True,
+        mount_point="chronowarden",
     )
     logger.info("  Created chronowarden AppRole")
 
     # Get role_id
-    role_id = client.auth.approle.read_role_id(role_name="chronowarden")["data"]["role_id"]
-    
+    role_id = client.auth.approle.read_role_id(role_name="chronowarden", mount_point="chronowarden")["data"]["role_id"]
+
     # Generate secret_id
-    secret_id_response = client.auth.approle.generate_secret_id(role_name="chronowarden")
+    secret_id_response = client.auth.approle.generate_secret_id(role_name="chronowarden", mount_point="chronowarden")
     secret_id = secret_id_response["data"]["secret_id"]
     
     logger.info(f"  Generated AppRole credentials (role_id: {role_id[:8]}...)")
@@ -289,6 +293,7 @@ def login_with_approle(address: str, role_id: str, secret_id: str) -> Optional[s
         login_response = client.auth.approle.login(
             role_id=role_id,
             secret_id=secret_id,
+            mount_point="chronowarden",
         )
         token = login_response["auth"]["client_token"]
         logger.info(f"  Successfully logged in with AppRole (token: {token[:8]}...)")
