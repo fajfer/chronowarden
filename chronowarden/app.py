@@ -2,8 +2,6 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-"""Main FastAPI application for Chronowarden."""
-
 import logging
 from contextlib import asynccontextmanager
 from importlib.metadata import metadata, version
@@ -38,6 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     db.connect()
 
     logger.info("Chronowarden started with %d vault(s) configured", len(app_config.vaults))
+    vault_manager.start_reconnect_loop()
     yield
     db.close()
     vault_manager.disconnect_all()

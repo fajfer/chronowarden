@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 import hvac
 from hvac.exceptions import InvalidPath, VaultError
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from chronowarden.integrations.base import BaseIntegration
 
@@ -104,6 +105,12 @@ class VaultIntegration(BaseIntegration):
             return False
         except VaultError:
             logger.exception("Failed to connect to Vault")
+            return False
+        except RequestsConnectionError:
+            logger.warning("Vault at %s appears to be offline", self._address)
+            return False
+        except Exception:
+            logger.exception("Unexpected error connecting to Vault at %s", self._address)
             return False
 
     def disconnect(self) -> None:

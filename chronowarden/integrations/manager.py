@@ -4,6 +4,7 @@
 
 """Vault connection manager for multiple Vault instances."""
 
+import asyncio
 import logging
 import tempfile
 from pathlib import Path
@@ -15,6 +16,8 @@ from chronowarden.metrics import INTEGRATION_HEALTH, VAULT_CONNECTIONS_TOTAL
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_RECONNECT_INTERVAL_SECONDS = 120
+
 
 class VaultManager:
     """Manages connections to multiple Vault instances defined by configuration."""
@@ -23,6 +26,9 @@ class VaultManager:
         """Initialize the Vault manager with empty connections."""
         self._vaults: dict[str, VaultIntegration] = {}
         self._ca_bundle_path: Optional[str] = None
+        self._pending_configs: dict[str, VaultConfig] = {}
+        self._reconnect_task: Optional[asyncio.Task[None]] = None
+        self._reconnect_interval: int = _DEFAULT_RECONNECT_INTERVAL_SECONDS
 
     @property
     def vault_names(self) -> list[str]:
@@ -52,13 +58,17 @@ class VaultManager:
         if config.ca_certs_dir:
             self._ca_bundle_path = self._create_ca_bundle(config.ca_certs_dir)
 
+        self._reconnect_interval = config.vault_reconnect_interval
+
         for vault_config in config.vaults:
             self._connect_vault(vault_config)
 
     def disconnect_all(self) -> None:
-        """Disconnect from all vault instances."""
+        """Disconnect from all vault instances and stop reconnection loop."""
+        self.stop_reconnect_loop()
         for name in list(self._vaults.keys()):
             self._disconnect_vault(name)
+        self._pending_configs.clear()
 
     def health(self) -> dict[str, dict[str, Any]]:
         """
@@ -179,13 +189,21 @@ class VaultManager:
 
         if integration.connect():
             self._vaults[vault_config.name] = integration
+            self._pending_configs.pop(vault_config.name, None)
             VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
             INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(1)
             logger.info("Connected to vault '%s' at %s", vault_config.name, vault_config.address)
         else:
+            self._vaults[vault_config.name] = integration
+            self._pending_configs[vault_config.name] = vault_config
             VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
             INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
-            logger.error("Failed to connect to vault '%s' at %s", vault_config.name, vault_config.address)
+            logger.warning(
+                "Vault '%s' at %s appears to be offline, will retry every %d seconds",
+                vault_config.name,
+                vault_config.address,
+                self._reconnect_interval,
+            )
 
     def _disconnect_vault(self, name: str) -> None:
         """
@@ -199,3 +217,44 @@ class VaultManager:
             vault.disconnect()
             INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(0)
             logger.info("Disconnected from vault '%s'", name)
+
+    def start_reconnect_loop(self) -> None:
+        """Start an async background task that periodically retries offline vaults."""
+        if self._reconnect_task is not None:
+            return
+        self._reconnect_task = asyncio.create_task(self._reconnect_loop())
+        logger.info("Vault reconnection loop started (interval=%ds)", self._reconnect_interval)
+
+    def stop_reconnect_loop(self) -> None:
+        """Cancel the reconnection background task."""
+        if self._reconnect_task is not None:
+            self._reconnect_task.cancel()
+            self._reconnect_task = None
+            logger.info("Vault reconnection loop stopped")
+
+    async def _reconnect_loop(self) -> None:
+        """Periodically attempt to reconnect offline vault instances."""
+        while True:
+            await asyncio.sleep(self._reconnect_interval)
+            if not self._pending_configs:
+                continue
+            pending_names = list(self._pending_configs.keys())
+            logger.info("Attempting to reconnect %d offline vault(s): %s", len(pending_names), pending_names)
+            for name in pending_names:
+                vault_config = self._pending_configs.get(name)
+                if vault_config is None:
+                    continue
+                integration = self._vaults.get(name)
+                if integration is None:
+                    continue
+                if integration.connect():
+                    self._pending_configs.pop(name, None)
+                    VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
+                    INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1)
+                    logger.info(
+                        "Reconnected to vault '%s' at %s", name, vault_config.address
+                    )
+                else:
+                    logger.warning(
+                        "Vault '%s' at %s is still offline", name, vault_config.address
+                    )

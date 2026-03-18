@@ -332,6 +332,11 @@ class AppConfig(BaseModel):
     vaults: list[VaultConfig] = Field(default_factory=list, description="List of Vault instances to connect to")
     date_format: str = Field(default="YYYY-MM-DD", description="Global date format for chronowarden_ttl")
     polling_interval: str = Field(default="6h", description="Global polling interval for change detection")
+    vault_reconnect_interval: int = Field(
+        default=120,
+        ge=10,
+        description="Seconds between reconnection attempts for offline vault instances (minimum 10)",
+    )
     expiry_profiles: dict[str, ExpiryProfile] = Field(
         default_factory=lambda: {name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()},
         description="Expiry profiles mapping severity names to rotation periods",
