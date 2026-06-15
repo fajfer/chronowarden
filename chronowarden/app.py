@@ -49,6 +49,7 @@ app = FastAPI(
     version=version("chronowarden"),
     lifespan=lifespan,
     openapi_tags=[
+        {"name": "root", "description": "Root endpoint with API information"},
         {"name": "health", "description": "Health and metrics endpoints"},
         {"name": "secrets", "description": "Secret management operations"},
         {"name": "vault", "description": "HashiCorp Vault integration"},
@@ -65,7 +66,7 @@ app.include_router(sync_router, prefix="/api/v1")
 app.include_router(owners_router, prefix="/api/v1")
 
 
-@app.get("/", summary="Root endpoint")
+@app.get("/api/v1", tags=["root"], summary="API endpoint")
 async def root() -> dict[str, str]:
     """
     Root endpoint returning API information.
@@ -74,7 +75,7 @@ async def root() -> dict[str, str]:
         API name and version.
     """
     return {
-        "name": metadata("chronowarden")["Name"] + " API",
+        "name": metadata("chronowarden")["Name"],
         "version": version("chronowarden"),
         "docs": "/docs",
     }
@@ -85,6 +86,11 @@ async def root() -> dict[str, str]:
 _FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "build"
 
 if _FRONTEND_DIR.is_dir():
+
+    @app.get("/", include_in_schema=False)
+    async def serve_index() -> FileResponse:
+        """Serve the index.html file for the root path."""
+        return FileResponse(_FRONTEND_DIR / "index.html")
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str) -> FileResponse:
