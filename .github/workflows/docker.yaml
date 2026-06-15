@@ -19,6 +19,8 @@ jobs:
   docker-build:
     name: Build and Push Container Image
     runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -44,7 +46,7 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          tags: ghcr.io/${{ github.repository }}:${{ env.IMAGE_TAG }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
@@ -56,7 +58,7 @@ jobs:
           context: .
           target: dev
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}-dev
+          tags: ghcr.io/${{ github.repository }}:${{ env.IMAGE_TAG }}-dev
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
