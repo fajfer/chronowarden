@@ -257,7 +257,8 @@ class VaultIntegration(BaseIntegration):
             return {"healthy": False, "error": "Not connected"}
 
         try:
-            health = self._client.sys.read_health_status(method="GET")
+            resp = self._client.sys.read_health_status(method="GET")
+            health = resp if isinstance(resp, dict) else resp.json()
             return {
                 "healthy": True,
                 "initialized": health.get("initialized", False),
