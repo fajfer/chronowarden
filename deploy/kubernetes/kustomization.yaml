@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: chronowarden
+
+resources:
+  - deployment.yaml
+  - pvc.yaml
+  - service.yaml
+  ## Supplement your own
+  # - ingress.yaml
+  # - config-secret.yaml
+
+# One way to input custom certificates into the image
+# secretGenerator:
+#   - name: chronowarden-certs
+#     files:
+#       - certs/custom.crt
+#       - certs/another_custom.crt
