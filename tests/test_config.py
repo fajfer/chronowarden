@@ -88,6 +88,13 @@ class TestAppConfigDefaults:
         config = AppConfig()
         assert config.polling_interval == "6h"
 
+    def test_default_sentry_dsn(self) -> None:
+        config = AppConfig()
+        assert config.sentry_dsn is None
+
+    def test_custom_sentry_dsn(self) -> None:
+        config = AppConfig(sentry_dsn="https://key@o0.sentry.example.com/0")
+        assert config.sentry_dsn == "https://key@o0.sentry.example.com/0"
 
 class TestConfigCascade:
     """Tests for the configuration cascade (secret config → engine → vault → global)."""
