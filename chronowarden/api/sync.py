@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Path, status
 
 router = APIRouter(prefix="/sync", tags=["sync"])
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 def _get_app_dependencies() -> tuple[Any, Any, Any]:

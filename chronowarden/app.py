@@ -18,7 +18,7 @@ from chronowarden.config import AppConfig, load_config
 from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 vault_manager = VaultManager()
 db = Database()

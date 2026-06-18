@@ -15,7 +15,7 @@ from chronowarden.models.secret import SecretMetadataResponse, SecretMetadataUpd
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 def _get_app_dependencies() -> tuple[Any, Any, Any]:

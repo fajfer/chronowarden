@@ -13,7 +13,7 @@ from typing import Optional
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 _DEFAULT_CONFIG_PATHS = [
     pathlib.Path("/etc/chronowarden/config.yaml"),

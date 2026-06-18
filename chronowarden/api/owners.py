@@ -20,7 +20,7 @@ from chronowarden.models.owner import (
 
 router = APIRouter(prefix="/owners", tags=["owners"])
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 def _get_db() -> Any:
