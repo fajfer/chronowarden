@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: EUPL-1.2
 
 import logging
+import sentry_sdk
 from contextlib import asynccontextmanager
 from importlib.metadata import metadata, version
 from pathlib import Path
@@ -24,11 +25,37 @@ db = Database()
 app_config = AppConfig()
 
 
+def _configure_sentry(config: AppConfig) -> None:
+    """Initialize Sentry SDK if a DSN is configured."""
+    if not config.sentry_dsn:
+        logger.info("Sentry DSN is not configured; Sentry integration disabled")
+        return
+
+    sentry_sdk.init(
+        dsn=config.sentry_dsn,
+        # Add data like request headers and IP for users,
+        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+        send_default_pii=True,
+        # Enable sending logs to Sentry
+        enable_logs=True,
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for tracing.
+        traces_sample_rate=1.0,
+        # Set profile_session_sample_rate to 1.0 to profile 100%
+        # of profile sessions.
+        profile_session_sample_rate=1.0,
+        # Set profile_lifecycle to "trace" to automatically
+        # run the profiler on when there is an active transaction
+        profile_lifecycle="trace",
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan handler for startup and shutdown events."""
     global app_config
     app_config = load_config()
+    _configure_sentry(app_config)
     vault_manager.connect_all(app_config)
 
     db_path = Path("chronowarden.db")

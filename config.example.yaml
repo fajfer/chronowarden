@@ -27,6 +27,7 @@
 # Global CA certificates directory (optional)
 # All .pem, .crt, and .cert files in this directory will be trusted for all vaults
 ca_certs_dir: /etc/chronowarden/certs
+sentry_dsn: "https://1337.ingest.de.sentry.io/1337"  # optional Sentry DSN for error reporting
 # Global defaults
 date_format: "YYYY-MM-DD"  # or "YYYY-DD-MM", with auto-detection fallback
 polling_interval: "6h"     # Global polling interval for all vaults (e.g. '6h', '30m')
