@@ -266,14 +266,14 @@ class VaultIntegration(BaseIntegration):
                 "version": health.get("version", "unknown"),
             }
         except VaultError:
-            logger.exception("Error checking Vault health")
-            return {"healthy": False, "error": "Health check failed"}
+            logger.exception("Failed to connect to Vault")
+            return {"healthy": False, "error": "Failed to connect to Vault"}
         except RequestsConnectionError:
-            logger.warning("Vault appears to be offline")
-            return {"healthy": False, "error": "Vault is offline"}
+            logger.warning("Vault at %s appears to be offline", self._address)
+            return {"healthy": False, "error": f"Vault at {self._address} appears to be offline"}
         except Exception:
             logger.exception("Unexpected error connecting to Vault at %s", self._address)
-            return {"healthy": False, "error": "Unhandled exception"}
+            return {"healthy": False, "error": f"Unexpected error connecting to Vault at {self._address}"}
 
     def write_secret_metadata(
         self,
