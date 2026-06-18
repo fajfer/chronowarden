@@ -13,7 +13,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from chronowarden.integrations.base import BaseIntegration
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 class VaultIntegration(BaseIntegration):
@@ -268,6 +268,12 @@ class VaultIntegration(BaseIntegration):
         except VaultError:
             logger.exception("Error checking Vault health")
             return {"healthy": False, "error": "Health check failed"}
+        except RequestsConnectionError:
+            logger.warning("Vault appears to be offline")
+            return {"healthy": False, "error": "Vault is offline"}
+        except Exception:
+            logger.exception("Unexpected error connecting to Vault at %s", self._address)
+            return {"healthy": False, "error": "Unhandled exception"}
 
     def write_secret_metadata(
         self,

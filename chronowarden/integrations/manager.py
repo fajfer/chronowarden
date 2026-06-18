@@ -14,7 +14,7 @@ from chronowarden.config import AppConfig, VaultConfig
 from chronowarden.integrations.vault import VaultIntegration
 from chronowarden.metrics import INTEGRATION_HEALTH, VAULT_CONNECTIONS_TOTAL
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 _DEFAULT_RECONNECT_INTERVAL_SECONDS = 120
 
@@ -80,6 +80,7 @@ class VaultManager:
         result: dict[str, dict[str, Any]] = {}
         for name, vault in self._vaults.items():
             health = vault.check_health()
+            logger.debug(health)
             health["connected"] = vault.is_connected()
             result[name] = health
         return result

@@ -13,7 +13,7 @@ from chronowarden.config import AppConfig
 from chronowarden.database import Database, SecretMetadataCache
 from chronowarden.integrations.vault import VaultIntegration
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 _ISO_8601_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 

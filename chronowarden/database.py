@@ -12,7 +12,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 DEFAULT_DB_PATH = Path("chronowarden.db")
 
