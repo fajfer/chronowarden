@@ -5,9 +5,9 @@
 """Tests for the (HashiCorp/OpenBao) Vault integration."""
 
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from hvac.exceptions import VaultError
+from hvac.exceptions import InvalidRequest, VaultError
 from requests.models import Response
 
 from chronowarden.integrations.vault import VaultIntegration
@@ -103,4 +103,33 @@ class TestCheckHealth:
 
         result = integration.check_health()
 
-        assert result == {"healthy": False, "error": "Connection failed"}
+        assert result["healthy"] is False
+        assert result["error"].startswith("Connection failed")
+
+
+class TestConnect:
+    """Tests for the VaultIntegration.connect() method."""
+
+    def test_approle_invalid_credentials_are_reported_as_auth_error(self) -> None:
+        """Invalid AppRole credentials are captured as an authentication failure."""
+        integration = VaultIntegration(
+            address="http://localhost:8202",
+            auth_method="approle",
+            role_id="rid",
+            secret_id="sid",
+            approle_mount_point="chronowarden",
+        )
+        mock_client = MagicMock()
+        mock_client.auth.approle.login.side_effect = InvalidRequest(
+            "invalid role or secret ID",
+            method="post",
+            url="http://localhost:8202/v1/auth/chronowarden/login",
+        )
+
+        with patch("chronowarden.integrations.vault.hvac.Client", return_value=mock_client):
+            connected = integration.connect()
+
+        assert connected is False
+        assert integration.last_error_kind == "auth"
+        assert integration.last_error is not None
+        assert "invalid role_id or secret_id" in integration.last_error

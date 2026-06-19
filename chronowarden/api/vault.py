@@ -113,14 +113,19 @@ async def vault_instance_health(
         )
 
     health = vault.check_health()
+    connected = vault.is_connected()
+    error = health.get("error")
+    if not connected and vault.last_error is not None:
+        error = vault.last_error
+
     return VaultInstanceHealth(
         name=vault_name,
-        connected=vault.is_connected(),
+        connected=connected,
         healthy=health.get("healthy", False),
         initialized=health.get("initialized"),
         sealed=health.get("sealed"),
         version=health.get("version"),
-        error=health.get("error"),
+        error=error,
     )
 
 
@@ -154,9 +159,12 @@ async def list_vault_secrets(
         )
 
     if not vault.is_connected():
+        detail = f"Vault instance '{vault_name}' is not connected"
+        if vault.last_error is not None:
+            detail = f"{detail}: {vault.last_error}"
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Vault instance '{vault_name}' is not connected",
+            detail=detail,
         )
 
     secrets = vault.list_secrets(path, mount_point)
@@ -193,9 +201,12 @@ async def get_vault_secret_metadata(
         )
 
     if not vault.is_connected():
+        detail = f"Vault instance '{vault_name}' is not connected"
+        if vault.last_error is not None:
+            detail = f"{detail}: {vault.last_error}"
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Vault instance '{vault_name}' is not connected",
+            detail=detail,
         )
 
     metadata = vault.get_secret_metadata(request.path, request.mount_point)

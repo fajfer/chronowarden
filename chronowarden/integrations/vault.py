@@ -8,7 +8,7 @@ import logging
 from typing import Any, Optional
 
 import hvac
-from hvac.exceptions import InvalidPath, VaultError
+from hvac.exceptions import InvalidPath, InvalidRequest, VaultError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from chronowarden.integrations.base import BaseIntegration
@@ -58,6 +58,28 @@ class VaultIntegration(BaseIntegration):
         self._secret_id = secret_id
         self._approle_mount_point = approle_mount_point
         self._client: Optional[hvac.Client] = None
+        self._last_error: Optional[str] = None
+        self._last_error_kind: Optional[str] = None
+
+    @property
+    def last_error(self) -> Optional[str]:
+        """Return the last connection error message, if available."""
+        return self._last_error
+
+    @property
+    def last_error_kind(self) -> Optional[str]:
+        """Return a category for the last connection error, if available."""
+        return self._last_error_kind
+
+    def _set_last_error(self, kind: str, message: str) -> None:
+        """Store error diagnostics from the most recent connection attempt."""
+        self._last_error_kind = kind
+        self._last_error = message
+
+    def _clear_last_error(self) -> None:
+        """Clear connection diagnostics after a successful authentication."""
+        self._last_error_kind = None
+        self._last_error = None
 
     def connect(self) -> bool:
         """
@@ -66,6 +88,8 @@ class VaultIntegration(BaseIntegration):
         Returns:
             bool: True if connection and authentication successful.
         """
+        self._clear_last_error()
+
         try:
             verify: bool | str = self._verify_ssl
 
@@ -98,18 +122,51 @@ class VaultIntegration(BaseIntegration):
                 )
 
             if self._client.is_authenticated():
+                self._clear_last_error()
                 logger.info("Successfully connected to Vault at %s", self._address)
                 return True
 
+            if self._auth_method == "approle":
+                self._set_last_error(
+                    "auth",
+                    (
+                        "AppRole authentication failed: invalid role_id or secret_id "
+                        f"(mount point '{self._approle_mount_point}')"
+                    ),
+                )
+            else:
+                self._set_last_error("auth", "Vault connection established but authentication failed")
             logger.warning("Vault connection established but authentication failed")
             return False
-        except VaultError:
+        except InvalidRequest as exc:
+            error_text = str(exc)
+            if self._auth_method == "approle" and "invalid role or secret id" in error_text.lower():
+                message = (
+                    "AppRole authentication failed: invalid role_id or secret_id "
+                    f"(mount point '{self._approle_mount_point}')"
+                )
+                logger.warning(
+                    "Vault AppRole authentication failed at %s (mount_point=%s): invalid role or secret ID",
+                    self._address,
+                    self._approle_mount_point,
+                )
+            else:
+                message = f"Vault authentication request rejected: {error_text}"
+                logger.warning("Vault authentication request rejected at %s: %s", self._address, error_text)
+
+            self._set_last_error("auth", message)
+            return False
+        except VaultError as exc:
+            self._set_last_error("vault", str(exc) or "Failed to connect to Vault")
             logger.exception("Failed to connect to Vault")
             return False
         except RequestsConnectionError:
-            logger.warning("Vault at %s appears to be offline", self._address)
+            message = f"Vault at {self._address} appears to be offline"
+            self._set_last_error("offline", message)
+            logger.warning(message)
             return False
         except Exception:
+            self._set_last_error("unexpected", f"Unexpected error connecting to Vault at {self._address}")
             logger.exception("Unexpected error connecting to Vault at %s", self._address)
             return False
 
@@ -118,6 +175,7 @@ class VaultIntegration(BaseIntegration):
         if self._client is not None:
             self._client.adapter.close()
             self._client = None
+            self._clear_last_error()
             logger.info("Disconnected from Vault")
 
     def is_connected(self) -> bool:
@@ -131,7 +189,8 @@ class VaultIntegration(BaseIntegration):
             return False
         try:
             return self._client.is_authenticated()
-        except VaultError:
+        except VaultError as exc:
+            self._set_last_error("vault", str(exc) or "Error checking Vault connection")
             logger.exception("Error checking Vault connection")
             return False
 
@@ -254,7 +313,7 @@ class VaultIntegration(BaseIntegration):
             Health status dictionary.
         """
         if not self._client:
-            return {"healthy": False, "error": "Not connected"}
+            return {"healthy": False, "error": self._last_error or "Not connected"}
 
         try:
             resp = self._client.sys.read_health_status(method="GET")
@@ -265,15 +324,21 @@ class VaultIntegration(BaseIntegration):
                 "sealed": health.get("sealed", True),
                 "version": health.get("version", "unknown"),
             }
-        except VaultError:
+        except VaultError as exc:
             logger.exception("Failed to connect to Vault")
-            return {"healthy": False, "error": "Failed to connect to Vault"}
+            error = str(exc) or "Failed to connect to Vault"
+            self._set_last_error("vault", error)
+            return {"healthy": False, "error": error}
         except RequestsConnectionError:
-            logger.warning("Vault at %s appears to be offline", self._address)
-            return {"healthy": False, "error": f"Vault at {self._address} appears to be offline"}
+            error = f"Vault at {self._address} appears to be offline"
+            self._set_last_error("offline", error)
+            logger.warning(error)
+            return {"healthy": False, "error": error}
         except Exception:
+            error = f"Unexpected error connecting to Vault at {self._address}"
+            self._set_last_error("unexpected", error)
             logger.exception("Unexpected error connecting to Vault at %s", self._address)
-            return {"healthy": False, "error": f"Unexpected error connecting to Vault at {self._address}"}
+            return {"healthy": False, "error": error}
 
     def write_secret_metadata(
         self,
