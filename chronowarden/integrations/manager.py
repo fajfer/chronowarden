@@ -81,7 +81,10 @@ class VaultManager:
         for name, vault in self._vaults.items():
             health = vault.check_health()
             logger.debug(health)
-            health["connected"] = vault.is_connected()
+            connected = vault.is_connected()
+            health["connected"] = connected
+            if not connected and vault.last_error is not None:
+                health["error"] = vault.last_error
             result[name] = health
         return result
 
@@ -196,15 +199,34 @@ class VaultManager:
             logger.info("Connected to vault '%s' at %s", vault_config.name, vault_config.address)
         else:
             self._vaults[vault_config.name] = integration
-            self._pending_configs[vault_config.name] = vault_config
             VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
             INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
-            logger.warning(
-                "Vault '%s' at %s appears to be offline, will retry every %d seconds",
-                vault_config.name,
-                vault_config.address,
-                self._reconnect_interval,
-            )
+            reason = integration.last_error or "unknown connection failure"
+            if integration.last_error_kind == "auth":
+                self._pending_configs.pop(vault_config.name, None)
+                logger.error(
+                    "Vault '%s' at %s authentication failed and will not be retried automatically: %s",
+                    vault_config.name,
+                    vault_config.address,
+                    reason,
+                )
+            elif integration.last_error_kind == "offline":
+                self._pending_configs[vault_config.name] = vault_config
+                logger.warning(
+                    "Vault '%s' at %s appears to be offline, will retry every %d seconds",
+                    vault_config.name,
+                    vault_config.address,
+                    self._reconnect_interval,
+                )
+            else:
+                self._pending_configs[vault_config.name] = vault_config
+                logger.warning(
+                    "Vault '%s' at %s connection failed, will retry every %d seconds: %s",
+                    vault_config.name,
+                    vault_config.address,
+                    self._reconnect_interval,
+                    reason,
+                )
 
     def _disconnect_vault(self, name: str) -> None:
         """
@@ -256,6 +278,23 @@ class VaultManager:
                         "Reconnected to vault '%s' at %s", name, vault_config.address
                     )
                 else:
-                    logger.warning(
-                        "Vault '%s' at %s is still offline", name, vault_config.address
-                    )
+                    reason = integration.last_error or "unknown connection failure"
+                    if integration.last_error_kind == "auth":
+                        self._pending_configs.pop(name, None)
+                        logger.error(
+                            "Vault '%s' at %s authentication failed during reconnect and retries were stopped: %s",
+                            name,
+                            vault_config.address,
+                            reason,
+                        )
+                    elif integration.last_error_kind == "offline":
+                        logger.warning(
+                            "Vault '%s' at %s is still offline", name, vault_config.address
+                        )
+                    else:
+                        logger.warning(
+                            "Vault '%s' at %s is still unavailable: %s",
+                            name,
+                            vault_config.address,
+                            reason,
+                        )
