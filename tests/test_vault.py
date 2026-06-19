@@ -5,9 +5,11 @@
 """Tests for the (HashiCorp/OpenBao) Vault integration."""
 
 import json
+import logging
 from unittest.mock import MagicMock, patch
 
-from hvac.exceptions import InvalidRequest, VaultError
+import pytest
+from hvac.exceptions import Forbidden, InvalidRequest, VaultError
 from requests.models import Response
 
 from chronowarden.integrations.vault import VaultIntegration
@@ -133,3 +135,53 @@ class TestConnect:
         assert integration.last_error_kind == "auth"
         assert integration.last_error is not None
         assert "invalid role_id or secret_id" in integration.last_error
+
+class TestPermissionDeniedLogging:
+    """Regression tests for 403 handling.
+
+    A permission denied (HTTP 403) from Vault must be caught, downgraded to a
+    safe return value, and logged with an actionable, policy-oriented message
+    naming the mount ad the missing capability.
+    """
+
+    def _integration(self) -> VaultIntegration:
+        return VaultIntegration(address="http://example.com:8200")
+
+    def test_list_secrets_forbidden(self, caplog: pytest.LogCaptureFixture) -> None:
+        """list_secrets returns [] and logs the missing 'list' capability"""
+        integration = self._integration()
+        integration._client = MagicMock()
+        integration._client.secrets.kv.v2.list_secrets.side_effect = Forbidden("Permission denied")
+
+        with caplog.at_level(logging.ERROR):
+            secrets = integration.list_secrets("", mount_point="apps")
+
+        assert result == []
+        assert "Permission denied listing secrets" in caplog.text
+        assert "apps/metadata" in caplog.text
+
+    def test_get_secret_metadata_forbidden(self, caplog: pytest.LogCaptureFixture) -> None:
+        """get_secret_metadata returns None and logs the missing 'read' capability"""
+        integration = self._integration()
+        integration._client = MagicMock()
+        integration._client.secrets.kv.v2.read_secret_metadata.side_effect = Forbidden("Permission denied")
+
+        with caplog.at_level(logging.ERROR):
+            metadata = integration.get_secret_metadata("db", mount_point="apps")
+
+        assert metadata is None
+        assert "Permission denied reading metadata" in caplog.text
+        assert "apps/metadata" in caplog.text
+
+    def test_write_secret_metadata_forbidden(self, caplog: pytest.LogCaptureFixture) -> None:
+        """write_secret_metadata returns False and logs the missing 'update' capability"""
+        integration = self._integration()
+        integration._client = MagicMock()
+        integration._client.secrets.kv.v2.update_metadata.side_effect = Forbidden("Permission denied")
+
+        with caplog.at_level(logging.ERROR):
+            result = integration.write_secret_metadata("db", {"chronowarden_severity": "critical"}, mount_point="apps")
+
+        assert result is False
+        assert "Permission denied writing metadata" in caplog.text
+        assert "apps/metadata" in caplog.text

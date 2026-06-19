@@ -8,7 +8,7 @@ import logging
 from typing import Any, Optional
 
 import hvac
-from hvac.exceptions import InvalidPath, InvalidRequest, VaultError
+from hvac.exceptions import Forbidden, InvalidPath, InvalidRequest, VaultError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from chronowarden.integrations.base import BaseIntegration
@@ -267,6 +267,14 @@ class VaultIntegration(BaseIntegration):
             else:
                 logger.warning("Path not found: %s", path)
             return []
+        except Forbidden:
+            logger.exception(
+                "Permission denied listing secrets in '%s' - token lacks 'list' on "
+                "%s/metadata; check the Vault policy",
+                mount,
+                mount,
+            )
+            return []
         except VaultError:
             logger.exception("Error listing secrets from Vault")
             return []
@@ -301,6 +309,15 @@ class VaultIntegration(BaseIntegration):
         except InvalidPath:
             logger.warning("Secret metadata not found at path: %s", path)
             return None
+        except Forbidden:
+            logger.exception(
+                "Permission denied reading metadata for '%s/%s' - token lacks 'read' on "
+                "%s/metadata; check the Vault policy",
+                mount,
+                path,
+                mount,
+            )
+            return []
         except VaultError:
             logger.exception("Error retrieving secret metadata from Vault")
             return None
@@ -371,6 +388,15 @@ class VaultIntegration(BaseIntegration):
             )
             logger.debug("Updated custom metadata for %s/%s", mount, path)
             return True
+        except Forbidden:
+            logger.exception(
+                "Permission denied writing metadata for '%s/%s' - token lacks 'update' on "
+                "%s/metadata; check the Vault policy",
+                mount,
+                path,
+                mount,
+            )
+            return False
         except VaultError:
             logger.exception("Error writing metadata to Vault")
             return False
