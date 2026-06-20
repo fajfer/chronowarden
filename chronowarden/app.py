@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: EUPL-1.2
 
 import logging
+import os
 import sentry_sdk
 from contextlib import asynccontextmanager
 from importlib.metadata import metadata, version
