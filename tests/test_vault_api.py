@@ -29,10 +29,7 @@ class TestVaultApiErrors:
         vault = MagicMock()
         vault.check_health.return_value = {"healthy": True}
         vault.is_connected.return_value = False
-        vault.last_error = (
-            "AppRole authentication failed: invalid role_id or secret_id "
-            "(mount point 'chronowarden')"
-        )
+        vault.last_error = "AppRole authentication failed: invalid role_id or secret_id " "(mount point 'chronowarden')"
         manager.get.return_value = vault
 
         with patch("chronowarden.api.vault._get_vault_manager", return_value=manager):
@@ -47,10 +44,7 @@ class TestVaultApiErrors:
         manager = MagicMock()
         vault = MagicMock()
         vault.is_connected.return_value = False
-        vault.last_error = (
-            "AppRole authentication failed: invalid role_id or secret_id "
-            "(mount point 'chronowarden')"
-        )
+        vault.last_error = "AppRole authentication failed: invalid role_id or secret_id " "(mount point 'chronowarden')"
         manager.get.return_value = vault
 
         with patch("chronowarden.api.vault._get_vault_manager", return_value=manager):

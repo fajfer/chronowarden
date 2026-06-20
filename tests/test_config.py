@@ -96,6 +96,7 @@ class TestAppConfigDefaults:
         config = AppConfig(sentry_dsn="https://key@o0.sentry.example.com/0")
         assert config.sentry_dsn == "https://key@o0.sentry.example.com/0"
 
+
 class TestConfigCascade:
     """Tests for the configuration cascade (secret config → engine → vault → global)."""
 
