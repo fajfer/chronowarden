@@ -58,7 +58,7 @@ Development — full shell, git, --reload, 286MB \
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12+ (tested on 3.13.5)
 - Node.js 18+ (for frontend)
 - Docker (optional, for dev Vaults)
 

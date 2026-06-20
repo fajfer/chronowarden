@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
+ARG PYTHON_VERSION=3.13.5
+
 # ============================================================================
 # Stage 1: Frontend builder
 # ============================================================================
@@ -18,7 +20,7 @@ RUN npm run build
 # ============================================================================
 # Stage 2: Backend builder
 # ============================================================================
-FROM python:3.12-slim AS backend-builder
+FROM python:${PYTHON_VERSION}-slim AS backend-builder
 
 WORKDIR /app
 
@@ -33,7 +35,7 @@ RUN python -m venv /app/.venv \
 # Stage 3a: Development image  (--target dev)
 #   Includes shell, dev tools, editable source mounts expected
 # ============================================================================
-FROM python:3.12-slim AS dev
+FROM python:${PYTHON_VERSION}-slim AS dev
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git \
@@ -62,15 +64,15 @@ CMD ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--re
 # ============================================================================
 # Stage 3b: Production image  (default target)
 # ============================================================================
-FROM gcr.io/distroless/python3-debian12:nonroot AS production
+FROM gcr.io/distroless/python3-debian13:nonroot AS production
 
 WORKDIR /app
 
-COPY --from=backend-builder /app/.venv/lib/python3.12/site-packages /app/.venv/lib/python3.12/site-packages
+COPY --from=backend-builder /app/.venv/lib/python3.13/site-packages /app/.venv/lib/python3.13/site-packages
 COPY chronowarden/ /app/chronowarden/
 COPY --from=frontend-builder /app/frontend/build /app/frontend/build
 
-ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:/app" \
+ENV PYTHONPATH="/app/.venv/lib/python3.13/site-packages:/app" \
     PYTHONUNBUFFERED=1 \
     CHRONOWARDEN_CONFIG=/data/config.yaml
 
