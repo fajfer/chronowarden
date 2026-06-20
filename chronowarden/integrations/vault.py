@@ -317,7 +317,7 @@ class VaultIntegration(BaseIntegration):
                 path,
                 mount,
             )
-            return []
+            return None
         except VaultError:
             logger.exception("Error retrieving secret metadata from Vault")
             return None
@@ -438,6 +438,12 @@ class VaultIntegration(BaseIntegration):
                         }
                     )
             return engines
+        except Forbidden:
+            logger.exception(
+                "Permission denied discovering secret engines - token lacks 'read' on "
+                "sys/mounts; check the Vault policy"
+            )
+            return []
         except VaultError:
             logger.exception("Error discovering secret engines")
             return []
