@@ -37,9 +37,6 @@ spec:
           env:
             - name: CHRONOWARDEN_CONFIG
               value: /etc/chronowarden/config.yaml
-            # I had to do that to make frontend work on dev version with uvicorn
-            # - name: PYTHONPATH
-            #   value: /app:/app/.venv/lib/python3.13/site-packages
           volumeMounts:
             - name: config
               mountPath: /etc/chronowarden/config.yaml

@@ -145,11 +145,15 @@ Chronowarden requires read/write access to **secret metadata only**. It never re
 **Required capabilities:**
 ```hcl
 # For KV v2 engines
-path "secret/metadata/*" {
-  capabilities = ["read", "list", "update"]
+path "+/metadata/*" {
+  capabilities = ["list", "read", "update"]
 }
 
-# Optional: engine discovery
+path "+/metadata" {
+  capabilities = ["list"]
+}
+
+# Engine discovery
 path "sys/mounts" {
   capabilities = ["read"]
 }
