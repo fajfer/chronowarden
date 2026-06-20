@@ -157,7 +157,7 @@ class TestPermissionDeniedLogging:
         with caplog.at_level(logging.ERROR):
             secrets = integration.list_secrets("", mount_point="apps")
 
-        assert result == []
+        assert secrets == []
         assert "Permission denied listing secrets" in caplog.text
         assert "apps/metadata" in caplog.text
 
@@ -186,3 +186,16 @@ class TestPermissionDeniedLogging:
         assert result is False
         assert "Permission denied writing metadata" in caplog.text
         assert "apps/metadata" in caplog.text
+
+    def test_discover_engines_forbidden(self, caplog: pytest.LogCaptureFixture) -> None:
+        """discover_engines returns [] and logs the missing 'read' capability on sys/mounts"""
+        integration = self._integration()
+        integration._client = MagicMock()
+        integration._client.sys.list_mounted_secrets_engines.side_effect = Forbidden("Permission denied")
+
+        with caplog.at_level(logging.ERROR):
+            engines = integration.discover_engines()
+
+        assert engines == []
+        assert "Permission denied discovering secret engines" in caplog.text
+        assert "sys/mounts" in caplog.text

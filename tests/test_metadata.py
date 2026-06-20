@@ -5,9 +5,11 @@
 """Tests for date parsing, TTL calculation, and metadata logic."""
 
 from typing import Any
+from unittest.mock import MagicMock
 
 from chronowarden.config import AppConfig
 from chronowarden.metadata import (
+    _list_secret_paths,
     calculate_ttl,
     format_date,
     is_secret_enabled,
@@ -292,3 +294,40 @@ class TestResolveSeverity:
         )
         result = config.resolve_severity("any-engine", "prod", secret_path="any-secret")
         assert result == "critical"
+
+
+class TestNestedSecretTraversal:
+    """Tests for recursive secret discovery in _list_secret_paths."""
+
+    def test_recurses_into_nested_folders(self) -> None:
+        """Secrets stored under sub-folders are discovered, not just root secrets."""
+        tree = {
+            "": ["db", "app/", "shared/"],
+            "app/": ["api-key", "nested/"],
+            "app/nested/": ["token"],
+            "shared/": ["cert"],
+        }
+        vault = MagicMock()
+        vault.list_secrets.side_effect = lambda path, mount_point=None: tree.get(path, [])
+
+        paths = _list_secret_paths(vault, "secret")
+
+        assert sorted(paths) == ["app/api-key", "app/nested/token", "db", "shared/cert"]
+
+    def test_flat_engine_returns_root_secrets(self) -> None:
+        """An engine without folders yields only its root-level secrets."""
+        vault = MagicMock()
+        vault.list_secrets.side_effect = lambda path, mount_point=None: ["a", "b"] if path == "" else []
+
+        paths = _list_secret_paths(vault, "secret")
+
+        assert sorted(paths) == ["a", "b"]
+
+    def test_listing_failure_does_not_abort_walk(self) -> None:
+        """An unexpected listing error is swallowed and yields no paths."""
+        vault = MagicMock()
+        vault.list_secrets.side_effect = RuntimeError("Unexpected error")
+
+        paths = _list_secret_paths(vault, "secret")
+
+        assert paths == []
