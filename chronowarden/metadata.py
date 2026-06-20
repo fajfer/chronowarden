@@ -270,6 +270,36 @@ def sync_secret_metadata(
     return entry
 
 
+def _list_secret_paths(vault: VaultIntegration, engine_id: str, prefix: str = "") -> list[str]:
+    """
+    Recursively list all secret paths under a given engine and prefix.
+
+    Walks the KV v2 hierarchy depth-first, descending into subdirectories (keys that
+    end with '/') and collecting all secret paths, not just those stored at the engine
+    root.
+
+    Args:
+        vault: The VaultIntegration instance.
+        engine_id: Engine mount path.
+        prefix: Optional (empty for root) prefix to filter secrets.
+    """
+    paths: list[str] = []
+
+    try:
+        keys = vault.list_secrets(prefix, mount_point=engine_id)
+    except Exception:
+        logger.exception("Error listing secrets in %s/%s", engine_id, prefix)
+        return paths
+
+    for key in keys:
+        full_path = f"{prefix}{key}"
+        if key.endswith("/"):
+            paths.extend(_list_secret_paths(vault, engine_id, full_path))
+        else:
+            paths.append(full_path)
+    return paths
+
+
 def detect_changes(
     vault: VaultIntegration,
     vault_name: str,
@@ -299,22 +329,13 @@ def detect_changes(
         engine_path = engine["path"]
         logger.info("Scanning engine '%s' in vault '%s'", engine_path, vault_name)
 
-        try:
-            secrets = vault.list_secrets("", mount_point=engine_path)
-        except Exception:
-            logger.exception("Error listing secrets in %s", engine_path)
-            continue
-
-        for secret_name in secrets:
-            if secret_name.endswith("/"):
-                continue
-
+        for secret_path in _list_secret_paths(vault, engine_path):
             try:
-                result = sync_secret_metadata(vault, vault_name, engine_path, secret_name, config, db)
+                result = sync_secret_metadata(vault, vault_name, engine_path, secret_path, config, db)
                 if result is not None:
                     updated.append(result)
             except Exception:
-                logger.exception("Error syncing secret %s/%s", engine_path, secret_name)
+                logger.exception("Error syncing secret %s/%s", engine_path, secret_path)
 
     logger.info("Sync complete for vault '%s': %d secrets processed", vault_name, len(updated))
     return updated
