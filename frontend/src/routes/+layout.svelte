@@ -12,9 +12,40 @@
   import { loadSecrets } from '$lib/stores/secrets';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { onMount } from 'svelte';
+
+  const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
+
+  const getInitialSidebarState = (): boolean => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    return window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
+  };
 
   let { children } = $props();
-  let sidebarOpen = $state(true);
+  let sidebarOpen = $state(getInitialSidebarState());
+
+  onMount(() => {
+    const desktopQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
+
+    const syncSidebarWithViewport = (isDesktopViewport: boolean): void => {
+      sidebarOpen = isDesktopViewport;
+    };
+
+    syncSidebarWithViewport(desktopQuery.matches);
+
+    const handleViewportChange = (event: MediaQueryListEvent): void => {
+      syncSidebarWithViewport(event.matches);
+    };
+
+    desktopQuery.addEventListener('change', handleViewportChange);
+
+    return () => {
+      desktopQuery.removeEventListener('change', handleViewportChange);
+    };
+  });
 
   $effect(() => {
     initAuth();
