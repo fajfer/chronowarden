@@ -110,7 +110,21 @@ async def root() -> dict[str, str]:
 
 # Serve SvelteKit static frontend in production.
 # The build directory is created by `npm run build` with adapter-static.
-_FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "build"
+def _resolve_frontend_dir() -> Path:
+    """Return the first existing frontend build directory."""
+    override = os.environ.get("CHRONOWARDEN_FRONTEND_DIR")
+    candidates = [
+        Path(override) if override else None,
+        Path(__file__).resolve().parent.parent / "frontend" / "build",
+        Path("/app/frontend/build"),
+    ]
+    for candidate in candidates:
+        if candidate is not None and candidate.is_dir():
+            return candidate
+    return Path("/app/frontend/build")
+
+
+_FRONTEND_DIR = _resolve_frontend_dir()
 
 if _FRONTEND_DIR.is_dir():
 
