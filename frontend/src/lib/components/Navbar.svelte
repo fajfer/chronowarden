@@ -4,6 +4,7 @@
 
 <script lang="ts">
   import { currentUser, logout } from '$lib/stores/auth';
+  import { currentTheme } from '$lib/stores/theme';
   import { goto } from '$app/navigation';
   import SyncButton from './SyncButton.svelte';
 
@@ -25,8 +26,9 @@
           ☰
         </button>
       {/if}
-      <a href="/" class="flex items-center gap-2 text-white font-bold text-lg">
-        <span>Chronowarden</span>
+      <a href="/" class="flex items-center gap-2">
+        <img src={$currentTheme.logo.src} alt={$currentTheme.logo.alt} class="h-12 w-auto object-contain" />
+        <span class="sr-only">Chronowarden</span>
       </a>
     </div>
 
