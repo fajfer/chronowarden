@@ -199,3 +199,20 @@ class TestPermissionDeniedLogging:
         assert engines == []
         assert "Permission denied discovering secret engines" in caplog.text
         assert "sys/mounts" in caplog.text
+
+
+class TestListSecretsNullKeys:
+    """Regression tests for Vault returning null for the 'keys' field."""
+
+    def _integration(self) -> VaultIntegration:
+        return VaultIntegration(address="http://example.com:8200")
+
+    def test_list_secrets_null_keys_returns_empty_list(self) -> None:
+        """list_secrets returns [] when Vault API responds with null for 'keys'."""
+        integration = self._integration()
+        integration._client = MagicMock()
+        integration._client.secrets.kv.v2.list_secrets.return_value = {"data": {"keys": None}}
+
+        secrets = integration.list_secrets("some/path", mount_point="apps")
+
+        assert secrets == []
