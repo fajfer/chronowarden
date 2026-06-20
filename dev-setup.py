@@ -76,7 +76,9 @@ def run_command(cmd: list[str], capture_output: bool = False) -> tuple[Optional[
 
 def is_container_running(name: str) -> bool:
     """Check if a Docker container is running."""
-    result, success = run_command(["docker", "ps", "--filter", f"name={name}", "--format", "{{.Names}}"], capture_output=True)
+    result, success = run_command(
+        ["docker", "ps", "--filter", f"name={name}", "--format", "{{.Names}}"], capture_output=True
+    )
     return success and name in (result or "")
 
 
@@ -84,9 +86,11 @@ def start_container(config: dict) -> bool:
     """Start a Docker container with the given configuration."""
     name = config["name"]
     cmd = [
-        "docker", "run",
+        "docker",
+        "run",
         "-d",
-        "--name", name,
+        "--name",
+        name,
     ]
 
     # Add ports
@@ -182,6 +186,7 @@ def create_dev_config(approle_credentials: dict[str, tuple[str, str]]) -> None:
     }
 
     import yaml
+
     with open(config_path, "w") as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
@@ -245,7 +250,7 @@ path "sys/mounts" {
 def setup_approle(client: hvac.Client) -> tuple[str, str]:
     """
     Set up AppRole authentication and return (role_id, secret_id).
-    
+
     Returns:
         Tuple of (role_id, secret_id) for AppRole authentication
     """
@@ -275,16 +280,16 @@ def setup_approle(client: hvac.Client) -> tuple[str, str]:
     # Generate secret_id
     secret_id_response = client.auth.approle.generate_secret_id(role_name="chronowarden", mount_point="chronowarden")
     secret_id = secret_id_response["data"]["secret_id"]
-    
+
     logger.info(f"  Generated AppRole credentials (role_id: {role_id[:8]}...)")
-    
+
     return role_id, secret_id
 
 
 def login_with_approle(address: str, role_id: str, secret_id: str) -> Optional[str]:
     """
     Login to Vault using AppRole and return the client token.
-    
+
     Returns:
         Client token string or None on failure
     """
@@ -393,39 +398,39 @@ def main():
     for container_name, root_token in root_tokens.items():
         if root_token and container_name in vault_addresses:
             address = vault_addresses[container_name]
-            
+
             # Populate vault with secrets
             populate_vault(container_name, address, root_token)
-            
+
             # Set up AppRole authentication
             try:
                 client = hvac.Client(url=address, token=root_token, verify=False)
                 if not client.is_authenticated():
                     logger.error(f"Failed to authenticate to {container_name}")
                     continue
-                
+
                 # Create policy and AppRole
                 create_chronowarden_policy(client)
                 role_id, secret_id = setup_approle(client)
                 approle_credentials[container_name] = (role_id, secret_id)
                 logger.info(f"AppRole credentials stored for {container_name}")
-                    
+
             except Exception:
                 logger.exception(f"Error setting up AppRole for {container_name}")
 
     # Create config with AppRole credentials
     create_dev_config(approle_credentials)
 
-    logger.info("\n" + "="*70)
+    logger.info("\n" + "=" * 70)
     logger.info("Development setup complete!")
-    logger.info("="*70)
+    logger.info("=" * 70)
     logger.info("\nRoot tokens (for emergency access only):")
     for container_name, root_token in root_tokens.items():
         logger.info(f"  {container_name}: {root_token}")
     logger.info("\nConfig file created with AppRole credentials for secure access.")
     logger.info("Vaults configured with auth_method: approle (direct role_id/secret_id).")
     logger.info("You can now run: uv run uvicorn chronowarden:app --reload")
-    logger.info("="*70 + "\n")
+    logger.info("=" * 70 + "\n")
 
 
 if __name__ == "__main__":

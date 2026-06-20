@@ -274,9 +274,7 @@ class VaultManager:
                     self._pending_configs.pop(name, None)
                     VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
                     INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1)
-                    logger.info(
-                        "Reconnected to vault '%s' at %s", name, vault_config.address
-                    )
+                    logger.info("Reconnected to vault '%s' at %s", name, vault_config.address)
                 else:
                     reason = integration.last_error or "unknown connection failure"
                     if integration.last_error_kind == "auth":
@@ -288,9 +286,7 @@ class VaultManager:
                             reason,
                         )
                     elif integration.last_error_kind == "offline":
-                        logger.warning(
-                            "Vault '%s' at %s is still offline", name, vault_config.address
-                        )
+                        logger.warning("Vault '%s' at %s is still offline", name, vault_config.address)
                     else:
                         logger.warning(
                             "Vault '%s' at %s is still unavailable: %s",

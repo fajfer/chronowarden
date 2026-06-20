@@ -28,7 +28,7 @@ class TestCheckHealth:
 
     def _integration(self) -> VaultIntegration:
         return VaultIntegration(address="http://example.com:8200")
-    
+
     def test_not_connected(self) -> None:
         """Health check without a client reports not connected."""
         integration = self._integration()
@@ -55,7 +55,7 @@ class TestCheckHealth:
 
     def test_returns_raw_response_on_standby(self) -> None:
         """Regression: hvac returns a raw Response for non-200 (e.g. standby) nodes.
-        
+
         Previously this raised ''AttributeError: 'Response' object has no attribute 'get''.
         and surfaced as a 500 Internal Server Error in the API.
         """
@@ -135,6 +135,7 @@ class TestConnect:
         assert integration.last_error_kind == "auth"
         assert integration.last_error is not None
         assert "invalid role_id or secret_id" in integration.last_error
+
 
 class TestPermissionDeniedLogging:
     """Regression tests for 403 handling.

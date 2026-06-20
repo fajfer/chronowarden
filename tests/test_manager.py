@@ -20,10 +20,7 @@ class TestVaultManagerHealth:
         vault = MagicMock()
         vault.check_health.return_value = {"healthy": True, "version": "1.16.0"}
         vault.is_connected.return_value = False
-        vault.last_error = (
-            "AppRole authentication failed: invalid role_id or secret_id "
-            "(mount point 'chronowarden')"
-        )
+        vault.last_error = "AppRole authentication failed: invalid role_id or secret_id " "(mount point 'chronowarden')"
 
         manager._vaults["dev-vault"] = vault
 
@@ -51,8 +48,7 @@ class TestVaultManagerConnectionRetry:
         integration.connect.return_value = False
         integration.last_error_kind = "auth"
         integration.last_error = (
-            "AppRole authentication failed: invalid role_id or secret_id "
-            "(mount point 'chronowarden')"
+            "AppRole authentication failed: invalid role_id or secret_id " "(mount point 'chronowarden')"
         )
 
         with patch("chronowarden.integrations.manager.VaultIntegration", return_value=integration):
