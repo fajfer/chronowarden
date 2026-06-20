@@ -258,7 +258,7 @@ class VaultIntegration(BaseIntegration):
             )
 
             if response and "data" in response and "keys" in response["data"]:
-                return response["data"]["keys"]
+                return response["data"]["keys"] or []
 
             return []
         except InvalidPath:
