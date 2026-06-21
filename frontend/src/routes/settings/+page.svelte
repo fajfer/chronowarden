@@ -6,6 +6,7 @@
   import { fetchOwners, createOwner, updateOwner, deleteOwner, testNotificationRoute } from '$lib/api/owners';
   import { fetchHealthCheck, fetchApiInfo } from '$lib/api/vaults';
   import OwnerModal from '$lib/components/OwnerModal.svelte';
+  import { availableThemes, currentTheme, setTheme } from '$lib/stores/theme';
   import { addToast } from '$lib/stores/sync';
   import type { Owner, ApiInfo } from '$lib/types';
 
@@ -139,6 +140,22 @@
             <p class="text-xs text-gray-500">Backend version</p>
           </div>
           <span class="text-gray-400">{apiInfo?.version ?? '—'}</span>
+        </div>
+        <div class="flex items-center justify-between py-2 border-b border-gray-700">
+          <div>
+            <p class="text-gray-200">Theme</p>
+            <p class="text-xs text-gray-500">Frontend branding and logo variant</p>
+          </div>
+          <select
+            class="min-w-36 rounded-md border border-gray-600 bg-gray-900 px-3 py-1.5 text-gray-200 focus:border-indigo-500 focus:outline-none"
+            aria-label="Theme"
+            value={$currentTheme.id}
+            onchange={(event) => setTheme((event.currentTarget as HTMLSelectElement).value)}
+          >
+            {#each availableThemes as theme}
+              <option value={theme.id}>{theme.label}</option>
+            {/each}
+          </select>
         </div>
         <div class="flex items-center justify-between py-2 border-b border-gray-700">
           <div>
