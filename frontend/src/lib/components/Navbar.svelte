@@ -27,7 +27,7 @@
         </button>
       {/if}
       <a href="/" class="flex items-center gap-2">
-        <img src={$currentTheme.logo.src} alt={$currentTheme.logo.alt} class="h-12 w-auto object-contain" />
+        <img src={$currentTheme.logo.src} alt={$currentTheme.logo.alt} class="h-10 w-auto object-contain" />
         <span class="sr-only">Chronowarden</span>
       </a>
     </div>
