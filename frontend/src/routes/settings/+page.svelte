@@ -144,7 +144,7 @@
         <div class="flex items-center justify-between py-2 border-b border-gray-700">
           <div>
             <p class="text-gray-200">Theme</p>
-            <p class="text-xs text-gray-500">Frontend branding and logo variant</p>
+            <p class="text-xs text-gray-500">Frontend branding, logo, and mascot variant</p>
           </div>
           <select
             class="min-w-36 rounded-md border border-gray-600 bg-gray-900 px-3 py-1.5 text-gray-200 focus:border-indigo-500 focus:outline-none"
