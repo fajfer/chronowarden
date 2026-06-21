@@ -14,12 +14,20 @@ const THEME_DEFINITIONS = {
       src: '/logo.png',
       alt: 'Chronowarden',
     },
+    mascot: {
+      src: '/goat.png',
+      alt: 'Chronowarden goat mascot',
+    },
   },
   bison: {
     label: 'Bison',
     logo: {
       src: '/logo-bison.png',
       alt: 'Chronowarden',
+    },
+    mascot: {
+      src: '/goat-bison.png',
+      alt: 'Chronowarden bison goat mascot',
     },
   },
 } as const;
@@ -30,6 +38,10 @@ export interface ThemeDefinition {
   id: ThemeId;
   label: string;
   logo: {
+    src: string;
+    alt: string;
+  };
+  mascot: {
     src: string;
     alt: string;
   };
@@ -62,6 +74,10 @@ function getTheme(themeId: ThemeId): ThemeDefinition {
     logo: {
       src: definition.logo.src,
       alt: definition.logo.alt,
+    },
+    mascot: {
+      src: definition.mascot.src,
+      alt: definition.mascot.alt,
     },
   };
 }

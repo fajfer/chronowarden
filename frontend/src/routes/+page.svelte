@@ -6,6 +6,7 @@
   import StatsCard from '$lib/components/StatsCard.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import SecretModal from '$lib/components/SecretModal.svelte';
+  import { currentTheme } from '$lib/stores/theme';
   import { secretStats, criticalSecrets, secretsLoading, secretsError } from '$lib/stores/secrets';
   import { formatDate } from '$lib/utils/dateFormat';
   import type { Secret } from '$lib/types';
@@ -45,9 +46,20 @@
       </div>
 
       {#if $criticalSecrets.length === 0}
-        <div class="px-6 py-12 text-center text-gray-500">
-          <p class="text-lg">🎉 No warning or expired secrets</p>
-          <p class="text-sm mt-1">All secrets are healthy</p>
+        <div class="px-6 py-12">
+          <div
+            class="mx-auto flex max-w-2xl flex-col items-center justify-center gap-5 text-center sm:flex-row sm:text-left"
+          >
+            <img
+              src={$currentTheme.mascot.src}
+              alt={$currentTheme.mascot.alt}
+              class="h-24 w-auto shrink-0 object-contain sm:h-80"
+            />
+            <div class="space-y-1">
+              <p class="text-lg font-semibold text-green-300">No warning or expired secrets</p>
+              <p class="text-sm text-gray-400">All secrets are healthy</p>
+            </div>
+          </div>
         </div>
       {:else}
         <div class="overflow-x-auto">
