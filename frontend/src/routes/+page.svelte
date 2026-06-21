@@ -56,7 +56,7 @@
               class="h-24 w-auto shrink-0 object-contain sm:h-80"
             />
             <div class="space-y-1">
-              <p class="text-lg font-semibold text-green-300">No warning or expired secrets</p>
+              <p class="text-lg font-semibold text-green-300">No secrets in expired or warning state</p>
               <p class="text-sm text-gray-400">All secrets are healthy</p>
             </div>
           </div>
