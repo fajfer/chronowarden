@@ -78,7 +78,7 @@ def _validate_severity_input(severity: Optional[str], config: AppConfig, request
     )
 
 
-def _enrich_secret(entry: SecretMetadataCache, config: Any) -> SecretMetadataResponse:
+def _enrich_secret(entry: SecretMetadataCache, config: AppConfig) -> SecretMetadataResponse:
     """
     Build a SecretMetadataResponse from a cache entry with computed fields.
 
