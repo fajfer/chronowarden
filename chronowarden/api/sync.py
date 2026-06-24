@@ -49,7 +49,7 @@ async def sync_vault(
     from chronowarden.metadata import detect_changes
 
     manager, config, database = _get_app_dependencies()
-    manager.restart_reconnect_loop()
+    manager.start_reconnect_loop()
     vault = manager.get(vault_name)
 
     if not vault:
