@@ -442,6 +442,21 @@ class TestSecretsAPI:
             response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
             assert response.status_code == 503
 
+    def test_patch_secret_vault_write_returns_false(self) -> None:
+        """Test PATCH returns 503 when vault metadata write returns False."""
+        self._insert_secret()
+        mock_vault = MagicMock()
+        mock_vault.is_connected.return_value = True
+        mock_vault.write_secret_metadata.return_value = False
+        self.vault_manager.get.return_value = mock_vault
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
+            assert response.status_code == 503
+
     def test_list_secrets_filter_engine(self) -> None:
         """Test listing secrets filtered by engine ID via API."""
         self._insert_secret(engine_id="apps", secret_path="key-1")
