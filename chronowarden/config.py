@@ -28,7 +28,6 @@ DEFAULT_EXPIRY_PROFILES: dict[str, dict[str, str]] = {
     "pci-dss-4.0": {"rotation_period": "90d"},
 }
 
-VALID_SEVERITY_VALUES = {"default", "critical", "pci-dss-4.0", "none"}
 RESERVED_SEVERITY_VALUES = {"none"}
 
 _DURATION_PATTERN = re.compile(r"^(\d+)([dmy])$")
