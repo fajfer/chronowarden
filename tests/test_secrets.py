@@ -475,6 +475,7 @@ class TestSecretsAPI:
         ):
             response = client.patch("/api/v1/secrets/1", json={"severity": "   "})
             assert response.status_code == 422
+            assert "Severity must not be blank" in response.json()["detail"][0]["msg"]
 
     def test_list_secrets_filter_engine(self) -> None:
         """Test listing secrets filtered by engine ID via API."""
