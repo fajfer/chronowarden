@@ -55,20 +55,25 @@ def _configure_sentry(config: AppConfig) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan handler for startup and shutdown events."""
     global app_config
-    app_config = load_config()
-    _configure_sentry(app_config)
-    vault_manager.connect_all(app_config)
+    try:
+        app_config = load_config()
+        _configure_sentry(app_config)
+        vault_manager.connect_all(app_config)
 
-    db_path = Path("chronowarden.db")
-    db._db_path = db_path
-    db.connect()
+        db_path = Path("chronowarden.db")
+        db._db_path = db_path
+        db.connect()
 
-    logger.info("Chronowarden started with %d vault(s) configured", len(app_config.vaults))
-    vault_manager.start_reconnect_loop()
-    yield
-    db.close()
-    vault_manager.disconnect_all()
-    logger.info("Chronowarden shutdown complete")
+        logger.info("Chronowarden started with %d vault(s) configured", len(app_config.vaults))
+        vault_manager.start_reconnect_loop()
+        yield
+    except Exception:
+        logger.exception("Chronowarden startup failed")
+        raise
+    finally:
+        db.close()
+        vault_manager.disconnect_all()
+        logger.info("Chronowarden shutdown complete")
 
 
 app = FastAPI(
