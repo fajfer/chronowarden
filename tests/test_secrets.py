@@ -428,11 +428,11 @@ class TestSecretsAPI:
             assert response.status_code == 503
 
     def test_patch_secret_vault_write_failure(self) -> None:
-        """Test PATCH returns 503 when vault write raises an exception."""
+        """Test PATCH returns 503 when vault write raises a runtime error."""
         self._insert_secret()
         mock_vault = MagicMock()
         mock_vault.is_connected.return_value = True
-        mock_vault.write_secret_metadata.side_effect = Exception("connection lost")
+        mock_vault.write_secret_metadata.side_effect = RuntimeError("connection lost")
         self.vault_manager.get.return_value = mock_vault
         client = self._build_client()
         with patch(

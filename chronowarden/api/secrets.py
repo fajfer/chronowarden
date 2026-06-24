@@ -196,8 +196,12 @@ async def update_secret_metadata(secret_id: int, body: SecretMetadataUpdate) -> 
 
     if metadata_fields:
         try:
-            metadata_updated = vault.write_secret_metadata(entry.secret_path, metadata_fields, mount_point=entry.engine_id)
-        except VaultError:
+            metadata_updated = vault.write_secret_metadata(
+                entry.secret_path,
+                metadata_fields,
+                mount_point=entry.engine_id,
+            )
+        except (VaultError, RuntimeError):
             logger.exception("Failed to write metadata to vault for secret %d", secret_id)
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
