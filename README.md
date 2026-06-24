@@ -4,8 +4,11 @@ SPDX-FileCopyrightText: 2025-2026 Damian Fajfer <damian@fajfer.org>
 
 SPDX-License-Identifier: EUPL-1.2
 -->
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/fajfer/chronowarden/badge)](https://scorecard.dev/viewer/?uri=github.com/fajfer/chronowarden)
 
 **Monitor and track expiring secrets across your Vault infrastructure**
+
+<img src="https://raw.githubusercontent.com/fajfer/chronowarden/refs/heads/main/frontend/static/goat.png" width="258">
 
 Chronowarden is a secret lifecycle observability service that syncs with your secret providers, tracking TTLs and rotation requirements through custom metadata. It provides a web UI and REST API to visualize secret health and alert on expiring credentials.
 
@@ -240,9 +243,16 @@ See [deploy/](deploy/) for:
 
 Licensed under the [EUPL-1.2](LICENSE) - see [LICENSES/](LICENSES/) for full text.
 
+## Logo & mascot
+
+<img src="https://raw.githubusercontent.com/fajfer/chronowarden/refs/heads/main/frontend/static/logo.png" width=600>
+
+Our logo and mascot (currently unnamed), designed by Aleksandra Lejman, wears a vintage, polish banking guard uniform to symbolize security and honor the banking sector where the idea for this software was born.
+
+The choice of a goat for the mascot was inspired by the author's daughter, Irena, who is a huge fan of the classic [Koziołek Matołek](https://en.wikipedia.org/wiki/Kozio%C5%82ek_Mato%C5%82ek) series
+
 ## Support
 
 Community support is available through [Matrix](https://matrix.to/#/#gcups:fsfe.org) channel as well as issues on GitHub
 
 For commercial support, consultations and training feel free to reach me via email at damian (at) fajfer.org to discuss your needs and get a custom quote.
-
