@@ -59,9 +59,6 @@ def _validate_severity_input(severity: Optional[str], config: AppConfig, request
         config: Application configuration.
         request_source: Human-readable request source label.
 
-    Returns:
-        None if severity is valid or not provided.
-
     Raises:
         HTTPException: If severity is unknown.
     """
