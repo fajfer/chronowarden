@@ -216,3 +216,32 @@ class TestListSecretsNullKeys:
         secrets = integration.list_secrets("some/path", mount_point="apps")
 
         assert secrets == []
+
+
+class TestIsConnectedDiagnostics:
+    """Tests for disconnected/auth-expired diagnostics."""
+
+    def test_sets_auth_error_when_token_is_no_longer_valid(self) -> None:
+        """A false authentication check stores an actionable auth error message."""
+        integration = VaultIntegration(address="http://example.com:8200")
+        integration._client = MagicMock()
+        integration._client.is_authenticated.return_value = False
+
+        connected = integration.is_connected()
+
+        assert connected is False
+        assert integration.last_error_kind == "auth"
+        assert integration.last_error is not None
+        assert "token may be expired or revoked" in integration.last_error
+
+    def test_preserves_existing_connection_error_kind(self) -> None:
+        """An existing error classification should not be overwritten by auth check."""
+        integration = VaultIntegration(address="http://example.com:8200")
+        integration._client = MagicMock()
+        integration._client.is_authenticated.return_value = False
+        integration._set_last_error("offline", "Vault at http://example.com:8200 appears to be offline")
+
+        connected = integration.is_connected()
+
+        assert connected is False
+        assert integration.last_error_kind == "offline"

@@ -336,7 +336,10 @@ class AppConfig(BaseModel):
     vault_reconnect_interval: int = Field(
         default=120,
         ge=10,
-        description="Seconds between reconnection attempts for offline vault instances (minimum 10)",
+        description=(
+            "Seconds between reconnection attempts for offline or disconnected vault instances "
+            "(minimum 10)"
+        ),
     )
     expiry_profiles: dict[str, ExpiryProfile] = Field(
         default_factory=lambda: {name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()},
