@@ -5,6 +5,7 @@
 """Tests for SQLite database operations."""
 
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -261,3 +262,33 @@ class TestDatabaseConnection:
         db.connect()
         db.close()
         db.close()
+
+
+class TestDatabaseConcurrency:
+    """Tests for concurrent database access with a shared connection."""
+
+    def test_concurrent_upsert_and_read(self, tmp_path: Path) -> None:
+        """Concurrent upserts and reads should stay consistent without SQLite threading errors."""
+        db = Database(db_path=tmp_path / "concurrency.db")
+        db.connect()
+        try:
+            total_entries = 100
+
+            def worker(index: int) -> SecretMetadataCache | None:
+                entry = SecretMetadataCache(
+                    vault_name="vault-1",
+                    engine_id="apps",
+                    secret_path=f"secret-{index}",
+                    ttl="2027-02-07",
+                    severity="default",
+                )
+                db.upsert_secret_metadata(entry)
+                return db.get_secret_metadata("vault-1", "apps", f"secret-{index}")
+
+            with ThreadPoolExecutor(max_workers=12) as executor:
+                results = list(executor.map(worker, range(total_entries)))
+
+            assert all(result is not None for result in results)
+            assert len(db.list_secrets_for_vault("vault-1")) == total_entries
+        finally:
+            db.close()
