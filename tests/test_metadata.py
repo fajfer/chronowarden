@@ -7,6 +7,8 @@
 from typing import Any
 from unittest.mock import MagicMock
 
+from hvac.exceptions import VaultError
+
 from chronowarden.config import AppConfig
 from chronowarden.metadata import (
     _list_secret_paths,
@@ -324,9 +326,9 @@ class TestNestedSecretTraversal:
         assert sorted(paths) == ["a", "b"]
 
     def test_listing_failure_does_not_abort_walk(self) -> None:
-        """An unexpected listing error is swallowed and yields no paths."""
+        """A Vault listing error is swallowed and yields no paths."""
         vault = MagicMock()
-        vault.list_secrets.side_effect = RuntimeError("Unexpected error")
+        vault.list_secrets.side_effect = VaultError("Unexpected error")
 
         paths = _list_secret_paths(vault, "secret")
 
