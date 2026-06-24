@@ -97,7 +97,12 @@ function applyTheme(themeId: ThemeId): void {
   }
 
   document.documentElement.dataset.theme = themeId;
-  localStorage.setItem(THEME_STORAGE_KEY, themeId);
+
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, themeId);
+  } catch {
+    // Ignore storage failures (e.g. blocked/disabled localStorage).
+  }
 }
 
 /** Initialize theme from local storage or configured default. */
@@ -106,7 +111,13 @@ export function initTheme(): void {
     return;
   }
 
-  const storedThemeId = normalizeThemeId(localStorage.getItem(THEME_STORAGE_KEY));
+  let storedThemeId = configuredThemeId;
+  try {
+    storedThemeId = normalizeThemeId(localStorage.getItem(THEME_STORAGE_KEY));
+  } catch {
+    // Ignore storage failures and fall back to configured default.
+  }
+
   activeThemeId.set(storedThemeId);
   applyTheme(storedThemeId);
 }
