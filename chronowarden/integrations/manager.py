@@ -242,7 +242,7 @@ class VaultManager:
             logger.info("Disconnected from vault '%s'", name)
 
     def start_reconnect_loop(self) -> None:
-        """Start an async background task that periodically retries offline vaults."""
+        """Start an async background task that retries offline and disconnected vaults."""
         if self._reconnect_task is not None:
             return
         self._reconnect_task = asyncio.create_task(self._reconnect_loop())
@@ -255,42 +255,81 @@ class VaultManager:
             self._reconnect_task = None
             logger.info("Vault reconnection loop stopped")
 
+    def _retry_pending_vaults(self) -> None:
+        """Retry vaults that failed initial connection and were queued for reconnect."""
+        if not self._pending_configs:
+            return
+
+        pending_names = list(self._pending_configs.keys())
+        logger.info("Attempting to reconnect %d offline vault(s): %s", len(pending_names), pending_names)
+
+        for name in pending_names:
+            vault_config = self._pending_configs.get(name)
+            if vault_config is None:
+                continue
+            integration = self._vaults.get(name)
+            if integration is None:
+                continue
+
+            if integration.connect():
+                self._pending_configs.pop(name, None)
+                VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
+                INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1)
+                logger.info("Reconnected to vault '%s' at %s", name, vault_config.address)
+                continue
+
+            reason = integration.last_error or "unknown connection failure"
+            if integration.last_error_kind == "auth":
+                self._pending_configs.pop(name, None)
+                logger.error(
+                    "Vault '%s' at %s authentication failed during reconnect and retries were stopped: %s",
+                    name,
+                    vault_config.address,
+                    reason,
+                )
+            elif integration.last_error_kind == "offline":
+                logger.warning("Vault '%s' at %s is still offline", name, vault_config.address)
+            else:
+                logger.warning(
+                    "Vault '%s' at %s is still unavailable: %s",
+                    name,
+                    vault_config.address,
+                    reason,
+                )
+
+    def _reconnect_disconnected_vaults(self) -> None:
+        """Reconnect vaults that were connected previously but later lost authentication."""
+        for name, integration in self._vaults.items():
+            if name in self._pending_configs:
+                continue
+            if integration.is_connected():
+                continue
+
+            reason = integration.last_error or "unknown disconnection"
+            logger.warning(
+                "Vault '%s' is disconnected, attempting re-authentication (reason: %s)",
+                name,
+                reason,
+            )
+
+            if integration.connect():
+                VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
+                INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1)
+                logger.info("Re-authenticated vault '%s'", name)
+                continue
+
+            INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(0)
+            reason = integration.last_error or "unknown connection failure"
+            if integration.last_error_kind == "offline":
+                logger.warning("Vault '%s' appears offline during re-authentication", name)
+            elif integration.last_error_kind == "auth":
+                logger.error("Vault '%s' re-authentication failed: %s", name, reason)
+            else:
+                logger.warning("Vault '%s' re-authentication failed: %s", name, reason)
+
     async def _reconnect_loop(self) -> None:
-        """Periodically attempt to reconnect offline vault instances."""
+        """Periodically attempt to reconnect offline and disconnected vault instances."""
         while True:
             await asyncio.sleep(self._reconnect_interval)
-            if not self._pending_configs:
-                continue
-            pending_names = list(self._pending_configs.keys())
-            logger.info("Attempting to reconnect %d offline vault(s): %s", len(pending_names), pending_names)
-            for name in pending_names:
-                vault_config = self._pending_configs.get(name)
-                if vault_config is None:
-                    continue
-                integration = self._vaults.get(name)
-                if integration is None:
-                    continue
-                if integration.connect():
-                    self._pending_configs.pop(name, None)
-                    VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
-                    INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1)
-                    logger.info("Reconnected to vault '%s' at %s", name, vault_config.address)
-                else:
-                    reason = integration.last_error or "unknown connection failure"
-                    if integration.last_error_kind == "auth":
-                        self._pending_configs.pop(name, None)
-                        logger.error(
-                            "Vault '%s' at %s authentication failed during reconnect and retries were stopped: %s",
-                            name,
-                            vault_config.address,
-                            reason,
-                        )
-                    elif integration.last_error_kind == "offline":
-                        logger.warning("Vault '%s' at %s is still offline", name, vault_config.address)
-                    else:
-                        logger.warning(
-                            "Vault '%s' at %s is still unavailable: %s",
-                            name,
-                            vault_config.address,
-                            reason,
-                        )
+            self._retry_pending_vaults()
+            self._reconnect_disconnected_vaults()

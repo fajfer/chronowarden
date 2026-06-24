@@ -78,3 +78,53 @@ class TestVaultManagerConnectionRetry:
 
         assert manager.get("dev-vault") is integration
         assert manager._pending_configs["dev-vault"] == vault_config
+
+
+class TestVaultManagerDisconnectedReconnect:
+    """Tests for reconnecting vaults that lose authentication after startup."""
+
+    def test_disconnected_vault_is_reauthenticated(self) -> None:
+        """A disconnected vault outside pending queue is re-authenticated."""
+        manager = VaultManager()
+        integration = MagicMock()
+        integration.is_connected.return_value = False
+        integration.connect.return_value = True
+
+        manager._vaults["dev-vault"] = integration
+
+        manager._reconnect_disconnected_vaults()
+
+        integration.connect.assert_called_once_with()
+
+    def test_connected_vault_is_not_reauthenticated(self) -> None:
+        """A healthy vault is skipped by disconnected reconnect pass."""
+        manager = VaultManager()
+        integration = MagicMock()
+        integration.is_connected.return_value = True
+
+        manager._vaults["dev-vault"] = integration
+
+        manager._reconnect_disconnected_vaults()
+
+        integration.connect.assert_not_called()
+
+    def test_pending_vault_is_handled_by_pending_retry_path(self) -> None:
+        """Vaults already queued as pending are skipped by disconnected pass."""
+        manager = VaultManager()
+        integration = MagicMock()
+        integration.is_connected.return_value = False
+        integration.connect.return_value = True
+        vault_config = VaultConfig(
+            name="dev-vault",
+            address="http://localhost:8202",
+            auth_method="approle",
+            role_id="rid",
+            secret_id="sid",
+        )
+
+        manager._vaults["dev-vault"] = integration
+        manager._pending_configs["dev-vault"] = vault_config
+
+        manager._reconnect_disconnected_vaults()
+
+        integration.connect.assert_not_called()

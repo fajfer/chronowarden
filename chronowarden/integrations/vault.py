@@ -90,6 +90,14 @@ class VaultIntegration(BaseIntegration):
         """
         self._clear_last_error()
 
+        if self._client is not None:
+            try:
+                self._client.adapter.close()
+            except Exception:
+                logger.exception("Failed to close previous Vault client before reconnect")
+            finally:
+                self._client = None
+
         try:
             verify: bool | str = self._verify_ssl
 
@@ -188,7 +196,18 @@ class VaultIntegration(BaseIntegration):
         if self._client is None:
             return False
         try:
-            return self._client.is_authenticated()
+            is_authenticated = self._client.is_authenticated()
+            if is_authenticated:
+                if self._last_error_kind == "auth":
+                    self._clear_last_error()
+                return True
+
+            if self._last_error_kind is None:
+                self._set_last_error(
+                    "auth",
+                    "Vault authentication is no longer valid (token may be expired or revoked)",
+                )
+            return False
         except VaultError as exc:
             self._set_last_error("vault", str(exc) or "Error checking Vault connection")
             logger.exception("Error checking Vault connection")
