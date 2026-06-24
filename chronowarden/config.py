@@ -343,11 +343,11 @@ class AppConfig(BaseModel):
     def validate_severity_values(self) -> "AppConfig":
         """Validate configured severity values against configured expiry profiles."""
         valid_values = set(self.expiry_profiles) | RESERVED_SEVERITY_VALUES
-        self._validate_all_severity_values(valid_values)
+        self._warn_invalid_severity_values(valid_values)
         return self
 
-    def _validate_all_severity_values(self, valid_values: set[str]) -> None:
-        """Validate severity values across all config scopes against allowed profiles."""
+    def _warn_invalid_severity_values(self, valid_values: set[str]) -> None:
+        """Warn for severity values across all config scopes that are not in allowed profiles."""
 
         for engine in self.engines:
             _validate_severity_value(engine.default_severity, "legacy engine config", valid_values)
