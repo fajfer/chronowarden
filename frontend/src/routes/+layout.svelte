@@ -16,13 +16,7 @@
 
   const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
-  const getInitialSidebarState = (): boolean => {
-    if (typeof window === 'undefined') {
-      return true;
-    }
-
-    return window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
-  };
+  const getInitialSidebarState = (): boolean => true;
 
   let { children } = $props();
   let sidebarOpen = $state(getInitialSidebarState());
