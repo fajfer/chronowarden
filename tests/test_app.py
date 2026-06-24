@@ -9,8 +9,8 @@ from unittest.mock import patch
 import pytest
 from fastapi import FastAPI
 
-from chronowarden.config import AppConfig
 from chronowarden.app import lifespan
+from chronowarden.config import AppConfig
 
 
 @pytest.mark.asyncio
