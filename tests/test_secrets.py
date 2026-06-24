@@ -465,6 +465,17 @@ class TestSecretsAPI:
             assert response.status_code == 422
             assert response.json()["detail"].startswith("Invalid severity")
 
+    def test_patch_secret_blank_severity(self) -> None:
+        """Test PATCH with blank severity returns 422."""
+        self._insert_secret()
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/1", json={"severity": "   "})
+            assert response.status_code == 422
+
     def test_list_secrets_filter_engine(self) -> None:
         """Test listing secrets filtered by engine ID via API."""
         self._insert_secret(engine_id="apps", secret_path="key-1")
