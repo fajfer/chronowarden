@@ -35,8 +35,9 @@ This document contains critical information about working with this codebase. Fo
     - eg. if it said 2025-2026 and the current year is 2027, change the date range to 2025-2027
 
 - Use [conventional commits](https://www.conventionalcommits.org/) as a standard for committing
-- NEVER ever mention a `co-authored-by` or similar aspects. In particular, never
-  mention the tool used to create the commit message or PR.
+- ALWAYS add an `Assisted-by: <agent-name>/<model-id>` git trailer to commits made during an AI-assisted coding session.
+- Substitute both `<agent-name>` and `<model-id>` with your own values
+- Don't use Co-authored-by: - AI assistants are not GitHub users and the co-author convention is reserved for human collaborators. Assisted-by: is the correct semantic.
 
 ## Code Formatting
 
