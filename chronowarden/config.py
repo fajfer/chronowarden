@@ -338,17 +338,13 @@ class AppConfig(BaseModel):
         default=120,
         ge=10,
         description=(
-            "Seconds between reconnection attempts for offline or disconnected vault instances "
-            "(minimum 10)"
+            "Seconds between reconnection attempts for offline or disconnected vault instances " "(minimum 10)"
         ),
     )
     vault_reconnect_max_attempts: int = Field(
         default=5,
         ge=1,
-        description=(
-            "Maximum number of reconnect cycles before the background reconnect loop stops "
-            "(minimum 1)"
-        ),
+        description=("Maximum number of reconnect cycles before the background reconnect loop stops " "(minimum 1)"),
     )
     expiry_profiles: dict[str, ExpiryProfile] = Field(
         default_factory=lambda: {name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()},
