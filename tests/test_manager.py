@@ -4,6 +4,9 @@
 
 """Tests for Vault manager behavior."""
 
+import asyncio
+
+from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -128,3 +131,54 @@ class TestVaultManagerDisconnectedReconnect:
         manager._reconnect_disconnected_vaults()
 
         integration.connect.assert_not_called()
+
+
+class TestVaultManagerReconnectLoop:
+    """Tests for bounded reconnect loop behavior."""
+
+    def test_reconnect_loop_stops_after_configured_attempts(self) -> None:
+        """Reconnect loop exits after reaching configured max attempts."""
+        manager = VaultManager()
+        manager._reconnect_interval = 1
+        manager._reconnect_max_attempts = 3
+        manager._retry_pending_vaults = MagicMock()
+        manager._reconnect_disconnected_vaults = MagicMock()
+
+        async def _run_loop() -> None:
+            with patch("chronowarden.integrations.manager.asyncio.sleep", new=AsyncMock()):
+                await manager._reconnect_loop()
+
+        asyncio.run(_run_loop())
+
+        assert manager._reconnect_attempts == 3
+        assert manager._retry_pending_vaults.call_count == 3
+        assert manager._reconnect_disconnected_vaults.call_count == 3
+        assert manager._reconnect_task is None
+
+    def test_start_reconnect_loop_can_restart_after_exhaustion(self) -> None:
+        """A new loop can be started after a previous one exhausted max attempts."""
+        manager = VaultManager()
+        manager._reconnect_interval = 1
+        manager._reconnect_max_attempts = 1
+        manager._retry_pending_vaults = MagicMock()
+        manager._reconnect_disconnected_vaults = MagicMock()
+
+        async def _run_restart() -> None:
+            with patch("chronowarden.integrations.manager.asyncio.sleep", new=AsyncMock()):
+                manager.start_reconnect_loop()
+                first_task = manager._reconnect_task
+                assert first_task is not None
+                await first_task
+
+                assert manager._reconnect_task is None
+
+                manager.start_reconnect_loop()
+                second_task = manager._reconnect_task
+                assert second_task is not None
+                assert second_task is not first_task
+                await second_task
+
+        asyncio.run(_run_restart())
+
+        assert manager._retry_pending_vaults.call_count == 2
+        assert manager._reconnect_disconnected_vaults.call_count == 2

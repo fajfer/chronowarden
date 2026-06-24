@@ -341,6 +341,14 @@ class AppConfig(BaseModel):
             "(minimum 10)"
         ),
     )
+    vault_reconnect_max_attempts: int = Field(
+        default=5,
+        ge=1,
+        description=(
+            "Maximum number of reconnect cycles before the background reconnect loop stops "
+            "(minimum 1)"
+        ),
+    )
     expiry_profiles: dict[str, ExpiryProfile] = Field(
         default_factory=lambda: {name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()},
         description="Expiry profiles mapping severity names to rotation periods",
