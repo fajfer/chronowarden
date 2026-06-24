@@ -50,14 +50,14 @@ def _compute_status(days_remaining: Optional[int]) -> SecretStatus:
     return SecretStatus.OK
 
 
-def _validate_severity_input(severity: Optional[str], config: AppConfig, source: str) -> None:
+def _validate_severity_input(severity: Optional[str], config: AppConfig, request_source: str) -> None:
     """
     Validate a request severity value against configured expiry profiles.
 
     Args:
         severity: Requested severity value.
         config: Application configuration.
-        source: Human-readable request source label.
+        request_source: Human-readable request source label.
 
     Raises:
         HTTPException: If severity is unknown.
@@ -71,7 +71,7 @@ def _validate_severity_input(severity: Optional[str], config: AppConfig, source:
     allowed_values = ", ".join(sorted(config.expiry_profiles))
     raise HTTPException(
         status_code=422,
-        detail=f"Invalid severity '{severity}' in {source}. Allowed values: {allowed_values}",
+        detail=f"Invalid severity '{severity}' in {request_source}. Allowed values: {allowed_values}",
     )
 
 
