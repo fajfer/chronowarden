@@ -41,7 +41,7 @@ class SecretMetadataResponse(BaseModel):
 class SecretMetadataUpdate(BaseModel):
     """Request body for updating Chronowarden-specific metadata fields."""
 
-    severity: Optional[str] = Field(default=None, min_length=1, description="Override severity profile")
+    severity: Optional[str] = Field(default=None, description="Override severity profile")
     enabled: Optional[bool] = Field(default=None, description="Enable/disable monitoring")
 
     @field_validator("severity")

@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from chronowarden.config import AppConfig
 from chronowarden.database import SecretMetadataCache
 from chronowarden.models.secret import SecretMetadataResponse, SecretMetadataUpdate, SecretStatus
 
@@ -49,7 +50,7 @@ def _compute_status(days_remaining: Optional[int]) -> SecretStatus:
     return SecretStatus.OK
 
 
-def _validate_severity_input(severity: Optional[str], config: Any, source: str) -> None:
+def _validate_severity_input(severity: Optional[str], config: AppConfig, source: str) -> None:
     """
     Validate a request severity value against configured expiry profiles.
 

@@ -451,7 +451,7 @@ class TestSecretsAPI:
         ):
             response = client.get("/api/v1/secrets/", params={"severity": "unknown"})
             assert response.status_code == 422
-            assert "Invalid severity" in response.json()["detail"]
+            assert response.json()["detail"].startswith("Invalid severity")
 
     def test_patch_secret_invalid_severity(self) -> None:
         """Test PATCH with unknown severity returns 422."""
@@ -463,7 +463,7 @@ class TestSecretsAPI:
         ):
             response = client.patch("/api/v1/secrets/1", json={"severity": "unknown"})
             assert response.status_code == 422
-            assert "Invalid severity" in response.json()["detail"]
+            assert response.json()["detail"].startswith("Invalid severity")
 
     def test_list_secrets_filter_engine(self) -> None:
         """Test listing secrets filtered by engine ID via API."""
