@@ -40,6 +40,7 @@ def _validate_severity_value(v: Optional[str], context: str, valid_values: Optio
     Args:
         v: The severity value to validate.
         context: Description of where the value comes from (for logging).
+        valid_values: Allowed severity values. If None, validation is skipped.
 
     Returns:
         The original severity value (validation is logged as warning only).
@@ -103,12 +104,6 @@ class SecretConfig(BaseModel):
     path: str = Field(description="Exact secret path within the engine")
     severity: str = Field(description="Severity override for this specific secret")
 
-    @field_validator("severity")
-    @classmethod
-    def validate_severity(cls, v: str) -> str:
-        """Validate severity value."""
-        return v
-
 
 class EngineConfigNested(BaseModel):
     """Per-engine configuration nested within a vault."""
@@ -117,24 +112,12 @@ class EngineConfigNested(BaseModel):
     severity: Optional[str] = Field(default=None, description="Severity override for this engine")
     secrets: list[SecretConfig] = Field(default_factory=list, description="Per-secret overrides")
 
-    @field_validator("severity")
-    @classmethod
-    def validate_severity(cls, v: Optional[str]) -> Optional[str]:
-        """Validate severity value."""
-        return v
-
 
 class EngineConfig(BaseModel):
     """Per-engine configuration (legacy top-level format)."""
 
     id: str = Field(description="Engine identifier (e.g. 'secret/my-app')")
     default_severity: Optional[str] = Field(default=None, description="Default severity for all secrets in this engine")
-
-    @field_validator("default_severity")
-    @classmethod
-    def validate_severity(cls, v: Optional[str]) -> Optional[str]:
-        """Validate severity value."""
-        return v
 
 
 class VaultConfig(BaseModel):
@@ -209,12 +192,6 @@ class VaultConfig(BaseModel):
                 )
 
         return self
-
-    @field_validator("severity")
-    @classmethod
-    def validate_severity(cls, v: Optional[str]) -> Optional[str]:
-        """Validate severity value."""
-        return v
 
     def get_engine_config(self, engine_name: str) -> Optional[EngineConfigNested]:
         """
