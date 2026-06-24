@@ -474,7 +474,7 @@ class TestSeverityValidation:
 
     def test_custom_profile_allowed(self, caplog: pytest.LogCaptureFixture) -> None:
         """Custom severity profile should not produce invalid severity warnings."""
-        with caplog.at_level(logging.WARNING, logger="uvicorn.error"):
+        with caplog.at_level(logging.WARNING):
             AppConfig(
                 expiry_profiles={
                     "default": ExpiryProfile(rotation_period="365d"),
@@ -493,7 +493,7 @@ class TestSeverityValidation:
 
     def test_invalid_profile_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         """Unknown severity values should log warning for cascade fallback."""
-        with caplog.at_level(logging.WARNING, logger="uvicorn.error"):
+        with caplog.at_level(logging.WARNING):
             AppConfig(
                 vaults=[
                     VaultConfig(
