@@ -33,19 +33,19 @@ RESERVED_SEVERITY_VALUES = {"none"}
 _DURATION_PATTERN = re.compile(r"^(\d+)([dmy])$")
 
 
-def _validate_severity_value(v: Optional[str], context: str, valid_values: Optional[set[str]] = None) -> Optional[str]:
+def _validate_severity_value(v: Optional[str], context: str, valid_values: set[str]) -> Optional[str]:
     """
     Validate a severity value against known profiles.
 
     Args:
         v: The severity value to validate.
         context: Description of where the value comes from (for logging).
-        valid_values: Allowed severity values. If None, validation is skipped.
+        valid_values: Allowed severity values.
 
     Returns:
         The original severity value (validation is logged as warning only).
     """
-    if valid_values is not None and v is not None and v not in valid_values:
+    if v is not None and v not in valid_values:
         logger.warning("Invalid severity value '%s' in %s, falling through to cascade", v, context)
     return v
 
@@ -343,6 +343,11 @@ class AppConfig(BaseModel):
     def validate_severity_values(self) -> "AppConfig":
         """Validate configured severity values against configured expiry profiles."""
         valid_values = set(self.expiry_profiles) | RESERVED_SEVERITY_VALUES
+        self._validate_all_severity_values(valid_values)
+        return self
+
+    def _validate_all_severity_values(self, valid_values: set[str]) -> None:
+        """Validate severity values across all config scopes against allowed profiles."""
 
         for engine in self.engines:
             _validate_severity_value(engine.default_severity, "legacy engine config", valid_values)
@@ -361,8 +366,6 @@ class AppConfig(BaseModel):
                         f"secret config '{vault.name}/{engine.name}/{secret.path}'",
                         valid_values,
                     )
-
-        return self
 
     def _get_vault_config(self, vault_name: str) -> Optional[VaultConfig]:
         """

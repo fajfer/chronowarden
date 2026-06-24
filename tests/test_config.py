@@ -475,7 +475,7 @@ class TestSeverityValidation:
     def test_custom_profile_allowed(self, caplog: pytest.LogCaptureFixture) -> None:
         """Custom severity profile should not produce invalid severity warnings."""
         with caplog.at_level(logging.WARNING):
-            AppConfig(
+            config = AppConfig(
                 expiry_profiles={
                     "default": ExpiryProfile(rotation_period="365d"),
                     "custom-policy": ExpiryProfile(rotation_period="45d"),
@@ -489,6 +489,7 @@ class TestSeverityValidation:
                     )
                 ],
             )
+        assert config.resolve_severity("any-engine", "test") == "custom-policy"
         assert "Invalid severity value" not in caplog.text
 
     def test_invalid_profile_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
