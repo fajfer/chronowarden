@@ -69,7 +69,7 @@ def _validate_severity_input(severity: Optional[str], config: Any, source: str) 
 
     allowed_values = ", ".join(sorted(config.expiry_profiles))
     raise HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=422,
         detail=f"Invalid severity '{severity}' in {source}. Allowed values: {allowed_values}",
     )
 
