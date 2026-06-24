@@ -49,6 +49,31 @@ def _compute_status(days_remaining: Optional[int]) -> SecretStatus:
     return SecretStatus.OK
 
 
+def _validate_severity_input(severity: Optional[str], config: Any, source: str) -> None:
+    """
+    Validate a request severity value against configured expiry profiles.
+
+    Args:
+        severity: Requested severity value.
+        config: Application configuration.
+        source: Human-readable request source label.
+
+    Raises:
+        HTTPException: If severity is unknown.
+    """
+    if severity is None:
+        return
+
+    if severity in config.expiry_profiles:
+        return
+
+    allowed_values = ", ".join(sorted(config.expiry_profiles))
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=f"Invalid severity '{severity}' in {source}. Allowed values: {allowed_values}",
+    )
+
+
 def _enrich_secret(entry: SecretMetadataCache, config: Any) -> SecretMetadataResponse:
     """
     Build a SecretMetadataResponse from a cache entry with computed fields.
@@ -118,6 +143,7 @@ async def list_secrets(
         List of enriched secret metadata entries.
     """
     database, config, _ = _get_app_dependencies()
+    _validate_severity_input(severity, config, "query parameter")
     entries = database.list_all_secrets(
         vault_name=vault_name,
         engine_id=engine_id,
@@ -172,6 +198,7 @@ async def update_secret_metadata(secret_id: int, body: SecretMetadataUpdate) -> 
         HTTPException: If secret not found or vault is unavailable.
     """
     database, config, manager = _get_app_dependencies()
+    _validate_severity_input(body.severity, config, "request body")
     entry = database.get_secret_by_id(secret_id)
 
     if entry is None:

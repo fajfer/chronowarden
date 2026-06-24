@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SecretStatus(str, Enum):
@@ -41,5 +41,18 @@ class SecretMetadataResponse(BaseModel):
 class SecretMetadataUpdate(BaseModel):
     """Request body for updating Chronowarden-specific metadata fields."""
 
-    severity: Optional[str] = Field(default=None, description="Override severity profile")
+    severity: Optional[str] = Field(default=None, min_length=1, description="Override severity profile")
     enabled: Optional[bool] = Field(default=None, description="Enable/disable monitoring")
+
+    @field_validator("severity")
+    @classmethod
+    def validate_severity(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and normalize severity input."""
+        if v is None:
+            return None
+
+        normalized = v.strip()
+        if not normalized:
+            raise ValueError("Severity must not be blank")
+
+        return normalized
