@@ -88,6 +88,22 @@ class TestAppConfigDefaults:
         config = AppConfig()
         assert config.polling_interval == "6h"
 
+    def test_default_vault_reconnect_interval(self) -> None:
+        config = AppConfig()
+        assert config.vault_reconnect_interval == 120
+
+    def test_default_vault_reconnect_max_attempts(self) -> None:
+        config = AppConfig()
+        assert config.vault_reconnect_max_attempts == 5
+
+    def test_custom_vault_reconnect_max_attempts(self) -> None:
+        config = AppConfig(vault_reconnect_max_attempts=12)
+        assert config.vault_reconnect_max_attempts == 12
+
+    def test_vault_reconnect_max_attempts_must_be_positive(self) -> None:
+        with pytest.raises(ValueError, match="greater than or equal to 1"):
+            AppConfig(vault_reconnect_max_attempts=0)
+
     def test_default_sentry_dsn(self) -> None:
         config = AppConfig()
         assert config.sentry_dsn is None

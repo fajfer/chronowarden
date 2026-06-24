@@ -17,6 +17,7 @@ from chronowarden.metrics import INTEGRATION_HEALTH, VAULT_CONNECTIONS_TOTAL
 logger = logging.getLogger("uvicorn.error")
 
 _DEFAULT_RECONNECT_INTERVAL_SECONDS = 120
+_DEFAULT_RECONNECT_MAX_ATTEMPTS = 5
 
 
 class VaultManager:
@@ -29,6 +30,8 @@ class VaultManager:
         self._pending_configs: dict[str, VaultConfig] = {}
         self._reconnect_task: Optional[asyncio.Task[None]] = None
         self._reconnect_interval: int = _DEFAULT_RECONNECT_INTERVAL_SECONDS
+        self._reconnect_max_attempts: int = _DEFAULT_RECONNECT_MAX_ATTEMPTS
+        self._reconnect_attempts: int = 0
 
     @property
     def vault_names(self) -> list[str]:
@@ -59,6 +62,7 @@ class VaultManager:
             self._ca_bundle_path = self._create_ca_bundle(config.ca_certs_dir)
 
         self._reconnect_interval = config.vault_reconnect_interval
+        self._reconnect_max_attempts = config.vault_reconnect_max_attempts
 
         for vault_config in config.vaults:
             self._connect_vault(vault_config)
@@ -244,9 +248,23 @@ class VaultManager:
     def start_reconnect_loop(self) -> None:
         """Start an async background task that retries offline and disconnected vaults."""
         if self._reconnect_task is not None:
-            return
+            if self._reconnect_task.done():
+                self._reconnect_task = None
+            else:
+                return
+
+        self._reconnect_attempts = 0
         self._reconnect_task = asyncio.create_task(self._reconnect_loop())
-        logger.info("Vault reconnection loop started (interval=%ds)", self._reconnect_interval)
+        logger.info(
+            "Vault reconnection loop started (interval=%ds, max_attempts=%d)",
+            self._reconnect_interval,
+            self._reconnect_max_attempts,
+        )
+
+    def restart_reconnect_loop(self) -> None:
+        """Restart the reconnect background loop and reset retry attempts."""
+        self.stop_reconnect_loop()
+        self.start_reconnect_loop()
 
     def stop_reconnect_loop(self) -> None:
         """Cancel the reconnection background task."""
@@ -254,6 +272,7 @@ class VaultManager:
             self._reconnect_task.cancel()
             self._reconnect_task = None
             logger.info("Vault reconnection loop stopped")
+        self._reconnect_attempts = 0
 
     def _retry_pending_vaults(self) -> None:
         """Retry vaults that failed initial connection and were queued for reconnect."""
@@ -328,8 +347,17 @@ class VaultManager:
                 logger.warning("Vault '%s' re-authentication failed: %s", name, reason)
 
     async def _reconnect_loop(self) -> None:
-        """Periodically attempt to reconnect offline and disconnected vault instances."""
-        while True:
-            await asyncio.sleep(self._reconnect_interval)
-            self._retry_pending_vaults()
-            self._reconnect_disconnected_vaults()
+        """Retry offline/disconnected vaults until max attempts are exhausted or loop is cancelled."""
+        try:
+            while self._reconnect_attempts < self._reconnect_max_attempts:
+                await asyncio.sleep(self._reconnect_interval)
+                self._retry_pending_vaults()
+                self._reconnect_disconnected_vaults()
+                self._reconnect_attempts += 1
+        finally:
+            self._reconnect_task = None
+
+        logger.warning(
+            "Vault reconnection loop exhausted %d attempt(s) and stopped; trigger sync to restart",
+            self._reconnect_max_attempts,
+        )

@@ -32,6 +32,7 @@ sentry_dsn: "https://1337.ingest.de.sentry.io/1337"  # optional Sentry DSN for e
 date_format: "YYYY-MM-DD"  # or "YYYY-DD-MM", with auto-detection fallback
 polling_interval: "6h"     # Global polling interval for all vaults (e.g. '6h', '30m')
 vault_reconnect_interval: 120  # Seconds between reconnection attempts for offline vaults (minimum 10, default: 120)
+vault_reconnect_max_attempts: 5  # Number of reconnect cycles before loop stops (minimum 1, default: 5)
 
 # Expiry profiles: define rotation periods per severity level
 # Supports: d (days), m (months), y (years)
