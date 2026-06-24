@@ -122,6 +122,9 @@ Development — full shell, git, --reload, 286MB \
 
    UI will be available at `http://localhost:5173`
 
+   Optionally set `VITE_API_BASE_URL` to point the frontend API client at a custom base path
+   (defaults to `/api/v1`).
+
 ## Development Environment
 
 For local testing with dev Vault instances:
