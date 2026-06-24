@@ -35,7 +35,7 @@ _DURATION_PATTERN = re.compile(r"^(\d+)([dmy])$")
 
 def _validate_severity_value(v: Optional[str], context: str, valid_values: set[str]) -> Optional[str]:
     """
-    Validate a severity value against known profiles.
+    Validate a severity value against caller-provided allowed profiles.
 
     Args:
         v: The severity value to validate.

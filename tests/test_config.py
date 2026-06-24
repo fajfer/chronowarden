@@ -490,6 +490,7 @@ class TestSeverityValidation:
                 ],
             )
         assert config.resolve_severity("any-engine", "test") == "custom-policy"
+        assert config.get_rotation_days("custom-policy") == 45
         assert "Invalid severity value" not in caplog.text
 
     def test_invalid_profile_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
