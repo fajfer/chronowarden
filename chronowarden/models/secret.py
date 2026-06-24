@@ -47,7 +47,12 @@ class SecretMetadataUpdate(BaseModel):
     @field_validator("severity")
     @classmethod
     def validate_severity(cls, v: Optional[str]) -> Optional[str]:
-        """Trim severity input and reject blank values."""
+        """
+        Trim severity input and reject blank values.
+
+        Raises:
+            ValueError: If severity contains only whitespace.
+        """
         if v is None:
             return None
 
