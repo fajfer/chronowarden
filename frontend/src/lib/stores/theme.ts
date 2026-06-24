@@ -50,7 +50,7 @@ export interface ThemeDefinition {
 const DEFAULT_THEME_ID: ThemeId = 'default';
 
 function isThemeId(value: string): value is ThemeId {
-  return value in THEME_DEFINITIONS;
+  return Object.prototype.hasOwnProperty.call(THEME_DEFINITIONS, value);
 }
 
 function normalizeThemeId(candidate: string | null | undefined): ThemeId {
