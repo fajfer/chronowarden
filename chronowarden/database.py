@@ -529,7 +529,8 @@ class Database:
             if conn is None:
                 return
             conn.execute(
-                "INSERT INTO notification_routes (id, owner_id, type, address, message_template) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO notification_routes "
+                "(id, owner_id, type, address, message_template) VALUES (?, ?, ?, ?, ?)",
                 (route_id, owner_id, route_type, address, message_template),
             )
             conn.commit()
