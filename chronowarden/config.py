@@ -29,11 +29,12 @@ DEFAULT_EXPIRY_PROFILES: dict[str, dict[str, str]] = {
 }
 
 VALID_SEVERITY_VALUES = {"default", "critical", "pci-dss-4.0", "none"}
+RESERVED_SEVERITY_VALUES = {"none"}
 
 _DURATION_PATTERN = re.compile(r"^(\d+)([dmy])$")
 
 
-def _validate_severity_value(v: Optional[str], context: str) -> Optional[str]:
+def _validate_severity_value(v: Optional[str], context: str, valid_values: Optional[set[str]] = None) -> Optional[str]:
     """
     Validate a severity value against known profiles.
 
@@ -44,7 +45,7 @@ def _validate_severity_value(v: Optional[str], context: str) -> Optional[str]:
     Returns:
         The original severity value (validation is logged as warning only).
     """
-    if v is not None and v not in VALID_SEVERITY_VALUES:
+    if valid_values is not None and v is not None and v not in valid_values:
         logger.warning("Invalid severity value '%s' in %s, falling through to cascade", v, context)
     return v
 
@@ -107,7 +108,7 @@ class SecretConfig(BaseModel):
     @classmethod
     def validate_severity(cls, v: str) -> str:
         """Validate severity value."""
-        return _validate_severity_value(v, "secret config") or v
+        return v
 
 
 class EngineConfigNested(BaseModel):
@@ -121,7 +122,7 @@ class EngineConfigNested(BaseModel):
     @classmethod
     def validate_severity(cls, v: Optional[str]) -> Optional[str]:
         """Validate severity value."""
-        return _validate_severity_value(v, "engine config")
+        return v
 
 
 class EngineConfig(BaseModel):
@@ -134,7 +135,7 @@ class EngineConfig(BaseModel):
     @classmethod
     def validate_severity(cls, v: Optional[str]) -> Optional[str]:
         """Validate severity value."""
-        return _validate_severity_value(v, "engine config")
+        return v
 
 
 class VaultConfig(BaseModel):
@@ -214,7 +215,7 @@ class VaultConfig(BaseModel):
     @classmethod
     def validate_severity(cls, v: Optional[str]) -> Optional[str]:
         """Validate severity value."""
-        return _validate_severity_value(v, "vault config")
+        return v
 
     def get_engine_config(self, engine_name: str) -> Optional[EngineConfigNested]:
         """
@@ -366,6 +367,31 @@ class AppConfig(BaseModel):
             raise ValueError(f"Duplicate vault names: {', '.join(set(duplicates))}")
         if self.engines:
             logger.warning("Deprecated: top-level 'engines' array. Move engine configs into vaults[].engines instead.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_severity_values(self) -> "AppConfig":
+        """Validate configured severity values against configured expiry profiles."""
+        valid_values = set(self.expiry_profiles) | RESERVED_SEVERITY_VALUES
+
+        for engine in self.engines:
+            _validate_severity_value(engine.default_severity, "legacy engine config", valid_values)
+
+        for vault in self.vaults:
+            _validate_severity_value(vault.severity, f"vault config '{vault.name}'", valid_values)
+            for engine in vault.engines:
+                _validate_severity_value(
+                    engine.severity,
+                    f"engine config '{vault.name}/{engine.name}'",
+                    valid_values,
+                )
+                for secret in engine.secrets:
+                    _validate_severity_value(
+                        secret.severity,
+                        f"secret config '{vault.name}/{engine.name}/{secret.path}'",
+                        valid_values,
+                    )
+
         return self
 
     def _get_vault_config(self, vault_name: str) -> Optional[VaultConfig]:
