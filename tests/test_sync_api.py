@@ -24,8 +24,8 @@ def _build_client() -> TestClient:
 class TestSyncApiReconnectLoop:
     """Tests for restarting reconnect loop on manual sync attempts."""
 
-    def test_sync_restarts_reconnect_loop_for_disconnected_vault(self) -> None:
-        """Manual sync should restart reconnect loop even when vault is currently disconnected."""
+    def test_sync_starts_reconnect_loop_for_disconnected_vault(self) -> None:
+        """Manual sync should start reconnect loop even when vault is currently disconnected."""
         client = _build_client()
         manager = MagicMock()
         vault = MagicMock()
@@ -39,10 +39,10 @@ class TestSyncApiReconnectLoop:
             response = client.post("/api/v1/sync/vault/dev-vault")
 
         assert response.status_code == 503
-        manager.restart_reconnect_loop.assert_called_once_with()
+        manager.start_reconnect_loop.assert_called_once_with()
 
-    def test_sync_restarts_reconnect_loop_for_connected_vault(self) -> None:
-        """Manual sync should restart reconnect loop and still return sync results on success."""
+    def test_sync_starts_reconnect_loop_for_connected_vault(self) -> None:
+        """Manual sync should start reconnect loop and still return sync results on success."""
         client = _build_client()
         manager = MagicMock()
         vault = MagicMock()
@@ -67,4 +67,4 @@ class TestSyncApiReconnectLoop:
         assert response.status_code == 200
         assert response.json()["vault"] == "dev-vault"
         assert response.json()["secrets_synced"] == 1
-        manager.restart_reconnect_loop.assert_called_once_with()
+        manager.start_reconnect_loop.assert_called_once_with()
