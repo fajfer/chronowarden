@@ -57,7 +57,7 @@ def _validate_severity_input(severity: Optional[str], config: AppConfig, request
     Args:
         severity: Requested severity value.
         config: Application configuration.
-        request_source: Human-readable request source label.
+        request_source: Human-readable source phrase used in errors (e.g. "query parameter", "request body").
 
     Raises:
         HTTPException: If severity is unknown.
