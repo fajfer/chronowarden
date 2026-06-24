@@ -4,6 +4,7 @@
 
 """Tests for configuration loading, expiry profiles, and cascade logic."""
 
+import logging
 import pathlib
 
 import pytest
@@ -466,6 +467,49 @@ class TestEngineConfigNested:
     def test_engine_no_severity(self) -> None:
         ec = EngineConfigNested(name="apps")
         assert ec.severity is None
+
+
+class TestSeverityValidation:
+    """Tests for severity validation against configured expiry profiles."""
+
+    def test_custom_profile_allowed(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Custom severity profile should not produce invalid severity warnings."""
+        with caplog.at_level(logging.WARNING, logger="uvicorn.error"):
+            AppConfig(
+                expiry_profiles={
+                    "default": ExpiryProfile(rotation_period="365d"),
+                    "custom-policy": ExpiryProfile(rotation_period="45d"),
+                },
+                vaults=[
+                    VaultConfig(
+                        name="test",
+                        address="http://localhost",
+                        token="test",
+                        severity="custom-policy",
+                    )
+                ],
+            )
+        assert "Invalid severity value" not in caplog.text
+
+    def test_invalid_profile_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Unknown severity values should log warning for cascade fallback."""
+        with caplog.at_level(logging.WARNING, logger="uvicorn.error"):
+            AppConfig(
+                vaults=[
+                    VaultConfig(
+                        name="test",
+                        address="http://localhost",
+                        token="test",
+                        engines=[
+                            EngineConfigNested(
+                                name="apps",
+                                secrets=[SecretConfig(path="api-key", severity="unknown-severity")],
+                            )
+                        ],
+                    )
+                ]
+            )
+        assert "Invalid severity value 'unknown-severity'" in caplog.text
 
 
 class TestAppRoleConfig:
