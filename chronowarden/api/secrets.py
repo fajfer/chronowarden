@@ -195,20 +195,18 @@ async def update_secret_metadata(secret_id: int, body: SecretMetadataUpdate) -> 
         metadata_fields["chronowarden_enabled"] = str(body.enabled).lower()
 
     if metadata_fields:
-        metadata_write_failed = False
         try:
-            write_succeeded = vault.write_secret_metadata(
+            if not vault.write_secret_metadata(
                 entry.secret_path,
                 metadata_fields,
                 mount_point=entry.engine_id,
-            )
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Failed to update metadata in vault",
+                )
         except (VaultError, RuntimeError):
             logger.exception("Failed to write metadata to vault for secret %d", secret_id)
-            metadata_write_failed = True
-        else:
-            metadata_write_failed = not write_succeeded
-
-        if metadata_write_failed:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Failed to update metadata in vault",
