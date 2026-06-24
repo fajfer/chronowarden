@@ -4,12 +4,12 @@
 
 import logging
 import os
-import sentry_sdk
 from contextlib import asynccontextmanager
 from importlib.metadata import metadata, version
 from pathlib import Path
 from typing import AsyncIterator
 
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
