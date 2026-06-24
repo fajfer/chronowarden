@@ -176,11 +176,11 @@ path "sys/mounts" {
 - `PATCH /api/v1/secrets/{id}` - Update secret metadata (severity, enabled, ttl)
 
 ### Sync
-- `POST /api/v1/sync` - Trigger synchronization with Vault instances
-  - Scans all configured vaults and updates local cache
+- `POST /api/v1/sync/vault/{vault_name}` - Trigger synchronization for a specific Vault instance
+  - Scans the specified vault instance and updates local cache
 
 ### Vaults
-- `GET /api/v1/vaults` - List configured Vault instances with connection status
+- `GET /api/v1/vault/instances` - List configured Vault instances with connection status
 
 ### Health
 - `GET /health` - Health check endpoint
