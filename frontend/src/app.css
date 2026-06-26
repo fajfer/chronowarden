@@ -4,3 +4,26 @@
 body {
   font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
 }
+
+[data-theme="bison"] {
+  /* Gray scale → black / grey / white */
+  --color-gray-950: #000000;
+  --color-gray-900: #000000;
+  --color-gray-800: #111111;
+  --color-gray-700: #222222;
+  --color-gray-600: #444444;
+  --color-gray-500: #828282;
+  --color-gray-400: #828282;
+  --color-gray-300: #aaaaaa;
+  --color-gray-200: #d4d4d4;
+  --color-gray-100: #eeeeee;
+  --color-gray-50: #ffffff;
+
+  /* Indigo (accent / interactive) → red #D71920 */
+  --color-indigo-700: #a01018;
+  --color-indigo-600: #d71920;
+  --color-indigo-500: #d71920;
+  --color-indigo-400: #e84a50;
+  --color-indigo-300: #f07377;
+  --color-indigo-200: #f8adb0;
+}
