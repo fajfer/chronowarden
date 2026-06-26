@@ -24,6 +24,12 @@ export interface Secret {
   enabled: boolean;
   last_synced: string | null;
   status: SecretStatus;
+  /**
+   * Optional owner assignment. Not yet returned by the backend Secret API
+   * (see the "assign secrets to internal systems" roadmap item) — rendered
+   * as "—" until the backend populates it.
+   */
+  owner?: string | null;
 }
 
 /**
