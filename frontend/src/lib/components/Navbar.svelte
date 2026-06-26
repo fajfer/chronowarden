@@ -50,7 +50,7 @@
         <span class="sr-only">Chronowarden</span>
       </a>
       {#if version}
-        <span class="hidden sm:inline-block font-mono text-[11px] text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">v{version}</span>
+        <span class="hidden sm:inline-block font-mono text-[11px] text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">{version}</span>
       {/if}
     </div>
 
