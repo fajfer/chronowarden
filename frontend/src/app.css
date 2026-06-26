@@ -6,18 +6,21 @@ body {
 }
 
 [data-theme="bison"] {
-  /* Gray scale → black / grey / white */
+  /* Light theme: grey page background, white cards */
   --color-gray-950: #000000;
-  --color-gray-900: #000000;
-  --color-gray-800: #111111;
-  --color-gray-700: #222222;
-  --color-gray-600: #444444;
-  --color-gray-500: #828282;
-  --color-gray-400: #828282;
-  --color-gray-300: #aaaaaa;
-  --color-gray-200: #d4d4d4;
-  --color-gray-100: #eeeeee;
-  --color-gray-50: #ffffff;
+  --color-gray-900: #f0f0f0;   /* page bg → light grey */
+  --color-gray-800: #ffffff;   /* cards, panels → white */
+  --color-gray-700: #e0e0e0;   /* borders → light grey */
+  --color-gray-600: #c8c8c8;   /* hover backgrounds */
+  --color-gray-500: #828282;   /* muted text */
+  --color-gray-400: #828282;   /* secondary text */
+  --color-gray-300: #555555;   /* body text */
+  --color-gray-200: #1a1a1a;   /* primary text → near black */
+  --color-gray-100: #1a1a1a;
+  --color-gray-50:  #000000;
+
+  /* text-white → near-black on light backgrounds */
+  --color-white: #1a1a1a;
 
   /* Indigo (accent / interactive) → red #D71920 */
   --color-indigo-700: #a01018;
@@ -26,4 +29,30 @@ body {
   --color-indigo-400: #e84a50;
   --color-indigo-300: #f07377;
   --color-indigo-200: #f8adb0;
+
+  /* Red palette — darken for readability on light backgrounds */
+  --color-red-900: #cc0000;    /* bg-red-900/30 → visible pink on white */
+  --color-red-800: #dc2626;    /* border-red-800 */
+  --color-red-700: #ef4444;    /* border-red-700 */
+  --color-red-400: #dc2626;    /* status dot / "Unhealthy" text */
+  --color-red-300: #b91c1c;    /* error message text */
+}
+
+/* Restore white text on red (accent) elements */
+[data-theme="bison"] .bg-indigo-600,
+[data-theme="bison"] .bg-indigo-500 {
+  --color-white: #ffffff;
+}
+
+/* Red top navbar (targeted by border-b class to avoid affecting sidebar nav) */
+[data-theme="bison"] nav.border-b {
+  --color-gray-900: #ac141a;   /* bg-gray-900 → top bar red */
+  --color-gray-800: #911016;   /* theme switcher container bg */
+  --color-gray-700: #7a0d15;   /* border */
+  --color-gray-600: #9e1218;   /* hover bg (logout button) */
+  --color-gray-400: rgba(255, 255, 255, 0.85);
+  --color-gray-500: rgba(255, 255, 255, 0.7);
+  --color-gray-300: #ffffff;
+  --color-gray-200: #ffffff;
+  --color-white: #ffffff;
 }
