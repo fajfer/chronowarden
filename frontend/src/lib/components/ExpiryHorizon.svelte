@@ -5,7 +5,7 @@
 <script lang="ts">
   import type { Secret } from '$lib/types';
   import { getStatusDotClasses } from '$lib/utils/statusColor';
-  import { setSeverity } from '$lib/stores/filters';
+  import { setSeverity, clearFilters } from '$lib/stores/filters';
   import { goto } from '$app/navigation';
 
   let { secrets = [] }: { secrets?: Secret[] } = $props();
@@ -44,6 +44,7 @@
   });
 
   function filterBySeverity(severity: string) {
+    clearFilters();
     setSeverity(severity);
     goto('/secrets');
   }

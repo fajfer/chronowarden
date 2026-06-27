@@ -113,7 +113,7 @@
                     <div class="text-xs text-gray-500 mt-0.5">{secret.vault_name} · {secret.severity}</div>
                   </td>
                   <td class="px-3 py-3 text-right font-mono font-semibold {secret.status === 'expired' ? 'text-red-400' : 'text-yellow-400'}">
-                    {secret.days_remaining ?? '—'}d
+                    {secret.days_remaining != null ? `${secret.days_remaining}d` : '—'}
                   </td>
                   <td class="px-5 py-3 text-right"><StatusBadge status={secret.status} /></td>
                 </tr>

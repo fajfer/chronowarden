@@ -64,12 +64,13 @@
       {/each}
     </nav>
 
+    <a href="https://github.com/fajfer/chronowarden" target="_blank" rel="noopener noreferrer">
     <div class="m-3 flex items-center gap-3 rounded-lg border border-gray-700 bg-gray-800/60 p-3">
       <img src={$currentTheme.mascot.src} alt={$currentTheme.mascot.alt} class="h-16 w-16 object-contain shrink-0" />
       <div class="min-w-0">
-        <div class="text-xs font-medium text-gray-300">Visit our website</div>
-        <div class="text-[10px] text-gray-500">PCI-DSS 4.0 · DORA</div>
+        <div class="text-xs font-medium text-gray-300">Visit our GitHub</div>
+        <div class="text-[10px] text-gray-500">fajfer/chronowarden</div>
       </div>
-    </div>
+    </div></a>
   </aside>
 {/if}
