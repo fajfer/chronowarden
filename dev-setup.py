@@ -303,7 +303,7 @@ def login_with_approle(address: str, role_id: str, secret_id: str) -> Optional[s
         token = login_response["auth"]["client_token"]
         logger.info(f"  Successfully logged in with AppRole (token: {token[:8]}...)")
         return token
-    except Exception:
+    except (hvac.exceptions.VaultError, KeyError, TypeError):
         logger.exception("Failed to login with AppRole")
         return None
 
@@ -351,8 +351,8 @@ def populate_vault(vault_name: str, address: str, token: str) -> None:
 
         logger.info(f"Successfully populated {vault_name} with {len(engines)} engines and {len(engines) * 5} secrets")
 
-    except Exception:
-        logger.exception(f"Error populating {vault_name}")
+    except hvac.exceptions.VaultError:
+        logger.exception("Error populating %s", vault_name)
 
 
 def main():
@@ -415,8 +415,8 @@ def main():
                 approle_credentials[container_name] = (role_id, secret_id)
                 logger.info(f"AppRole credentials stored for {container_name}")
 
-            except Exception:
-                logger.exception(f"Error setting up AppRole for {container_name}")
+            except hvac.exceptions.VaultError:
+                logger.exception("Error setting up AppRole for %s", container_name)
 
     # Create config with AppRole credentials
     create_dev_config(approle_credentials)

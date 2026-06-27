@@ -10,6 +10,7 @@ from typing import Any, Optional
 import hvac
 from hvac.exceptions import Forbidden, InvalidPath, InvalidRequest, VaultError
 from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import RequestException
 
 from chronowarden.integrations.base import BaseIntegration
 
@@ -173,7 +174,7 @@ class VaultIntegration(BaseIntegration):
             self._set_last_error("offline", message)
             logger.warning(message)
             return False
-        except Exception:
+        except RequestException:
             self._set_last_error("unexpected", f"Unexpected error connecting to Vault at {self._address}")
             logger.exception("Unexpected error connecting to Vault at %s", self._address)
             return False
@@ -370,7 +371,7 @@ class VaultIntegration(BaseIntegration):
             self._set_last_error("offline", error)
             logger.warning(error)
             return {"healthy": False, "error": error}
-        except Exception:
+        except RequestException:
             error = f"Unexpected error connecting to Vault at {self._address}"
             self._set_last_error("unexpected", error)
             logger.exception("Unexpected error connecting to Vault at %s", self._address)

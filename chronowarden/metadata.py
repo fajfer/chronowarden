@@ -6,8 +6,12 @@
 
 import logging
 import re
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
+
+from hvac.exceptions import VaultError
+from requests.exceptions import RequestException
 
 from chronowarden.config import AppConfig
 from chronowarden.database import Database, SecretMetadataCache
@@ -287,7 +291,7 @@ def _list_secret_paths(vault: VaultIntegration, engine_id: str, prefix: str = ""
 
     try:
         keys = vault.list_secrets(prefix, mount_point=engine_id)
-    except Exception:
+    except (VaultError, RequestException):
         logger.exception("Error listing secrets in %s/%s", engine_id, prefix)
         return paths
 
@@ -334,8 +338,10 @@ def detect_changes(
                 result = sync_secret_metadata(vault, vault_name, engine_path, secret_path, config, db)
                 if result is not None:
                     updated.append(result)
-            except Exception:
-                logger.exception("Error syncing secret %s/%s", engine_path, secret_path)
+            except VaultError:
+                logger.exception("Vault error syncing secret %s/%s", engine_path, secret_path)
+            except sqlite3.Error:
+                logger.exception("Database error syncing secret %s/%s", engine_path, secret_path)
 
     logger.info("Sync complete for vault '%s': %d secrets processed", vault_name, len(updated))
     return updated
