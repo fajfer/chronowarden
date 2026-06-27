@@ -92,7 +92,7 @@
               <img
                 src={$currentTheme.mascot.src}
                 alt={$currentTheme.mascot.alt}
-                class="h-24 w-auto shrink-0 object-contain sm:h-40"
+                class="h-24 w-auto shrink-0 object-contain sm:h-60"
               />
               <div class="space-y-1">
                 <p class="text-lg font-semibold text-green-300">Nothing expiring or overdue</p>

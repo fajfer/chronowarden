@@ -5,6 +5,8 @@
 <script lang="ts">
   import type { Secret } from '$lib/types';
   import { getStatusDotClasses } from '$lib/utils/statusColor';
+  import { setSeverity } from '$lib/stores/filters';
+  import { goto } from '$app/navigation';
 
   let { secrets = [] }: { secrets?: Secret[] } = $props();
 
@@ -21,8 +23,10 @@
   // Stable colour per severity lane, assigned in order of appearance.
   const LANE_COLORS = ['bg-indigo-400', 'bg-orange-400', 'bg-emerald-400', 'bg-sky-400', 'bg-fuchsia-400'];
 
+  const MAX_VISIBLE_DAYS = 100;
+
   const lanes = $derived.by(() => {
-    const tracked = secrets.filter((s) => s.days_remaining != null);
+    const tracked = secrets.filter((s) => s.days_remaining != null && (s.days_remaining as number) <= MAX_VISIBLE_DAYS);
     const severities = Array.from(new Set(tracked.map((s) => s.severity)));
     return severities.map((severity, i) => ({
       severity,
@@ -38,6 +42,11 @@
         })),
     }));
   });
+
+  function filterBySeverity(severity: string) {
+    setSeverity(severity);
+    goto('/secrets');
+  }
 
   const gridlines = [
     { left: clampPct(0), label: 'now' },
@@ -78,10 +87,14 @@
       <!-- severity lanes -->
       {#each lanes as lane}
         <div class="flex items-center h-12">
-          <div class="w-28 flex-shrink-0 flex items-center gap-2 text-xs text-gray-400">
+          <button
+            onclick={() => filterBySeverity(lane.severity)}
+            class="w-28 flex-shrink-0 flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors group"
+            title="Filter secrets by {lane.severity}"
+          >
             <span class="w-2 h-2 rounded-sm {lane.color}"></span>
-            <span class="truncate">{lane.severity}</span>
-          </div>
+            <span class="truncate group-hover:underline">{lane.severity}</span>
+          </button>
           <div class="relative flex-1 h-full">
             {#each lane.items as it (it.id)}
               <div
