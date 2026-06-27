@@ -494,6 +494,32 @@ class TestSeverityValidation:
         assert config.get_rotation_days(config.resolve_severity("any-engine", "test")) == 45
         assert "Invalid severity value" not in caplog.text
 
+    def test_builtin_profiles_preserved_when_custom_provided(self) -> None:
+        """Built-in profiles must remain available when the user adds custom ones."""
+        config = AppConfig(
+            expiry_profiles={"custom-policy": ExpiryProfile(rotation_period="45d")},
+            vaults=[
+                VaultConfig(
+                    name="prod",
+                    address="http://localhost",
+                    token="test",
+                    severity="critical",
+                )
+            ],
+        )
+        assert "critical" in config.expiry_profiles
+        assert "pci-dss-4.0" in config.expiry_profiles
+        assert config.get_rotation_days("critical") == 180
+        assert config.get_rotation_days("pci-dss-4.0") == 90
+        assert config.get_rotation_days("custom-policy") == 45
+
+    def test_custom_profile_overrides_builtin(self) -> None:
+        """User-provided profiles must override built-in profiles with the same name."""
+        config = AppConfig(
+            expiry_profiles={"critical": ExpiryProfile(rotation_period="30d")},
+        )
+        assert config.get_rotation_days("critical") == 30
+
     def test_invalid_profile_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         """Unknown severity values should log warning for cascade fallback."""
         with caplog.at_level(logging.WARNING):

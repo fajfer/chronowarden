@@ -340,6 +340,14 @@ class AppConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def merge_default_expiry_profiles(self) -> "AppConfig":
+        """Ensure built-in profiles are always present; user-provided profiles take precedence."""
+        merged = {name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()}
+        merged.update(self.expiry_profiles)
+        self.expiry_profiles = merged
+        return self
+
+    @model_validator(mode="after")
     def validate_severity_values(self) -> "AppConfig":
         """Validate configured severity values against configured expiry profiles."""
         valid_values = set(self.expiry_profiles) | RESERVED_SEVERITY_VALUES
