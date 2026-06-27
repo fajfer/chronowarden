@@ -4,7 +4,7 @@
 
 [project]
 name = "chronowarden"
-version = "0.4.0"
+version = "0.5.0"
 description = "Cloud-native secret expiration monitoring service"
 readme = "README.md"
 requires-python = ">=3.12"
