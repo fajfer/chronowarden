@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from hvac.exceptions import VaultError
+from requests.exceptions import RequestException
 
 from chronowarden.database import SecretMetadataCache
 from chronowarden.models.secret import SecretMetadataResponse, SecretMetadataUpdate, SecretStatus
@@ -201,7 +202,7 @@ async def update_secret_metadata(secret_id: int, body: SecretMetadataUpdate) -> 
                 metadata_fields,
                 mount_point=entry.engine_id,
             )
-        except VaultError:
+        except (VaultError, RequestException):
             logger.exception("Failed to write metadata to vault for secret %d", secret_id)
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

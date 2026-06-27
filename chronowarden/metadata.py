@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from hvac.exceptions import VaultError
+from requests.exceptions import RequestException
 
 from chronowarden.config import AppConfig
 from chronowarden.database import Database, SecretMetadataCache
@@ -290,7 +291,7 @@ def _list_secret_paths(vault: VaultIntegration, engine_id: str, prefix: str = ""
 
     try:
         keys = vault.list_secrets(prefix, mount_point=engine_id)
-    except VaultError:
+    except (VaultError, RequestException):
         logger.exception("Error listing secrets in %s/%s", engine_id, prefix)
         return paths
 
