@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { currentUser, logout } from '$lib/stores/auth';
-  import { currentTheme, availableThemes, setTheme } from '$lib/stores/theme';
+  import { currentTheme } from '$lib/stores/theme';
   import { fetchVaultInstances, fetchApiInfo } from '$lib/api/vaults';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
@@ -62,19 +62,7 @@
         </div>
       {/if}
 
-      <div class="hidden sm:flex gap-0.5 bg-gray-800 border border-gray-700 rounded-lg p-0.5">
-        {#each availableThemes as theme}
-          <button
-            onclick={() => setTheme(theme.id)}
-            class="px-2.5 py-1 rounded-md text-xs transition-colors
-                   {$currentTheme.id === theme.id ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}"
-          >
-            {theme.label}
-          </button>
-        {/each}
-      </div>
-
-      <SyncButton />
+<SyncButton />
 
       <span class="hidden lg:inline text-sm text-gray-400">{$currentUser?.name ?? ''}</span>
       <button
