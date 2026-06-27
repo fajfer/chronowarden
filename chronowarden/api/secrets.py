@@ -65,10 +65,10 @@ def _validate_severity_input(severity: Optional[str], config: AppConfig, request
     if severity is None:
         return
 
-    if severity in config.expiry_profiles:
+    if severity == "none" or severity in config.expiry_profiles:
         return
 
-    allowed_values = ", ".join(sorted(config.expiry_profiles))
+    allowed_values = ", ".join(sorted([*config.expiry_profiles, "none"]))
     raise HTTPException(
         status_code=422,
         detail=f"Invalid severity '{severity}' in {request_source}. Allowed values: {allowed_values}",

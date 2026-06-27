@@ -465,6 +465,27 @@ class TestSecretsAPI:
             assert response.status_code == 422
             assert response.json()["detail"].startswith("Invalid severity")
 
+    def test_list_secrets_none_severity_filter_is_valid(self) -> None:
+        """Test that severity=none is accepted by GET /secrets/ (not a profile but a valid sentinel)."""
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.get("/api/v1/secrets/", params={"severity": "none"})
+            assert response.status_code == 200
+
+    def test_patch_secret_none_severity_is_valid(self) -> None:
+        """Test that severity=none is accepted by PATCH (marks secret as monitor-only, no rotation)."""
+        self._insert_secret()
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/1", json={"severity": "none"})
+            assert response.status_code == 200
+
     def test_patch_secret_blank_severity(self) -> None:
         """Test PATCH with blank severity returns 422."""
         self._insert_secret()
