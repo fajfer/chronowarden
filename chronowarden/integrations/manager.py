@@ -7,6 +7,7 @@
 import asyncio
 import logging
 import tempfile
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any, Optional
 
@@ -18,6 +19,8 @@ logger = logging.getLogger("uvicorn.error")
 
 _DEFAULT_RECONNECT_INTERVAL_SECONDS = 120
 _DEFAULT_RECONNECT_MAX_ATTEMPTS = 5
+
+ReconnectCallback = Callable[[str], Awaitable[None]]
 
 
 class VaultManager:
@@ -32,6 +35,8 @@ class VaultManager:
         self._reconnect_interval: int = _DEFAULT_RECONNECT_INTERVAL_SECONDS
         self._reconnect_max_attempts: int = _DEFAULT_RECONNECT_MAX_ATTEMPTS
         self._reconnect_attempts: int = 0
+        self._sync_locks: dict[str, asyncio.Lock] = {}
+        self._on_reconnect: Optional[ReconnectCallback] = None
 
     @property
     def vault_names(self) -> list[str]:
@@ -49,6 +54,55 @@ class VaultManager:
             The VaultIntegration instance, or None if not found.
         """
         return self._vaults.get(name)
+
+    def sync_lock(self, name: str) -> asyncio.Lock:
+        """
+        Return the lock that serializes syncs of one vault.
+
+        Args:
+            name: The configured vault name.
+
+        Returns:
+            The vault's sync lock (created on first use).
+        """
+        return self._sync_locks.setdefault(name, asyncio.Lock())
+
+    def set_reconnect_callback(self, callback: Optional[ReconnectCallback]) -> None:
+        """
+        Register a coroutine called with the vault name after the background loop reconnects it.
+
+        Args:
+            callback: Async callable taking the vault name, or None to remove it.
+        """
+        self._on_reconnect = callback
+
+    def reconnect(self, name: str) -> bool:
+        """
+        Make one reconnect attempt for a vault, re-authenticating (AppRole logins get a new token).
+
+        Blocking: call it from a worker thread in async code.
+
+        Args:
+            name: The configured vault name.
+
+        Returns:
+            True if the vault is connected afterwards, False otherwise. After an auth failure the vault is
+            no longer retried by the background loop.
+        """
+        integration = self._vaults.get(name)
+        if integration is None:
+            return False
+
+        if integration.connect():
+            self._pending_configs.pop(name, None)
+            VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
+            INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1)
+            return True
+
+        INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(0)
+        if integration.last_error_kind == "auth":
+            self._pending_configs.pop(name, None)
+        return False
 
     def connect_all(self, config: AppConfig) -> None:
         """
@@ -274,10 +328,16 @@ class VaultManager:
             logger.info("Vault reconnection loop stopped")
         self._reconnect_attempts = 0
 
-    def _retry_pending_vaults(self) -> None:
-        """Retry vaults that failed initial connection and were queued for reconnect."""
+    def _retry_pending_vaults(self) -> list[str]:
+        """
+        Retry vaults that failed initial connection and were queued for reconnect.
+
+        Returns:
+            Names of the vaults that reconnected.
+        """
+        reconnected: list[str] = []
         if not self._pending_configs:
-            return
+            return reconnected
 
         pending_names = list(self._pending_configs.keys())
         logger.info("Attempting to reconnect %d offline vault(s): %s", len(pending_names), pending_names)
@@ -290,16 +350,13 @@ class VaultManager:
             if integration is None:
                 continue
 
-            if integration.connect():
-                self._pending_configs.pop(name, None)
-                VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
-                INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1)
+            if self.reconnect(name):
                 logger.info("Reconnected to vault '%s' at %s", name, vault_config.address)
+                reconnected.append(name)
                 continue
 
             reason = integration.last_error or "unknown connection failure"
             if integration.last_error_kind == "auth":
-                self._pending_configs.pop(name, None)
                 logger.error(
                     "Vault '%s' at %s authentication failed during reconnect and retries were stopped: %s",
                     name,
@@ -315,10 +372,17 @@ class VaultManager:
                     vault_config.address,
                     reason,
                 )
+        return reconnected
 
-    def _reconnect_disconnected_vaults(self) -> None:
-        """Reconnect vaults that were connected previously but later lost authentication."""
-        for name, integration in self._vaults.items():
+    def _reconnect_disconnected_vaults(self) -> list[str]:
+        """
+        Reconnect vaults that were connected previously but later lost authentication.
+
+        Returns:
+            Names of the vaults that reconnected.
+        """
+        reconnected: list[str] = []
+        for name, integration in list(self._vaults.items()):
             if name in self._pending_configs:
                 continue
             if integration.is_connected():
@@ -331,13 +395,11 @@ class VaultManager:
                 reason,
             )
 
-            if integration.connect():
-                VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
-                INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1)
+            if self.reconnect(name):
                 logger.info("Re-authenticated vault '%s'", name)
+                reconnected.append(name)
                 continue
 
-            INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(0)
             reason = integration.last_error or "unknown connection failure"
             if integration.last_error_kind == "offline":
                 logger.warning("Vault '%s' appears offline during re-authentication", name)
@@ -345,15 +407,28 @@ class VaultManager:
                 logger.error("Vault '%s' re-authentication failed: %s", name, reason)
             else:
                 logger.warning("Vault '%s' re-authentication failed: %s", name, reason)
+        return reconnected
+
+    async def _notify_reconnected(self, names: list[str]) -> None:
+        """Run the reconnect callback for each reconnected vault; a failure for one vault doesn't stop the others."""
+        if self._on_reconnect is None:
+            return
+        for name in names:
+            try:
+                await self._on_reconnect(name)
+            except Exception:
+                logger.exception("Callback after reconnecting vault '%s' failed", name)
 
     async def _reconnect_loop(self) -> None:
         """Retry offline/disconnected vaults until max attempts are exhausted or loop is cancelled."""
         try:
             while self._reconnect_attempts < self._reconnect_max_attempts:
                 await asyncio.sleep(self._reconnect_interval)
-                self._retry_pending_vaults()
-                self._reconnect_disconnected_vaults()
+                # connect() blocks on network I/O, so keep it off the event loop
+                reconnected = await asyncio.to_thread(self._retry_pending_vaults)
+                reconnected += await asyncio.to_thread(self._reconnect_disconnected_vaults)
                 self._reconnect_attempts += 1
+                await self._notify_reconnected(reconnected)
         finally:
             self._reconnect_task = None
 

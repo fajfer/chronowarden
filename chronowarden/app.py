@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
 from chronowarden.api import health_router, owners_router, secrets_router, sync_router, vault_router
+from chronowarden.api.sync import sync_vault_now
 from chronowarden.config import AppConfig, load_config
 from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
@@ -51,6 +52,12 @@ def _configure_sentry(config: AppConfig) -> None:
     )
 
 
+async def _sync_after_reconnect(vault_name: str) -> None:
+    """Sync a vault right after the background loop reconnected it (#59)."""
+    updated = await sync_vault_now(vault_manager, vault_name, app_config, db)
+    logger.info("Synced vault '%s' after reconnect: %d secret(s)", vault_name, len(updated))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan handler for startup and shutdown events."""
@@ -65,6 +72,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         db.connect()
 
         logger.info("Chronowarden started with %d vault(s) configured", len(app_config.vaults))
+        vault_manager.set_reconnect_callback(_sync_after_reconnect)
         vault_manager.start_reconnect_loop()
         yield
     except Exception:

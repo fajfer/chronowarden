@@ -50,3 +50,24 @@ async def test_lifespan_runs_cleanup_when_startup_fails() -> None:
 
     mock_db_close.assert_called_once_with()
     mock_disconnect_all.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_lifespan_registers_sync_after_reconnect() -> None:
+    """Startup registers the callback that syncs a vault after a background reconnect (#59)."""
+    from chronowarden.app import _sync_after_reconnect
+
+    with (
+        patch("chronowarden.app.load_config", return_value=AppConfig()),
+        patch("chronowarden.app._configure_sentry"),
+        patch("chronowarden.app.vault_manager.connect_all"),
+        patch("chronowarden.app.vault_manager.start_reconnect_loop"),
+        patch("chronowarden.app.vault_manager.set_reconnect_callback") as mock_set_callback,
+        patch("chronowarden.app.vault_manager.disconnect_all"),
+        patch("chronowarden.app.db.connect"),
+        patch("chronowarden.app.db.close"),
+    ):
+        async with lifespan(FastAPI()):
+            pass
+
+    mock_set_callback.assert_called_once_with(_sync_after_reconnect)

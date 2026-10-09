@@ -179,3 +179,69 @@ class TestVaultManagerReconnectLoop:
 
         assert manager._retry_pending_vaults.call_count == 2
         assert manager._reconnect_disconnected_vaults.call_count == 2
+
+
+class TestVaultManagerReconnect:
+    """Tests for single reconnect attempts, sync locks and the reconnect callback (#59)."""
+
+    def _manager_with(self, connect_ok: bool, error_kind: str = "offline") -> tuple[VaultManager, MagicMock]:
+        """Build a manager with one pending vault whose connect() succeeds or fails."""
+        manager = VaultManager()
+        integration = MagicMock()
+        integration.connect.return_value = connect_ok
+        integration.last_error_kind = None if connect_ok else error_kind
+        manager._vaults["v"] = integration
+        manager._pending_configs["v"] = VaultConfig(name="v", address="http://x", token="t")
+        return manager, integration
+
+    def test_reconnect_success_clears_pending(self) -> None:
+        """A successful reconnect removes the vault from the retry queue."""
+        manager, _ = self._manager_with(connect_ok=True)
+        assert manager.reconnect("v") is True
+        assert "v" not in manager._pending_configs
+
+    def test_reconnect_offline_keeps_pending(self) -> None:
+        """An offline vault stays queued for background retries."""
+        manager, _ = self._manager_with(connect_ok=False, error_kind="offline")
+        assert manager.reconnect("v") is False
+        assert "v" in manager._pending_configs
+
+    def test_reconnect_auth_failure_stops_retries(self) -> None:
+        """An auth failure removes the vault from background retries."""
+        manager, _ = self._manager_with(connect_ok=False, error_kind="auth")
+        assert manager.reconnect("v") is False
+        assert "v" not in manager._pending_configs
+
+    def test_reconnect_unknown_vault(self) -> None:
+        """An unknown vault can't be reconnected."""
+        assert VaultManager().reconnect("missing") is False
+
+    def test_sync_lock_is_per_vault(self) -> None:
+        """Each vault has exactly one lock, distinct from other vaults."""
+        manager = VaultManager()
+        assert manager.sync_lock("a") is manager.sync_lock("a")
+        assert manager.sync_lock("a") is not manager.sync_lock("b")
+
+    def test_loop_calls_callback_once_per_reconnected_vault(self) -> None:
+        """After a reconnect the loop calls the callback for exactly that vault."""
+        manager, _ = self._manager_with(connect_ok=True)
+        manager._reconnect_max_attempts = 1
+        manager._reconnect_interval = 0
+        callback = AsyncMock()
+        manager.set_reconnect_callback(callback)
+
+        with patch("chronowarden.integrations.manager.asyncio.sleep", new=AsyncMock()):
+            asyncio.run(manager._reconnect_loop())
+
+        callback.assert_awaited_once_with("v")
+
+    def test_callback_failure_does_not_stop_the_loop(self) -> None:
+        """An exception in the callback is logged and the loop completes."""
+        manager, _ = self._manager_with(connect_ok=True)
+        manager._reconnect_max_attempts = 1
+        manager.set_reconnect_callback(AsyncMock(side_effect=RuntimeError("sync failed")))
+
+        with patch("chronowarden.integrations.manager.asyncio.sleep", new=AsyncMock()):
+            asyncio.run(manager._reconnect_loop())
+
+        assert manager._reconnect_task is None
