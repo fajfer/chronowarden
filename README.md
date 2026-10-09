@@ -183,6 +183,9 @@ Severity is set in `config.yaml` only (per vault, engine or secret); the API is 
 ### Sync
 - `POST /api/v1/sync/vault/{vault_name}` - Trigger synchronization for a specific Vault instance
   - Scans the specified vault instance and updates local cache
+  - A disconnected vault is reconnected first. If that fails, the response is `503` with the `reason`
+    (`offline`, `auth`, ...) and whether a background retry is scheduled; the vault is then synced
+    automatically as soon as the retry reconnects it
 
 ### Vaults
 - `GET /api/v1/vault/instances` - List configured Vault instances with connection status
