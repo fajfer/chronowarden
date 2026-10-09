@@ -23,6 +23,11 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-09-release-0-6](2026-10-09-release-0-6.md) | **Release 0.6 Foundations: order of work** |
+| [2026-10-09-strict-config-validation](2026-10-09-strict-config-validation.md) | Fail fast on any config error (#12) |
+| [2026-10-09-sync-reconnect-first](2026-10-09-sync-reconnect-first.md) | Sync reconnects a disconnected vault before failing (#59) |
+| [2026-10-09-logging](2026-10-09-logging.md) | Timestamps, no probe noise in access logs (#58) |
+| [2026-10-09-instance-ui-settings](2026-10-09-instance-ui-settings.md) | Vault URLs and runtime default theme (#19, #57) |
 | [2026-10-09-per-profile-alert-threshold](2026-10-09-per-profile-alert-threshold.md) | WARNING window per expiry profile instead of fixed 30 days |
 | [2026-10-09-remove-enabled-flag](2026-10-09-remove-enabled-flag.md) | Remove `enabled` and `PATCH` severity overrides; config is the only source |
 | [2026-10-09-systems-and-owners](2026-10-09-systems-and-owners.md) | Systems (CMDB URI, asset number, owners) and owners assigned to secrets (#61) |
