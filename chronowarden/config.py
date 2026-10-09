@@ -30,6 +30,8 @@ DEFAULT_EXPIRY_PROFILES: dict[str, dict[str, str]] = {
 
 RESERVED_SEVERITY_VALUES = {"none"}
 
+DEFAULT_ALERT_THRESHOLD = "30d"
+
 _DURATION_PATTERN = re.compile(r"^(\d+)([dmy])$")
 
 # Unknown keys are rejected so that typos never get silently ignored
@@ -76,11 +78,15 @@ class ExpiryProfile(BaseModel):
     model_config = _STRICT
 
     rotation_period: str = Field(description="Rotation period (e.g. '365d', '6m', '1y')")
+    alert_threshold: str = Field(
+        default=DEFAULT_ALERT_THRESHOLD,
+        description="Secrets expiring within this window get the 'warning' status (e.g. '30d', '1m')",
+    )
 
-    @field_validator("rotation_period")
+    @field_validator("rotation_period", "alert_threshold")
     @classmethod
-    def validate_rotation_period(cls, v: str) -> str:
-        """Validate the rotation period format."""
+    def validate_duration(cls, v: str) -> str:
+        """Validate the duration format."""
         parse_duration_to_days(v)
         return v
 
@@ -88,6 +94,11 @@ class ExpiryProfile(BaseModel):
     def rotation_days(self) -> int:
         """Return rotation period in days."""
         return parse_duration_to_days(self.rotation_period)
+
+    @property
+    def alert_days(self) -> int:
+        """Return the alert threshold in days."""
+        return parse_duration_to_days(self.alert_threshold)
 
 
 class SecretConfig(BaseModel):
@@ -446,6 +457,10 @@ class AppConfig(BaseModel):
         """
         return self._resolve_severity_with_source(engine_id, vault_name, secret_path)
 
+    def _profile_for(self, severity: str) -> Optional[ExpiryProfile]:
+        """Return the expiry profile for a severity, falling back to the 'default' profile."""
+        return self.expiry_profiles.get(severity) or self.expiry_profiles.get("default")
+
     def get_rotation_days(self, severity: str) -> int:
         """
         Get rotation period in days for a given severity.
@@ -456,15 +471,21 @@ class AppConfig(BaseModel):
         Returns:
             Number of days for the rotation period.
         """
-        profile = self.expiry_profiles.get(severity)
-        if profile:
-            return profile.rotation_days
+        profile = self._profile_for(severity)
+        return profile.rotation_days if profile else 365
 
-        default_profile = self.expiry_profiles.get("default")
-        if default_profile:
-            return default_profile.rotation_days
+    def get_alert_days(self, severity: str) -> int:
+        """
+        Get the alert threshold in days for a given severity.
 
-        return 365
+        Args:
+            severity: The severity profile name.
+
+        Returns:
+            Number of days before expiry at which a secret gets the 'warning' status.
+        """
+        profile = self._profile_for(severity)
+        return profile.alert_days if profile else parse_duration_to_days(DEFAULT_ALERT_THRESHOLD)
 
     def resolve_date_format(self, vault_name: Optional[str] = None) -> str:
         """

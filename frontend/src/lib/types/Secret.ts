@@ -21,6 +21,7 @@ export interface Secret {
   days_remaining: number | null;
   severity: string;
   rotation_period_days: number;
+  alert_threshold_days: number;
   enabled: boolean;
   last_synced: string | null;
   status: SecretStatus;

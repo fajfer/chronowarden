@@ -528,6 +528,35 @@ class TestSeverityValidation:
         assert config.resolve_severity("apps", "v") == "none"
 
 
+class TestAlertThreshold:
+    """Tests for per-profile alert thresholds (#70)."""
+
+    def test_builtin_profiles_default_to_30_days(self) -> None:
+        """Built-in profiles keep the previous fixed 30-day window."""
+        config = AppConfig()
+        assert [config.get_alert_days(name) for name in ("default", "critical", "pci-dss-4.0")] == [30, 30, 30]
+
+    def test_custom_threshold(self) -> None:
+        """A profile can set its own threshold in the duration format."""
+        config = AppConfig(expiry_profiles={"monthly": ExpiryProfile(rotation_period="30d", alert_threshold="1m")})
+        assert config.get_alert_days("monthly") == 30
+
+    def test_custom_profile_without_threshold_uses_30_days(self) -> None:
+        """A custom profile without alert_threshold falls back to 30 days."""
+        config = AppConfig(expiry_profiles={"custom": ExpiryProfile(rotation_period="45d")})
+        assert config.get_alert_days("custom") == 30
+
+    def test_unknown_severity_uses_default_profile(self) -> None:
+        """Lookups for an unknown name fall back to the 'default' profile's threshold."""
+        config = AppConfig(expiry_profiles={"default": ExpiryProfile(rotation_period="365d", alert_threshold="14d")})
+        assert config.get_alert_days("missing") == 14
+
+    def test_invalid_threshold_is_rejected(self) -> None:
+        """An invalid duration fails validation."""
+        with pytest.raises(ValidationError, match="Invalid duration format"):
+            ExpiryProfile(rotation_period="30d", alert_threshold="7 days")
+
+
 class TestUnknownKeys:
     """Tests that typos in config keys are rejected (#12)."""
 

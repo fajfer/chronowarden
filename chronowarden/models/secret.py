@@ -33,6 +33,7 @@ class SecretMetadataResponse(BaseModel):
     days_remaining: Optional[int] = None
     severity: str = "default"
     rotation_period_days: int = 365
+    alert_threshold_days: int = 30
     enabled: bool = True
     last_synced: Optional[datetime] = None
     status: SecretStatus = SecretStatus.NO_TTL

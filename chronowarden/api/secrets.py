@@ -33,12 +33,13 @@ def _get_app_dependencies() -> tuple[Any, Any, Any]:
     return db, app_config, vault_manager
 
 
-def _compute_status(days_remaining: Optional[int]) -> SecretStatus:
+def _compute_status(days_remaining: Optional[int], alert_days: int) -> SecretStatus:
     """
     Compute the secret status from days remaining.
 
     Args:
         days_remaining: Number of days until expiry, or None.
+        alert_days: Alert threshold of the secret's expiry profile.
 
     Returns:
         The computed SecretStatus.
@@ -47,7 +48,7 @@ def _compute_status(days_remaining: Optional[int]) -> SecretStatus:
         return SecretStatus.NO_TTL
     if days_remaining <= 0:
         return SecretStatus.EXPIRED
-    if days_remaining <= 30:
+    if days_remaining <= alert_days:
         return SecretStatus.WARNING
     return SecretStatus.OK
 
@@ -92,6 +93,7 @@ def _enrich_secret(entry: SecretMetadataCache, config: AppConfig) -> SecretMetad
 
     severity = entry.severity or "default"
     rotation_days = config.get_rotation_days(severity)
+    alert_days = config.get_alert_days(severity)
     date_format = config.resolve_date_format(entry.vault_name)
 
     ttl_date: Optional[datetime] = None
@@ -120,9 +122,10 @@ def _enrich_secret(entry: SecretMetadataCache, config: AppConfig) -> SecretMetad
         days_remaining=days_remaining,
         severity=severity,
         rotation_period_days=rotation_days,
+        alert_threshold_days=alert_days,
         enabled=entry.enabled,
         last_synced=last_synced,
-        status=_compute_status(days_remaining),
+        status=_compute_status(days_remaining, alert_days),
     )
 
 

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from hvac.exceptions import VaultError
@@ -568,30 +569,76 @@ class TestComputeStatus:
         """None days remaining means no TTL is set."""
         from chronowarden.api.secrets import _compute_status
 
-        assert _compute_status(None) == SecretStatus.NO_TTL
+        assert _compute_status(None, 30) == SecretStatus.NO_TTL
 
     def test_negative_returns_expired(self) -> None:
         """Negative days remaining means the secret is expired."""
         from chronowarden.api.secrets import _compute_status
 
-        assert _compute_status(-5) == SecretStatus.EXPIRED
+        assert _compute_status(-5, 30) == SecretStatus.EXPIRED
 
     def test_zero_returns_expired(self) -> None:
         """Zero days remaining means the secret is expired."""
         from chronowarden.api.secrets import _compute_status
 
-        assert _compute_status(0) == SecretStatus.EXPIRED
+        assert _compute_status(0, 30) == SecretStatus.EXPIRED
 
-    def test_under_threshold_returns_warning(self) -> None:
-        """Days remaining within 30-day window returns warning."""
+    @pytest.mark.parametrize(
+        ("days", "alert_days", "expected"),
+        [
+            (1, 30, SecretStatus.WARNING),
+            (30, 30, SecretStatus.WARNING),
+            (31, 30, SecretStatus.OK),
+            (7, 7, SecretStatus.WARNING),
+            (8, 7, SecretStatus.OK),
+            (60, 90, SecretStatus.WARNING),
+        ],
+    )
+    def test_threshold_boundaries(self, days: int, alert_days: int, expected: SecretStatus) -> None:
+        """WARNING up to and including the profile's alert threshold, OK above it (#70)."""
         from chronowarden.api.secrets import _compute_status
 
-        assert _compute_status(1) == SecretStatus.WARNING
-        assert _compute_status(30) == SecretStatus.WARNING
+        assert _compute_status(days, alert_days) == expected
 
-    def test_above_threshold_returns_ok(self) -> None:
-        """Days remaining above 30-day window returns ok."""
-        from chronowarden.api.secrets import _compute_status
 
-        assert _compute_status(31) == SecretStatus.OK
-        assert _compute_status(365) == SecretStatus.OK
+class TestPerProfileAlertThreshold:
+    """API-level tests: the status uses the secret's own expiry profile threshold (#70)."""
+
+    def setup_method(self) -> None:
+        """Set up a database and a config with a short-threshold profile."""
+        from chronowarden.config import ExpiryProfile
+
+        self.db = Database(db_path=Path(":memory:"))
+        self.db.connect()
+        self.config = AppConfig(expiry_profiles={"short": ExpiryProfile(rotation_period="90d", alert_threshold="7d")})
+
+    def teardown_method(self) -> None:
+        """Close the database."""
+        self.db.close()
+
+    def _status_for(self, severity: str, days_ahead: int) -> dict:
+        """Insert a secret expiring in `days_ahead` days and return it from the API."""
+        ttl = (datetime.now(tz=timezone.utc) + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+        self.db.upsert_secret_metadata(
+            SecretMetadataCache(vault_name="v", engine_id="e", secret_path=severity, ttl=ttl, severity=severity)
+        )
+        app = FastAPI()
+        app.include_router(router, prefix="/api/v1")
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, MagicMock()),
+        ):
+            data = TestClient(app).get("/api/v1/secrets/").json()
+        return next(s for s in data if s["secret_path"] == severity)
+
+    def test_short_profile_is_ok_outside_its_threshold(self) -> None:
+        """15 days left is OK for a 7-day threshold profile."""
+        secret = self._status_for("short", 15)
+        assert secret["status"] == "ok"
+        assert secret["alert_threshold_days"] == 7
+
+    def test_default_profile_warns_at_same_distance(self) -> None:
+        """15 days left is a WARNING for the default 30-day threshold."""
+        secret = self._status_for("default", 15)
+        assert secret["status"] == "warning"
+        assert secret["alert_threshold_days"] == 30
