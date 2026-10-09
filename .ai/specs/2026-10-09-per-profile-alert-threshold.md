@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Per-profile alert threshold
 
-- **Status:** draft
+- **Status:** implemented
 - **Date:** 2026-10-09
 - **Issue:** #70
 
@@ -39,10 +39,10 @@ None (extends the expiry-profile schema; the cascade is unchanged).
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | Add `alert_threshold` (duration, same `<int>[d\|m\|y]` format) to `ExpiryProfile` with defaults for the built-in profiles; profiles without it keep 30d | core, `chronowarden/config.py` | `tests/test_config.py` covers default, custom, invalid value | todo | |
-| 2 | `_compute_status` takes the threshold of the entry's severity (`none` → never warning) | api, `chronowarden/api/secrets.py` | `tests/test_secrets.py` covers boundary days (threshold, threshold+1, 0) per profile | todo | |
-| 3 | Document in `config.example.yaml` and fix the README "Secret Status" table | core | Example and README match the code | todo | |
-| 4 | `ExpiryHorizon.svelte` no longer assumes a fixed 30d marker, or the marker is documented as fixed | [frontend](../../frontend/AGENTS.md) | `npm run check` has no new warnings | todo | |
+| 1 | Add `alert_threshold` (duration, same `<int>[d\|m\|y]` format) to `ExpiryProfile` with defaults for the built-in profiles; profiles without it keep 30d | core, `chronowarden/config.py` | `tests/test_config.py` covers default, custom, invalid value | done | |
+| 2 | `_compute_status` takes the threshold of the entry's severity (`none` → never warning) | api, `chronowarden/api/secrets.py` | `tests/test_secrets.py` covers boundary days (threshold, threshold+1, 0) per profile | done | |
+| 3 | Document in `config.example.yaml` and fix the README "Secret Status" table | core | Example and README match the code | done | |
+| 4 | `ExpiryHorizon.svelte` no longer assumes a fixed 30d marker, or the marker is documented as fixed. Result: no change needed, 30d is an axis tick and dot colours come from the backend status; `alert_threshold_days` added to the `Secret` type | [frontend](../../frontend/AGENTS.md) | `npm run check` has no new warnings | done | |
 
 ## Validation
 
@@ -50,5 +50,4 @@ None (extends the expiry-profile schema; the cascade is unchanged).
 
 ## Open questions
 
-- Default thresholds: the earlier README example used `critical` 7d, `pci-dss-4.0` 14d, `default` 30d. Adopt
-  these?
+- Decided 2026-10-09: all built-in profiles and custom profiles without a value use 30d.

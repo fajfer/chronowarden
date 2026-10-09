@@ -30,7 +30,8 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
   (root **Never**, #30).
 - `"none"` is reserved (`RESERVED_SEVERITY_VALUES`): monitored, never rotated; `calculate_ttl` returns `None`.
 - `DEFAULT_EXPIRY_PROFILES` (`default` 365d, `critical` 6m, `pci-dss-4.0` 90d) are always merged with
-  user-defined ones (`merge_default_expiry_profiles`). Durations are `<int>[d|m|y]`.
+  user-defined ones (`merge_default_expiry_profiles`). Each profile has `rotation_period` and `alert_threshold`
+  (default `30d`); durations are `<int>[d|m|y]`.
 - All config models use `extra="forbid"` (`_STRICT`): unknown keys are errors. Severities must match an expiry
   profile or `none`, otherwise validation fails.
 - Credential resolution order: `*_file` > `*_env` > literal (tokens and AppRole IDs).

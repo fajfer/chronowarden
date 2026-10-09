@@ -46,8 +46,8 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 
 ## Gotchas
 
-- `_compute_status` uses a fixed 30-day WARNING window, not a per-profile threshold. See
-  [the spec](../../.ai/specs/2026-10-09-per-profile-alert-threshold.md).
+- `_compute_status(days_remaining, alert_days)`: WARNING when `0 < days ≤ alert_days`, the alert threshold of the
+  secret's expiry profile (`AppConfig.get_alert_days`, default 30d, #70).
 - `_get_app_dependencies()` returns a different tuple order per module: `secrets` → `(db, config, manager)`,
   `sync` → `(manager, config, db)`.
 - `POST /owners/{id}/test-route/{route_id}` only logs; no notification is sent. Alerts go through
