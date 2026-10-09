@@ -196,7 +196,7 @@ def create_chronowarden_policy(client: hvac.Client) -> None:
     """Create the chronowarden policy in the vault."""
     policy = """
 # Read, list, and update metadata for all KV v2 mounts
-# Chronowarden manages custom_metadata fields (chronowarden_ttl, chronowarden_severity, chronowarden_enabled)
+# Chronowarden manages custom_metadata fields (chronowarden_ttl, chronowarden_severity)
 path "secret/metadata/*" {
   capabilities = ["read", "list", "update"]
 }
