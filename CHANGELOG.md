@@ -12,6 +12,29 @@ Before 1.0, minor versions may contain breaking changes; they are marked **Break
 Releases before 0.6.0 are described in the [GitHub releases](https://github.com/fajfer/chronowarden/releases) and the
 git history.
 
+## [0.6.1] - 2026-10-09
+
+Security release. **Upgrade as soon as possible** if the UI is reachable by anyone you don't fully trust.
+
+### Security
+
+- **Path traversal in the UI route (High).** Every release up to and including 0.6.0 served any file readable by
+  the Chronowarden process for requests such as `GET /..%2f..%2fdata%2fconfig.yaml`, without authentication. This
+  includes `config.yaml`, which can hold Vault tokens or AppRole `secret_id`s, and mounted secret files. The route
+  now serves only files inside the frontend build directory. After upgrading, **rotate the Vault credentials
+  Chronowarden uses** if the UI was reachable from untrusted networks.
+- Frontend build dependencies updated to patched releases (`@sveltejs/kit` 2.70.3, `devalue` 5.9.4, `postcss`
+  8.5.29, `source-map-js` 1.2.2, `cookie` 0.7.2), closing all open Dependabot alerts.
+
+### Fixed
+
+- Unknown `/api/...` paths return `404` instead of the UI page with `200`.
+
+### Added
+
+- CI starts the built production image and fails unless `/api/v1/health` answers and a path traversal request is
+  refused, before any image is pushed.
+
 ## [0.6.0] - 2026-10-09
 
 Milestone [0.6 Foundations](https://github.com/fajfer/chronowarden/milestone/2): a strict, predictable core before
@@ -64,4 +87,5 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
+[0.6.1]: https://github.com/fajfer/chronowarden/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/fajfer/chronowarden/compare/v0.5.0...v0.6.0
