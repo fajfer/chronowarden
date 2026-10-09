@@ -73,7 +73,7 @@ spec:
             failureThreshold: 3
           securityContext:
             allowPrivilegeEscalation: false
-            readonlyRootFilesystem: true
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL

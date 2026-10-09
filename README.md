@@ -82,23 +82,24 @@ Development — full shell, git, --reload, 286MB \
    Edit `config.yaml`:
    ```yaml
    vaults:
-     production:
-       url: https://vault.example.com
-       token: your-vault-token
+     - name: production
+       address: https://vault.example.com:8200
+       token_env: VAULT_PRODUCTION_TOKEN  # or token_file / token; AppRole is also supported
+       mount_path: secret
        verify_ssl: true
-       max_versions_per_secret: 5
-   
-   severity_levels:
-     critical:
-       rotation_period_days: 30
-       alert_threshold_days: 7
-     pci-dss-4.0:
-       rotation_period_days: 90
-       alert_threshold_days: 14
+       severity: critical  # default severity for every engine in this vault
+
+   expiry_profiles:  # built-in profiles shown; add your own or override them
      default:
-       rotation_period_days: 365
-       alert_threshold_days: 30
+       rotation_period: "365d"
+     critical:
+       rotation_period: "6m"
+     pci-dss-4.0:
+       rotation_period: "90d"
    ```
+
+   See [`config.example.yaml`](config.example.yaml) for every option, including per-engine and per-secret
+   severity overrides.
 
 3. **Run the server:**
    ```bash
@@ -186,8 +187,10 @@ path "sys/mounts" {
 - `GET /api/v1/vault/instances` - List configured Vault instances with connection status
 
 ### Health
-- `GET /health` - Health check endpoint
-- `GET /metrics` - Prometheus metrics
+- `GET /api/v1/health` - Health check endpoint (used by Kubernetes probes)
+- `GET /api/v1/ready` - Readiness check endpoint
+- `GET /api/v1/info` - API name and version
+- `GET /api/v1/metrics` - Prometheus metrics
 
 ## Secret Status
 

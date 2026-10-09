@@ -8,4 +8,4 @@
 // Config is the source of truth - severity cascade: secret config → engine config → vault severity → global default
 // Owner profiles support notification routing via email and webhook channels
 // Secrets API reads from the database cache populated by sync, not from an in-memory store
-// severity: none means monitor but never alert/rotate (replaces chronowarden_enabled field)
+// severity: none means monitor but never alert/rotate; chronowarden_enabled=false (complementary) stops tracking a secret entirely
