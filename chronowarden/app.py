@@ -19,8 +19,12 @@ from chronowarden.api.sync import sync_vault_now
 from chronowarden.config import AppConfig, load_config
 from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
+from chronowarden.logging_config import configure_logging
 
 logger = logging.getLogger("uvicorn.error")
+
+# Runs when uvicorn imports the app, after it set up its log handlers
+configure_logging()
 
 vault_manager = VaultManager()
 db = Database()
