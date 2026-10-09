@@ -26,6 +26,7 @@ class VaultInstanceHealth(BaseModel):
     """Health status of a single Vault instance."""
 
     name: str
+    address: str
     connected: bool
     healthy: bool
     initialized: Optional[bool] = None
@@ -72,6 +73,7 @@ async def all_vault_health() -> list[VaultInstanceHealth]:
     return [
         VaultInstanceHealth(
             name=name,
+            address=health.get("address", ""),
             connected=health.get("connected", False),
             healthy=health.get("healthy", False),
             initialized=health.get("initialized"),
@@ -120,6 +122,7 @@ async def vault_instance_health(
 
     return VaultInstanceHealth(
         name=vault_name,
+        address=vault.address,
         connected=connected,
         healthy=health.get("healthy", False),
         initialized=health.get("initialized"),

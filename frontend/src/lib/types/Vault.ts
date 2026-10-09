@@ -7,6 +7,7 @@
  */
 export interface VaultInstanceHealth {
   name: string;
+  address: string;
   connected: boolean;
   healthy: boolean;
   initialized: boolean | null;

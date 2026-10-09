@@ -29,6 +29,7 @@ class TestVaultApiErrors:
         vault = MagicMock()
         vault.check_health.return_value = {"healthy": True}
         vault.is_connected.return_value = False
+        vault.address = "http://localhost:8201"
         vault.last_error = "AppRole authentication failed: invalid role_id or secret_id " "(mount point 'chronowarden')"
         manager.get.return_value = vault
 
@@ -37,6 +38,21 @@ class TestVaultApiErrors:
 
         assert response.status_code == 200
         assert response.json()["error"] == vault.last_error
+        assert response.json()["address"] == "http://localhost:8201"
+
+    def test_all_vault_health_includes_address(self) -> None:
+        """The list health endpoint returns each vault's address (#19)."""
+        client = _build_client()
+        manager = MagicMock()
+        manager.health.return_value = {
+            "dev-vault": {"connected": True, "healthy": True, "address": "http://localhost:8201"},
+        }
+
+        with patch("chronowarden.api.vault._get_vault_manager", return_value=manager):
+            response = client.get("/api/v1/vault/health")
+
+        assert response.status_code == 200
+        assert response.json()[0]["address"] == "http://localhost:8201"
 
     def test_list_secrets_returns_reason_when_vault_not_connected(self) -> None:
         """List endpoint includes connection failure reason in 503 response details."""

@@ -53,6 +53,12 @@
             <span class="w-3 h-3 rounded-full {vault.healthy ? 'bg-green-400' : 'bg-red-400'}"></span>
           </div>
           <div class="space-y-2 text-sm">
+            <div class="flex justify-between gap-4">
+              <span class="text-gray-500">Address</span>
+              <a href={vault.address} target="_blank" rel="noopener noreferrer" class="text-indigo-400 hover:underline truncate" title={vault.address}>
+                {vault.address}
+              </a>
+            </div>
             <div class="flex justify-between">
               <span class="text-gray-500">Status</span>
               <span class="{vault.healthy ? 'text-green-400' : 'text-red-400'}">

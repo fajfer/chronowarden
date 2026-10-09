@@ -63,6 +63,11 @@ class VaultIntegration(BaseIntegration):
         self._last_error_kind: Optional[str] = None
 
     @property
+    def address(self) -> str:
+        """Return the Vault server address."""
+        return self._address
+
+    @property
     def last_error(self) -> Optional[str]:
         """Return the last connection error message, if available."""
         return self._last_error

@@ -141,6 +141,7 @@ class VaultManager:
             logger.debug(health)
             connected = vault.is_connected()
             health["connected"] = connected
+            health["address"] = vault.address
             if not connected and vault.last_error is not None:
                 health["error"] = vault.last_error
             result[name] = health
