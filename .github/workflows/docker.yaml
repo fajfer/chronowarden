@@ -43,6 +43,36 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
 
+      - name: Build production image for smoke test
+        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
+        with:
+          context: .
+          load: true
+          tags: chronowarden:smoke-test
+          platforms: linux/amd64
+          cache-from: type=gha
+
+      - name: Smoke test production image
+        run: |
+          printf 'vaults: []\n' > "$RUNNER_TEMP/config.yaml"
+          docker run -d --name smoke -p 127.0.0.1:8000:8000 \
+            -v "$RUNNER_TEMP/config.yaml:/data/config.yaml:ro" chronowarden:smoke-test
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8000/api/v1/health && break
+            sleep 1
+          done
+          if ! curl -fsS http://127.0.0.1:8000/api/v1/health; then
+            echo "::error::production image did not become healthy within 30s"
+            docker logs smoke
+            exit 1
+          fi
+          # Path traversal regression: the SPA catch-all must never serve files outside the build directory
+          if curl -s --path-as-is "http://127.0.0.1:8000/..%2f..%2f..%2fetc%2fpasswd" | grep -q '^root:'; then
+            echo "::error::path traversal: /etc/passwd was served"
+            exit 1
+          fi
+          docker rm -f smoke
+
       - name: Build and push (production target)
         uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
         with:
