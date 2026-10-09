@@ -32,7 +32,6 @@ export interface SyncedSecretEntry {
   path: string;
   ttl: string | null;
   severity: string | null;
-  enabled: boolean;
 }
 
 /**

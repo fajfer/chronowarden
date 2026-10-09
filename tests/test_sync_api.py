@@ -53,7 +53,6 @@ class TestSyncApiReconnectLoop:
                 secret_path="path/to/secret",
                 ttl="365d",
                 severity="default",
-                enabled=True,
             )
         ]
 

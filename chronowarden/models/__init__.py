@@ -15,7 +15,6 @@ from chronowarden.models.owner import (
 )
 from chronowarden.models.secret import (
     SecretMetadataResponse,
-    SecretMetadataUpdate,
     SecretStatus,
 )
 
@@ -30,6 +29,5 @@ __all__ = [
     "OwnerUpdate",
     # Secret
     "SecretMetadataResponse",
-    "SecretMetadataUpdate",
     "SecretStatus",
 ]

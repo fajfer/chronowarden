@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from hvac.exceptions import VaultError
 
 from chronowarden.api.secrets import router
 from chronowarden.config import AppConfig
@@ -38,7 +37,6 @@ class TestSecretsDatabaseMethods:
         secret_path: str = "my-app/api-key",
         ttl: str = "2026-06-01",
         severity: str = "default",
-        enabled: bool = True,
     ) -> None:
         """Helper to insert a secret metadata entry."""
         self.db.upsert_secret_metadata(
@@ -49,7 +47,6 @@ class TestSecretsDatabaseMethods:
                 updated_time="2025-01-01T00:00:00Z",
                 ttl=ttl,
                 severity=severity,
-                enabled=enabled,
                 last_synced=datetime.now(tz=timezone.utc).isoformat(),
             )
         )
@@ -99,14 +96,6 @@ class TestSecretsDatabaseMethods:
         assert len(result) == 1
         assert result[0].severity == "critical"
 
-    def test_list_all_secrets_filter_enabled(self) -> None:
-        """Test listing secrets filtered by enabled status."""
-        self._insert_secret(enabled=True, secret_path="key-1")
-        self._insert_secret(enabled=False, secret_path="key-2")
-        result = self.db.list_all_secrets(enabled=True)
-        assert len(result) == 1
-        assert result[0].enabled is True
-
     def test_list_all_secrets_multiple_filters(self) -> None:
         """Test listing secrets with multiple filters."""
         self._insert_secret(vault_name="v1", severity="critical", secret_path="key-1")
@@ -115,35 +104,6 @@ class TestSecretsDatabaseMethods:
         result = self.db.list_all_secrets(vault_name="v1", severity="critical")
         assert len(result) == 1
         assert result[0].secret_path == "key-1"
-
-    def test_update_secret_metadata_fields_severity(self) -> None:
-        """Test updating the severity field."""
-        self._insert_secret()
-        updated = self.db.update_secret_metadata_fields(1, severity="critical")
-        assert updated is True
-        entry = self.db.get_secret_by_id(1)
-        assert entry is not None
-        assert entry.severity == "critical"
-
-    def test_update_secret_metadata_fields_enabled(self) -> None:
-        """Test updating the enabled field."""
-        self._insert_secret()
-        updated = self.db.update_secret_metadata_fields(1, enabled=False)
-        assert updated is True
-        entry = self.db.get_secret_by_id(1)
-        assert entry is not None
-        assert entry.enabled is False
-
-    def test_update_secret_metadata_fields_nonexistent(self) -> None:
-        """Test updating a nonexistent secret returns False."""
-        updated = self.db.update_secret_metadata_fields(999, severity="critical")
-        assert updated is False
-
-    def test_update_secret_metadata_fields_no_changes(self) -> None:
-        """Test updating with no fields returns False."""
-        self._insert_secret()
-        updated = self.db.update_secret_metadata_fields(1)
-        assert updated is False
 
 
 class TestSecretsAPI:
@@ -173,7 +133,6 @@ class TestSecretsAPI:
         secret_path: str = "my-app/api-key",
         ttl: str = "2027-06-01",
         severity: str = "default",
-        enabled: bool = True,
     ) -> None:
         """Helper to insert a secret metadata entry."""
         self.db.upsert_secret_metadata(
@@ -184,7 +143,6 @@ class TestSecretsAPI:
                 updated_time="2025-01-01T00:00:00Z",
                 ttl=ttl,
                 severity=severity,
-                enabled=enabled,
                 last_synced=datetime.now(tz=timezone.utc).isoformat(),
             )
         )
@@ -217,7 +175,6 @@ class TestSecretsAPI:
             assert data[0]["secret_path"] == "my-app/api-key"
             assert data[0]["full_path"] == "dev-vault/secret/my-app/api-key"
             assert data[0]["severity"] == "default"
-            assert data[0]["enabled"] is True
             assert data[0]["status"] in ["ok", "warning", "expired", "no_ttl"]
             assert data[0]["rotation_period_days"] == 365
 
@@ -313,7 +270,6 @@ class TestSecretsAPI:
                 updated_time="2025-01-01T00:00:00Z",
                 ttl=None,
                 severity="default",
-                enabled=True,
                 last_synced=datetime.now(tz=timezone.utc).isoformat(),
             )
         )
@@ -337,6 +293,32 @@ class TestSecretsAPI:
             response = client.post("/api/v1/secrets/", json={})
             assert response.status_code == 405
 
+    def test_removed_endpoints_patch(self) -> None:
+        """PATCH /secrets/:id was removed: severity comes from config only (#73)."""
+        self._insert_secret()
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
+            assert response.status_code == 405
+
+    def test_enabled_query_param_is_ignored(self) -> None:
+        """The removed `enabled` filter is ignored instead of filtering (#73)."""
+        self._insert_secret(secret_path="key-1")
+        self._insert_secret(secret_path="key-2")
+        client = self._build_client()
+        with patch(
+            "chronowarden.api.secrets._get_app_dependencies",
+            return_value=(self.db, self.config, self.vault_manager),
+        ):
+            response = client.get("/api/v1/secrets/", params={"enabled": False})
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 2
+            assert all("enabled" not in secret for secret in data)
+
     def test_removed_endpoints_delete(self) -> None:
         """Test that DELETE /secrets/:id no longer exists."""
         client = self._build_client()
@@ -357,108 +339,6 @@ class TestSecretsAPI:
             response = client.get("/api/v1/secrets/public/")
             assert response.status_code == 422
 
-    def test_patch_secret_severity(self) -> None:
-        """Test PATCH endpoint updates severity in cache and vault."""
-        self._insert_secret()
-        mock_vault = MagicMock()
-        mock_vault.is_connected.return_value = True
-        mock_vault.write_secret_metadata.return_value = True
-        self.vault_manager.get.return_value = mock_vault
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
-            assert response.status_code == 200
-            data = response.json()
-            assert data["severity"] == "critical"
-            assert data["rotation_period_days"] == 180
-            mock_vault.write_secret_metadata.assert_called_once()
-
-    def test_patch_secret_enabled(self) -> None:
-        """Test PATCH endpoint updates enabled flag in cache and vault."""
-        self._insert_secret()
-        mock_vault = MagicMock()
-        mock_vault.is_connected.return_value = True
-        mock_vault.write_secret_metadata.return_value = True
-        self.vault_manager.get.return_value = mock_vault
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/1", json={"enabled": False})
-            assert response.status_code == 200
-            data = response.json()
-            assert data["enabled"] is False
-
-    def test_patch_secret_not_found(self) -> None:
-        """Test PATCH returns 404 for nonexistent secret."""
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/999", json={"severity": "critical"})
-            assert response.status_code == 404
-
-    def test_patch_secret_vault_disconnected(self) -> None:
-        """Test PATCH returns 503 when vault is not connected."""
-        self._insert_secret()
-        mock_vault = MagicMock()
-        mock_vault.is_connected.return_value = False
-        self.vault_manager.get.return_value = mock_vault
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
-            assert response.status_code == 503
-
-    def test_patch_secret_vault_not_found(self) -> None:
-        """Test PATCH returns 503 when vault instance is not registered."""
-        self._insert_secret()
-        self.vault_manager.get.return_value = None
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
-            assert response.status_code == 503
-
-    def test_patch_secret_vault_write_failure(self) -> None:
-        """Test PATCH returns 503 when vault write raises a VaultError."""
-        self._insert_secret()
-        mock_vault = MagicMock()
-        mock_vault.is_connected.return_value = True
-        mock_vault.write_secret_metadata.side_effect = VaultError("connection lost")
-        self.vault_manager.get.return_value = mock_vault
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
-            assert response.status_code == 503
-
-    def test_patch_secret_vault_write_returns_false(self) -> None:
-        """Test PATCH returns 503 when vault metadata write returns False."""
-        self._insert_secret()
-        mock_vault = MagicMock()
-        mock_vault.is_connected.return_value = True
-        mock_vault.write_secret_metadata.return_value = False
-        self.vault_manager.get.return_value = mock_vault
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/1", json={"severity": "critical"})
-            assert response.status_code == 503
-
     def test_list_secrets_invalid_severity_filter(self) -> None:
         """Test listing secrets with unknown severity returns 422."""
         client = self._build_client()
@@ -467,18 +347,6 @@ class TestSecretsAPI:
             return_value=(self.db, self.config, self.vault_manager),
         ):
             response = client.get("/api/v1/secrets/", params={"severity": "unknown"})
-            assert response.status_code == 422
-            assert response.json()["detail"].startswith("Invalid severity")
-
-    def test_patch_secret_invalid_severity(self) -> None:
-        """Test PATCH with unknown severity returns 422."""
-        self._insert_secret()
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/1", json={"severity": "unknown"})
             assert response.status_code == 422
             assert response.json()["detail"].startswith("Invalid severity")
 
@@ -491,30 +359,6 @@ class TestSecretsAPI:
         ):
             response = client.get("/api/v1/secrets/", params={"severity": "none"})
             assert response.status_code == 200
-
-    def test_patch_secret_none_severity_is_valid(self) -> None:
-        """Test that severity=none is accepted by PATCH (marks secret as monitor-only, no rotation)."""
-        self._insert_secret()
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/1", json={"severity": "none"})
-            assert response.status_code == 200
-
-    def test_patch_secret_blank_severity(self) -> None:
-        """Test PATCH with blank severity returns 422."""
-        self._insert_secret()
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.patch("/api/v1/secrets/1", json={"severity": "   "})
-            assert response.status_code == 422
-            detail = response.json()["detail"]
-            assert any("Severity must not be blank" in err.get("msg", "") for err in detail)
 
     def test_list_secrets_filter_engine(self) -> None:
         """Test listing secrets filtered by engine ID via API."""
@@ -545,21 +389,6 @@ class TestSecretsAPI:
             data = response.json()
             assert len(data) == 1
             assert data[0]["severity"] == "critical"
-
-    def test_list_secrets_filter_enabled(self) -> None:
-        """Test listing secrets filtered by enabled status via API."""
-        self._insert_secret(enabled=True, secret_path="key-1")
-        self._insert_secret(enabled=False, secret_path="key-2")
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.get("/api/v1/secrets/", params={"enabled": True})
-            assert response.status_code == 200
-            data = response.json()
-            assert len(data) == 1
-            assert data[0]["enabled"] is True
 
 
 class TestComputeStatus:

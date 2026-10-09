@@ -14,7 +14,6 @@ from chronowarden.metadata import (
     _list_secret_paths,
     calculate_ttl,
     format_date,
-    is_secret_enabled,
     parse_date,
 )
 
@@ -151,34 +150,6 @@ class TestCalculateTTL:
         none_value: Any = None
         result = calculate_ttl(none_value, "default", config)
         assert result is None
-
-
-class TestIsSecretEnabled:
-    """Tests for is_secret_enabled function."""
-
-    def test_missing_field_defaults_true(self) -> None:
-        assert is_secret_enabled({}) is True
-
-    def test_true_string(self) -> None:
-        assert is_secret_enabled({"chronowarden_enabled": "true"}) is True
-
-    def test_false_string(self) -> None:
-        assert is_secret_enabled({"chronowarden_enabled": "false"}) is False
-
-    def test_bool_true(self) -> None:
-        assert is_secret_enabled({"chronowarden_enabled": True}) is True
-
-    def test_bool_false(self) -> None:
-        assert is_secret_enabled({"chronowarden_enabled": False}) is False
-
-    def test_zero_string(self) -> None:
-        assert is_secret_enabled({"chronowarden_enabled": "0"}) is False
-
-    def test_no_string(self) -> None:
-        assert is_secret_enabled({"chronowarden_enabled": "no"}) is False
-
-    def test_none_value(self) -> None:
-        assert is_secret_enabled({"chronowarden_enabled": None}) is True
 
 
 class TestResolveSeverity:

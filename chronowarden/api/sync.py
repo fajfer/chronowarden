@@ -75,7 +75,6 @@ async def sync_vault(
                 "path": entry.secret_path,
                 "ttl": entry.ttl,
                 "severity": entry.severity,
-                "enabled": entry.enabled,
             }
             for entry in updated
         ],

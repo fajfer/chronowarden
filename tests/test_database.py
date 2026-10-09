@@ -33,7 +33,6 @@ class TestSecretMetadataCache:
             updated_time="2026-02-07T14:02:00Z",
             ttl="2027-02-07",
             severity="default",
-            enabled=True,
         )
         db.upsert_secret_metadata(entry)
 
@@ -42,7 +41,6 @@ class TestSecretMetadataCache:
         assert result.vault_name == "vault-1"
         assert result.ttl == "2027-02-07"
         assert result.severity == "default"
-        assert result.enabled is True
 
     def test_upsert_updates_existing(self, db: Database) -> None:
         entry = SecretMetadataCache(
@@ -141,7 +139,30 @@ class TestSecretMetadataCache:
         assert result.severity is None
         assert result.updated_time is None
         assert result.last_synced is not None  # auto-populated by upsert_secret_metadata
-        assert result.enabled is True
+
+    def test_upsert_into_pre_0_6_table_with_enabled_column(self, tmp_path: Path) -> None:
+        """A database created before 0.6 (with the old `enabled` column) still accepts upserts (#73)."""
+        import sqlite3
+
+        path = tmp_path / "old.db"
+        conn = sqlite3.connect(path)
+        conn.execute("""
+            CREATE TABLE secret_metadata_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vault_name TEXT NOT NULL, engine_id TEXT NOT NULL, secret_path TEXT NOT NULL,
+                updated_time TEXT, ttl TEXT, severity TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                last_synced TEXT,
+                UNIQUE(vault_name, engine_id, secret_path)
+            )
+            """)
+        conn.commit()
+        conn.close()
+        old_db = Database(db_path=path)
+        old_db.connect()
+        old_db.upsert_secret_metadata(SecretMetadataCache(vault_name="v", engine_id="e", secret_path="s"))
+        assert old_db.get_secret_metadata("v", "e", "s") is not None
+        old_db.close()
 
     def test_delete(self, db: Database) -> None:
         db.upsert_secret_metadata(
@@ -157,20 +178,6 @@ class TestSecretMetadataCache:
         db.delete_secret_metadata("vault-1", "apps", "secret-1")
         result = db.get_secret_metadata("vault-1", "apps", "secret-1")
         assert result is None
-
-    def test_disabled_secret(self, db: Database) -> None:
-        db.upsert_secret_metadata(
-            SecretMetadataCache(
-                vault_name="vault-1",
-                engine_id="apps",
-                secret_path="secret-1",
-                enabled=False,
-            )
-        )
-
-        result = db.get_secret_metadata("vault-1", "apps", "secret-1")
-        assert result is not None
-        assert result.enabled is False
 
 
 class TestDatabaseConnection:

@@ -8,7 +8,7 @@ import logging
 import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Optional
 
 from hvac.exceptions import VaultError
 from requests.exceptions import RequestException
@@ -126,29 +126,6 @@ def calculate_ttl(updated_time: str, severity: str, config: AppConfig) -> Option
     return format_date(expiry_dt, config.date_format)
 
 
-def is_secret_enabled(custom_metadata: dict[str, Any]) -> bool:
-    """
-    Determine if a secret is enabled for monitoring.
-
-    Args:
-        custom_metadata: The custom_metadata dict from Vault.
-
-    Returns:
-        True if the secret is enabled, False otherwise.
-    """
-    enabled_value = custom_metadata.get("chronowarden_enabled")
-    if enabled_value is None:
-        return True
-
-    if isinstance(enabled_value, bool):
-        return enabled_value
-
-    if isinstance(enabled_value, str):
-        return enabled_value.lower() not in ("false", "0", "no")
-
-    return bool(enabled_value)
-
-
 def sync_secret_metadata(
     vault: VaultIntegration,
     vault_name: str,
@@ -263,7 +240,6 @@ def sync_secret_metadata(
         updated_time=updated_time,
         ttl=desired_ttl,
         severity=severity,
-        enabled=True,
         last_synced=datetime.now(tz=timezone.utc).isoformat(),
     )
 

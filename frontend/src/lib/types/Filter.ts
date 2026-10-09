@@ -10,7 +10,6 @@ export interface FilterState {
   engineId: string | null;
   severity: string | null;
   statuses: SecretStatus[];
-  enabled: boolean | null;
 }
 
 export const DEFAULT_FILTERS: FilterState = {
@@ -19,5 +18,4 @@ export const DEFAULT_FILTERS: FilterState = {
   engineId: null,
   severity: null,
   statuses: [],
-  enabled: null,
 };

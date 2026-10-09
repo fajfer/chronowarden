@@ -28,7 +28,6 @@ class SecretMetadataCache(BaseModel):
     updated_time: Optional[str] = None
     ttl: Optional[str] = None
     severity: Optional[str] = None
-    enabled: bool = True
     last_synced: Optional[str] = None
 
 
@@ -85,7 +84,6 @@ class Database:
                 updated_time TEXT,
                 ttl TEXT,
                 severity TEXT,
-                enabled INTEGER NOT NULL DEFAULT 1,
                 last_synced TEXT,
                 UNIQUE(vault_name, engine_id, secret_path)
             );
@@ -122,13 +120,12 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO secret_metadata_cache
-                    (vault_name, engine_id, secret_path, updated_time, ttl, severity, enabled, last_synced)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(vault_name, engine_id, secret_path) DO UPDATE SET
                     updated_time = excluded.updated_time,
                     ttl = excluded.ttl,
                     severity = excluded.severity,
-                    enabled = excluded.enabled,
                     last_synced = excluded.last_synced
                 """,
                 (
@@ -138,7 +135,6 @@ class Database:
                     entry.updated_time,
                     entry.ttl,
                     entry.severity,
-                    1 if entry.enabled else 0,
                     entry.last_synced or datetime.now(tz=timezone.utc).isoformat(),
                 ),
             )
@@ -168,7 +164,7 @@ class Database:
             cursor = conn.execute(
                 """
                 SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
-                       severity, enabled, last_synced
+                       severity, last_synced
                 FROM secret_metadata_cache
                 WHERE vault_name = ? AND engine_id = ? AND secret_path = ?
                 """,
@@ -185,7 +181,6 @@ class Database:
                 updated_time=row["updated_time"],
                 ttl=row["ttl"],
                 severity=row["severity"],
-                enabled=bool(row["enabled"]),
                 last_synced=row["last_synced"],
             )
 
@@ -206,7 +201,7 @@ class Database:
             cursor = conn.execute(
                 """
                 SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
-                       severity, enabled, last_synced
+                       severity, last_synced
                 FROM secret_metadata_cache
                 WHERE vault_name = ?
                 """,
@@ -221,7 +216,6 @@ class Database:
                     updated_time=row["updated_time"],
                     ttl=row["ttl"],
                     severity=row["severity"],
-                    enabled=bool(row["enabled"]),
                     last_synced=row["last_synced"],
                 )
                 for row in cursor.fetchall()
@@ -244,7 +238,7 @@ class Database:
             cursor = conn.execute(
                 """
                 SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
-                       severity, enabled, last_synced
+                       severity, last_synced
                 FROM secret_metadata_cache
                 WHERE id = ?
                 """,
@@ -261,7 +255,6 @@ class Database:
                 updated_time=row["updated_time"],
                 ttl=row["ttl"],
                 severity=row["severity"],
-                enabled=bool(row["enabled"]),
                 last_synced=row["last_synced"],
             )
 
@@ -270,7 +263,6 @@ class Database:
         vault_name: Optional[str] = None,
         engine_id: Optional[str] = None,
         severity: Optional[str] = None,
-        enabled: Optional[bool] = None,
     ) -> list[SecretMetadataCache]:
         """
         List all cached secrets with optional filtering.
@@ -279,14 +271,13 @@ class Database:
             vault_name: Filter by vault instance name.
             engine_id: Filter by engine mount path.
             severity: Filter by severity profile.
-            enabled: Filter by monitoring enabled/disabled.
 
         Returns:
             List of cached metadata entries matching the filters.
         """
         query = """
             SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
-                   severity, enabled, last_synced
+                   severity, last_synced
             FROM secret_metadata_cache
             WHERE 1=1
         """
@@ -301,9 +292,6 @@ class Database:
         if severity is not None:
             query += " AND severity = ?"
             params.append(severity)
-        if enabled is not None:
-            query += " AND enabled = ?"
-            params.append(1 if enabled else 0)
 
         with self._conn_lock:
             conn = self._require_connection()
@@ -319,48 +307,10 @@ class Database:
                     updated_time=row["updated_time"],
                     ttl=row["ttl"],
                     severity=row["severity"],
-                    enabled=bool(row["enabled"]),
                     last_synced=row["last_synced"],
                 )
                 for row in cursor.fetchall()
             ]
-
-    def update_secret_metadata_fields(
-        self,
-        secret_id: int,
-        severity: Optional[str] = None,
-        enabled: Optional[bool] = None,
-    ) -> bool:
-        """
-        Update specific Chronowarden metadata fields for a cached secret.
-
-        Args:
-            secret_id: The database row ID.
-            severity: New severity override.
-            enabled: New enabled flag.
-
-        Returns:
-            True if a row was updated, False otherwise.
-        """
-        with self._conn_lock:
-            conn = self._require_connection()
-            if conn is None:
-                return False
-            updates = []
-            params: list = []
-            if severity is not None:
-                updates.append("severity = ?")
-                params.append(severity)
-            if enabled is not None:
-                updates.append("enabled = ?")
-                params.append(1 if enabled else 0)
-            if not updates:
-                return False
-            params.append(secret_id)
-            query = "UPDATE secret_metadata_cache SET " + ", ".join(updates) + " WHERE id = ?"
-            cursor = conn.execute(query, params)
-            conn.commit()
-            return cursor.rowcount > 0
 
     def delete_secret_metadata(self, vault_name: str, engine_id: str, secret_path: str) -> None:
         """

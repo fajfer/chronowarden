@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class SecretStatus(str, Enum):
@@ -34,31 +34,5 @@ class SecretMetadataResponse(BaseModel):
     severity: str = "default"
     rotation_period_days: int = 365
     alert_threshold_days: int = 30
-    enabled: bool = True
     last_synced: Optional[datetime] = None
     status: SecretStatus = SecretStatus.NO_TTL
-
-
-class SecretMetadataUpdate(BaseModel):
-    """Request body for updating Chronowarden-specific metadata fields."""
-
-    severity: Optional[str] = Field(default=None, description="Override severity profile")
-    enabled: Optional[bool] = Field(default=None, description="Enable/disable monitoring")
-
-    @field_validator("severity")
-    @classmethod
-    def validate_severity(cls, v: Optional[str]) -> Optional[str]:
-        """
-        Trim severity input and reject blank values.
-
-        Raises:
-            ValueError: If severity contains only whitespace.
-        """
-        if v is None:
-            return None
-
-        normalized = v.strip()
-        if not normalized:
-            raise ValueError("Severity must not be blank")
-
-        return normalized

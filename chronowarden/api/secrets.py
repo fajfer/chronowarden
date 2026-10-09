@@ -2,19 +2,17 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-"""API routes for secret metadata retrieval and management."""
+"""API routes for reading cached secret metadata."""
 
 import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
-from hvac.exceptions import VaultError
-from requests.exceptions import RequestException
 
 from chronowarden.config import AppConfig
 from chronowarden.database import SecretMetadataCache
-from chronowarden.models.secret import SecretMetadataResponse, SecretMetadataUpdate, SecretStatus
+from chronowarden.models.secret import SecretMetadataResponse, SecretStatus
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 
@@ -123,7 +121,6 @@ def _enrich_secret(entry: SecretMetadataCache, config: AppConfig) -> SecretMetad
         severity=severity,
         rotation_period_days=rotation_days,
         alert_threshold_days=alert_days,
-        enabled=entry.enabled,
         last_synced=last_synced,
         status=_compute_status(days_remaining, alert_days),
     )
@@ -134,7 +131,6 @@ async def list_secrets(
     vault_name: Optional[str] = Query(None, description="Filter by vault instance name"),
     engine_id: Optional[str] = Query(None, description="Filter by engine mount path"),
     severity: Optional[str] = Query(None, description="Filter by severity profile"),
-    enabled: Optional[bool] = Query(None, description="Filter by monitoring enabled/disabled"),
 ) -> list[SecretMetadataResponse]:
     """
     List all cached secret metadata with optional filtering.
@@ -143,7 +139,6 @@ async def list_secrets(
         vault_name: Filter by vault instance name.
         engine_id: Filter by engine mount path.
         severity: Filter by severity profile.
-        enabled: Filter by monitoring enabled/disabled.
 
     Returns:
         List of enriched secret metadata entries.
@@ -154,7 +149,6 @@ async def list_secrets(
         vault_name=vault_name,
         engine_id=engine_id,
         severity=severity,
-        enabled=enabled,
     )
     return [_enrich_secret(e, config) for e in entries]
 
@@ -183,80 +177,3 @@ async def get_secret(secret_id: int) -> SecretMetadataResponse:
         )
 
     return _enrich_secret(entry, config)
-
-
-@router.patch("/{secret_id}", response_model=SecretMetadataResponse, summary="Update secret metadata")
-async def update_secret_metadata(secret_id: int, body: SecretMetadataUpdate) -> SecretMetadataResponse:
-    """
-    Update Chronowarden-specific metadata fields for a cached secret.
-
-    Only severity and enabled can be modified. Changes are written to
-    both the local cache and the vault's custom_metadata.
-
-    Args:
-        secret_id: The secret metadata cache row ID.
-        body: Fields to update.
-
-    Returns:
-        The updated secret metadata.
-
-    Raises:
-        HTTPException: If secret not found or vault is unavailable.
-    """
-    database, config, manager = _get_app_dependencies()
-    _validate_severity_input(body.severity, config, "request body")
-    entry = database.get_secret_by_id(secret_id)
-
-    if entry is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Secret with id {secret_id} not found in cache",
-        )
-
-    vault = manager.get(entry.vault_name)
-    if not vault or not vault.is_connected():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Vault instance '{entry.vault_name}' is not connected",
-        )
-
-    metadata_fields: dict[str, str] = {}
-    if body.severity is not None:
-        metadata_fields["chronowarden_severity"] = body.severity
-    if body.enabled is not None:
-        metadata_fields["chronowarden_enabled"] = str(body.enabled).lower()
-
-    if metadata_fields:
-        try:
-            write_succeeded = vault.write_secret_metadata(
-                entry.secret_path,
-                metadata_fields,
-                mount_point=entry.engine_id,
-            )
-        except (VaultError, RequestException):
-            logger.exception("Failed to write metadata to vault for secret %d", secret_id)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Failed to update metadata in vault",
-            )
-        if not write_succeeded:
-            logger.error("Vault metadata write returned failure for secret %d", secret_id)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Failed to update metadata in vault",
-            )
-
-    database.update_secret_metadata_fields(
-        secret_id,
-        severity=body.severity,
-        enabled=body.enabled,
-    )
-
-    updated = database.get_secret_by_id(secret_id)
-    if updated is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Secret with id {secret_id} not found after update",
-        )
-
-    return _enrich_secret(updated, config)

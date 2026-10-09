@@ -30,11 +30,6 @@
           <span class="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium text-blue-400 border-blue-500">
             {secret.severity}
           </span>
-          {#if !secret.enabled}
-            <span class="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium text-gray-400 border-gray-500">
-              Disabled
-            </span>
-          {/if}
         </div>
 
         <div class="grid grid-cols-2 gap-3">

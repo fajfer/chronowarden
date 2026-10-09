@@ -4,7 +4,7 @@
 
 import { writable, derived } from 'svelte/store';
 import * as secretsApi from '$lib/api/secrets';
-import type { Secret, SecretMetadataUpdate } from '$lib/types';
+import type { Secret } from '$lib/types';
 
 export const secrets = writable<Secret[]>([]);
 export const secretsLoading = writable<boolean>(false);
@@ -46,11 +46,4 @@ export async function loadSecrets(): Promise<void> {
   } finally {
     secretsLoading.set(false);
   }
-}
-
-/** Update secret metadata via the backend. */
-export async function editSecretMetadata(id: number, data: SecretMetadataUpdate): Promise<Secret> {
-  const updated = await secretsApi.updateSecretMetadata(id, data);
-  secrets.update((list) => list.map((s) => (s.id === id ? updated : s)));
-  return updated;
 }

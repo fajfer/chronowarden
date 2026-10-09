@@ -42,8 +42,3 @@ export function setSeverity(severity: string | null): void {
 export function setEngineId(engineId: string | null): void {
   filters.update((f) => ({ ...f, engineId }));
 }
-
-/** Set the enabled filter. */
-export function setEnabled(enabled: boolean | null): void {
-  filters.update((f) => ({ ...f, enabled }));
-}

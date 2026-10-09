@@ -22,7 +22,6 @@ export interface Secret {
   severity: string;
   rotation_period_days: number;
   alert_threshold_days: number;
-  enabled: boolean;
   last_synced: string | null;
   status: SecretStatus;
   /**
@@ -31,12 +30,4 @@ export interface Secret {
    * as "—" until the backend populates it.
    */
   owner?: string | null;
-}
-
-/**
- * Payload for updating Chronowarden-specific metadata fields.
- */
-export interface SecretMetadataUpdate {
-  severity?: string;
-  enabled?: boolean;
 }
