@@ -11,7 +11,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -30,15 +30,6 @@ class SecretMetadataCache(BaseModel):
     severity: Optional[str] = None
     enabled: bool = True
     last_synced: Optional[str] = None
-
-
-class EngineConfigRow(BaseModel):
-    """Per-engine severity override stored in SQLite."""
-
-    id: Optional[int] = None
-    vault_name: str
-    engine_id: str = Field(description="Engine mount path (e.g. 'apps', 'databases')")
-    default_severity: Optional[str] = None
 
 
 class Database:
@@ -97,14 +88,6 @@ class Database:
                 enabled INTEGER NOT NULL DEFAULT 1,
                 last_synced TEXT,
                 UNIQUE(vault_name, engine_id, secret_path)
-            );
-
-            CREATE TABLE IF NOT EXISTS engine_config (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                vault_name TEXT NOT NULL,
-                engine_id TEXT NOT NULL,
-                default_severity TEXT,
-                UNIQUE(vault_name, engine_id)
             );
 
             CREATE TABLE IF NOT EXISTS owners (
@@ -378,61 +361,6 @@ class Database:
             cursor = conn.execute(query, params)
             conn.commit()
             return cursor.rowcount > 0
-
-    def upsert_engine_config(self, entry: EngineConfigRow) -> None:
-        """
-        Insert or update an engine configuration entry.
-
-        Args:
-            entry: The engine config entry to upsert.
-        """
-        with self._conn_lock:
-            conn = self._require_connection()
-            if conn is None:
-                return
-            conn.execute(
-                """
-                INSERT INTO engine_config (vault_name, engine_id, default_severity)
-                VALUES (?, ?, ?)
-                ON CONFLICT(vault_name, engine_id) DO UPDATE SET
-                    default_severity = excluded.default_severity
-                """,
-                (entry.vault_name, entry.engine_id, entry.default_severity),
-            )
-            conn.commit()
-
-    def get_engine_config(self, vault_name: str, engine_id: str) -> Optional[EngineConfigRow]:
-        """
-        Retrieve an engine configuration entry.
-
-        Args:
-            vault_name: The vault instance name.
-            engine_id: The engine mount path.
-
-        Returns:
-            The engine config entry, or None if not found.
-        """
-        with self._conn_lock:
-            conn = self._require_connection()
-            if conn is None:
-                return None
-            cursor = conn.execute(
-                """
-                SELECT id, vault_name, engine_id, default_severity
-                FROM engine_config
-                WHERE vault_name = ? AND engine_id = ?
-                """,
-                (vault_name, engine_id),
-            )
-            row = cursor.fetchone()
-            if row is None:
-                return None
-            return EngineConfigRow(
-                id=row["id"],
-                vault_name=row["vault_name"],
-                engine_id=row["engine_id"],
-                default_severity=row["default_severity"],
-            )
 
     def delete_secret_metadata(self, vault_name: str, engine_id: str, secret_path: str) -> None:
         """

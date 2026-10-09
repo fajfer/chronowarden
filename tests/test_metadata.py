@@ -202,9 +202,18 @@ class TestResolveSeverity:
         assert result == "critical"
 
     def test_falls_through_to_engine(self) -> None:
-        from chronowarden.config import EngineConfig
+        from chronowarden.config import EngineConfigNested, VaultConfig
 
-        config = AppConfig(engines=[EngineConfig(id="apps", default_severity="pci-dss-4.0")])
+        config = AppConfig(
+            vaults=[
+                VaultConfig(
+                    name="vault",
+                    address="http://localhost:8200",
+                    token="test",
+                    engines=[EngineConfigNested(name="apps", severity="pci-dss-4.0")],
+                ),
+            ]
+        )
         result = config.resolve_severity("apps", "vault")
         assert result == "pci-dss-4.0"
 

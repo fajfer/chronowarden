@@ -11,7 +11,6 @@ import pytest
 
 from chronowarden.config import (
     AppConfig,
-    EngineConfig,
     EngineConfigNested,
     ExpiryProfile,
     SecretConfig,
@@ -127,6 +126,7 @@ class TestConfigCascade:
                     address="http://localhost:8200",
                     token="test",
                     severity="critical",
+                    engines=[EngineConfigNested(name="apps", severity="pci-dss-4.0")],
                 ),
                 VaultConfig(
                     name="dev",
@@ -135,13 +135,10 @@ class TestConfigCascade:
                     date_format="YYYY-DD-MM",
                 ),
             ],
-            engines=[
-                EngineConfig(id="apps", default_severity="pci-dss-4.0"),
-            ],
         )
 
     def test_engine_cascade(self, config: AppConfig) -> None:
-        """Legacy engine severity used for matching engine."""
+        """Engine severity used for matching engine."""
         assert config.resolve_severity("apps", "prod") == "pci-dss-4.0"
 
     def test_engine_cascade_no_secret(self, config: AppConfig) -> None:
@@ -298,54 +295,23 @@ class TestResolveSeveritySource:
         assert source == "global_default"
 
 
-class TestBackwardCompatibility:
-    """Tests for backward compatibility with old config format."""
+class TestRemovedLegacyConfig:
+    """Regression tests: pre-1.0 legacy config forms are no longer supported (#30)."""
 
-    def test_default_severity_migrated_to_severity(self) -> None:
-        """Old default_severity field is migrated to severity."""
+    def test_default_severity_is_not_migrated(self) -> None:
+        """The removed default_severity key no longer sets the vault severity."""
         vc = VaultConfig(name="test", address="http://localhost", token="t", default_severity="critical")
-        assert vc.severity == "critical"
+        assert vc.severity is None
 
-    def test_severity_wins_over_default_severity(self) -> None:
-        """New severity field takes precedence over deprecated default_severity."""
-        vc = VaultConfig(
-            name="test", address="http://localhost", token="t", severity="pci-dss-4.0", default_severity="critical"
+    def test_top_level_engines_do_not_affect_cascade(self) -> None:
+        """The removed top-level engines array no longer takes part in severity resolution."""
+        config = AppConfig.model_validate(
+            {
+                "vaults": [{"name": "v1", "address": "http://localhost", "token": "t", "severity": "critical"}],
+                "engines": [{"id": "apps", "default_severity": "pci-dss-4.0"}],
+            }
         )
-        assert vc.severity == "pci-dss-4.0"
-
-    def test_legacy_top_level_engines(self) -> None:
-        """Old top-level engines array still works."""
-        config = AppConfig(
-            vaults=[
-                VaultConfig(name="v1", address="http://localhost", token="t", severity="critical"),
-            ],
-            engines=[
-                EngineConfig(id="apps", default_severity="pci-dss-4.0"),
-            ],
-        )
-        result = config.resolve_severity("apps", "v1")
-        assert result == "pci-dss-4.0"
-
-    def test_nested_engine_wins_over_legacy(self) -> None:
-        """Nested engine config takes precedence over legacy top-level config."""
-        config = AppConfig(
-            vaults=[
-                VaultConfig(
-                    name="v1",
-                    address="http://localhost",
-                    token="t",
-                    severity="default",
-                    engines=[
-                        EngineConfigNested(name="apps", severity="critical"),
-                    ],
-                ),
-            ],
-            engines=[
-                EngineConfig(id="apps", default_severity="pci-dss-4.0"),
-            ],
-        )
-        result = config.resolve_severity("apps", "v1")
-        assert result == "critical"
+        assert config.resolve_severity_source("apps", "v1") == ("critical", "vault_config")
 
 
 class TestGetRotationDays:

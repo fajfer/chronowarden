@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from chronowarden.database import Database, EngineConfigRow, SecretMetadataCache
+from chronowarden.database import Database, SecretMetadataCache
 
 
 @pytest.fixture()
@@ -173,41 +173,6 @@ class TestSecretMetadataCache:
         assert result.enabled is False
 
 
-class TestEngineConfig:
-    """Tests for engine configuration operations."""
-
-    def test_upsert_and_get(self, db: Database) -> None:
-        entry = EngineConfigRow(
-            vault_name="vault-1",
-            engine_id="apps",
-            default_severity="critical",
-        )
-        db.upsert_engine_config(entry)
-
-        result = db.get_engine_config("vault-1", "apps")
-        assert result is not None
-        assert result.default_severity == "critical"
-
-    def test_upsert_updates(self, db: Database) -> None:
-        entry = EngineConfigRow(
-            vault_name="vault-1",
-            engine_id="apps",
-            default_severity="critical",
-        )
-        db.upsert_engine_config(entry)
-
-        entry.default_severity = "pci-dss-4.0"
-        db.upsert_engine_config(entry)
-
-        result = db.get_engine_config("vault-1", "apps")
-        assert result is not None
-        assert result.default_severity == "pci-dss-4.0"
-
-    def test_get_nonexistent(self, db: Database) -> None:
-        result = db.get_engine_config("vault-1", "nonexistent")
-        assert result is None
-
-
 class TestDatabaseConnection:
     """Tests for database connection handling."""
 
@@ -217,7 +182,6 @@ class TestDatabaseConnection:
         # Should not raise, just log error
         assert db.get_secret_metadata("v", "e", "s") is None
         assert db.list_secrets_for_vault("v") == []
-        assert db.get_engine_config("v", "e") is None
 
     def test_write_operations_when_disconnected(self) -> None:
         """Test that write operations on a disconnected DB do not raise."""
@@ -230,7 +194,6 @@ class TestDatabaseConnection:
             )
         )
         db.delete_secret_metadata("v", "e", "s")
-        db.upsert_engine_config(EngineConfigRow(vault_name="v", engine_id="e", default_severity="default"))
 
     def test_owner_operations_when_disconnected(self) -> None:
         """Test that owner operations on a disconnected DB return safe defaults."""
