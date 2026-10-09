@@ -8,13 +8,16 @@ import logging
 import pathlib
 
 import pytest
+from pydantic import ValidationError
 
 from chronowarden.config import (
     AppConfig,
+    ConfigError,
     EngineConfigNested,
     ExpiryProfile,
     SecretConfig,
     VaultConfig,
+    load_config,
     parse_duration_to_days,
 )
 
@@ -298,20 +301,15 @@ class TestResolveSeveritySource:
 class TestRemovedLegacyConfig:
     """Regression tests: pre-1.0 legacy config forms are no longer supported (#30)."""
 
-    def test_default_severity_is_not_migrated(self) -> None:
-        """The removed default_severity key no longer sets the vault severity."""
-        vc = VaultConfig(name="test", address="http://localhost", token="t", default_severity="critical")
-        assert vc.severity is None
+    def test_default_severity_is_rejected(self) -> None:
+        """The removed default_severity key is rejected as an unknown key."""
+        with pytest.raises(ValidationError, match="default_severity"):
+            VaultConfig(name="test", address="http://localhost", token="t", default_severity="critical")
 
-    def test_top_level_engines_do_not_affect_cascade(self) -> None:
-        """The removed top-level engines array no longer takes part in severity resolution."""
-        config = AppConfig.model_validate(
-            {
-                "vaults": [{"name": "v1", "address": "http://localhost", "token": "t", "severity": "critical"}],
-                "engines": [{"id": "apps", "default_severity": "pci-dss-4.0"}],
-            }
-        )
-        assert config.resolve_severity_source("apps", "v1") == ("critical", "vault_config")
+    def test_top_level_engines_are_rejected(self) -> None:
+        """The removed top-level engines array is rejected as an unknown key."""
+        with pytest.raises(ValidationError, match="engines"):
+            AppConfig.model_validate({"engines": [{"id": "apps", "default_severity": "pci-dss-4.0"}]})
 
 
 class TestGetRotationDays:
@@ -486,9 +484,9 @@ class TestSeverityValidation:
         )
         assert config.get_rotation_days("critical") == 30
 
-    def test_invalid_profile_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Unknown severity values should log warning for cascade fallback."""
-        with caplog.at_level(logging.WARNING):
+    def test_unknown_secret_severity_is_rejected(self) -> None:
+        """An unknown severity at secret level fails validation and names where it is (#12)."""
+        with pytest.raises(ValidationError, match="'unknown-severity' in secret 'test/apps/api-key'"):
             AppConfig(
                 vaults=[
                     VaultConfig(
@@ -504,7 +502,119 @@ class TestSeverityValidation:
                     )
                 ]
             )
-        assert "Invalid severity value 'unknown-severity'" in caplog.text
+
+    def test_all_unknown_severities_are_listed(self) -> None:
+        """Every unknown severity is reported at once, together with the allowed values."""
+        with pytest.raises(ValidationError) as exc_info:
+            AppConfig(
+                vaults=[
+                    VaultConfig(
+                        name="v",
+                        address="http://localhost",
+                        token="t",
+                        severity="critcal",
+                        engines=[EngineConfigNested(name="apps", severity="pci")],
+                    )
+                ]
+            )
+        message = str(exc_info.value)
+        assert "'critcal' in vault 'v'" in message
+        assert "'pci' in engine 'v/apps'" in message
+        assert "Allowed values: critical, default, none, pci-dss-4.0" in message
+
+    def test_none_severity_is_allowed(self) -> None:
+        """The reserved 'none' severity is always valid."""
+        config = AppConfig(vaults=[VaultConfig(name="v", address="http://localhost", token="t", severity="none")])
+        assert config.resolve_severity("apps", "v") == "none"
+
+
+class TestUnknownKeys:
+    """Tests that typos in config keys are rejected (#12)."""
+
+    @pytest.mark.parametrize(
+        ("data", "key"),
+        [
+            ({"polling_intervall": "6h"}, "polling_intervall"),
+            ({"vaults": [{"name": "v", "address": "http://x", "token": "t", "sevrity": "critical"}]}, "sevrity"),
+            (
+                {"vaults": [{"name": "v", "address": "http://x", "token": "t", "engines": [{"nme": "apps"}]}]},
+                "nme",
+            ),
+            ({"expiry_profiles": {"custom": {"rotation_period": "30d", "alert": "7d"}}}, "alert"),
+        ],
+    )
+    def test_unknown_key_is_rejected(self, data: dict, key: str) -> None:
+        """An unknown key at any level fails validation and names the key."""
+        with pytest.raises(ValidationError, match=key):
+            AppConfig.model_validate(data)
+
+
+class TestLoadConfig:
+    """Tests for load_config error handling (#12)."""
+
+    def _write(self, tmp_path: pathlib.Path, content: str) -> str:
+        """Write a config file and return its path."""
+        path = tmp_path / "config.yaml"
+        path.write_text(content)
+        return str(path)
+
+    def test_valid_file_loads(self, tmp_path: pathlib.Path) -> None:
+        """A valid file is loaded."""
+        path = self._write(tmp_path, "vaults:\n  - name: v\n    address: http://x\n    token: t\n")
+        assert [v.name for v in load_config(path).vaults] == ["v"]
+
+    def test_empty_file_yields_defaults(self, tmp_path: pathlib.Path) -> None:
+        """An empty file means 'use defaults'."""
+        assert load_config(self._write(tmp_path, "")).vaults == []
+
+    def test_no_file_at_default_paths_yields_defaults(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Without any config file the defaults are used."""
+        monkeypatch.delenv("CHRONOWARDEN_CONFIG", raising=False)
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("chronowarden.config._DEFAULT_CONFIG_PATHS", [tmp_path / "missing.yaml"])
+        assert load_config().vaults == []
+
+    def test_missing_explicit_path_raises(self, tmp_path: pathlib.Path) -> None:
+        """A missing explicit path is an error, not silently ignored."""
+        with pytest.raises(ConfigError, match="does not exist"):
+            load_config(str(tmp_path / "missing.yaml"))
+
+    def test_missing_env_path_raises(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A CHRONOWARDEN_CONFIG pointing nowhere is an error."""
+        monkeypatch.setenv("CHRONOWARDEN_CONFIG", str(tmp_path / "missing.yaml"))
+        with pytest.raises(ConfigError, match="CHRONOWARDEN_CONFIG"):
+            load_config()
+
+    def test_invalid_yaml_raises(self, tmp_path: pathlib.Path) -> None:
+        """Unparsable YAML is an error instead of an empty default config."""
+        with pytest.raises(ConfigError, match="Cannot parse"):
+            load_config(self._write(tmp_path, "vaults: [unclosed\n"))
+
+    def test_non_mapping_raises(self, tmp_path: pathlib.Path) -> None:
+        """A YAML list at the top level is an error."""
+        with pytest.raises(ConfigError, match="must contain a mapping"):
+            load_config(self._write(tmp_path, "- a\n- b\n"))
+
+    def test_validation_errors_are_listed_with_paths(self, tmp_path: pathlib.Path) -> None:
+        """All validation errors are reported in one message, each with its key path."""
+        path = self._write(
+            tmp_path,
+            "vault_reconnect_interval: 1\nvaults:\n  - name: v\n    address: http://x\n    token: t\n    tken: x\n",
+        )
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(path)
+        message = str(exc_info.value)
+        assert "2 error(s)" in message
+        assert "vault_reconnect_interval:" in message
+        assert "vaults.0.tken:" in message
+
+    @pytest.mark.parametrize("example", ["config.example.yaml", "deploy/compose/config.yaml"])
+    def test_shipped_examples_are_valid(self, example: str) -> None:
+        """The example configs in the repository pass strict validation."""
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+        load_config(str(repo_root / example))
 
 
 class TestAppRoleConfig:

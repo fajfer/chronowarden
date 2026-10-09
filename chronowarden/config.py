@@ -11,7 +11,7 @@ import re
 from typing import Optional
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -32,22 +32,12 @@ RESERVED_SEVERITY_VALUES = {"none"}
 
 _DURATION_PATTERN = re.compile(r"^(\d+)([dmy])$")
 
+# Unknown keys are rejected so that typos never get silently ignored
+_STRICT = ConfigDict(extra="forbid")
 
-def _validate_severity_value(v: Optional[str], context: str, valid_values: set[str]) -> Optional[str]:
-    """
-    Validate a severity value against caller-provided allowed profiles.
 
-    Args:
-        v: The severity value to validate.
-        context: Description of where the value comes from (for logging).
-        valid_values: Allowed severity values.
-
-    Returns:
-        The original severity value (validation is logged as warning only).
-    """
-    if v is not None and v not in valid_values:
-        logger.warning("Invalid severity value '%s' in %s, falling through to cascade", v, context)
-    return v
+class ConfigError(Exception):
+    """Raised when the configuration file is missing, unreadable or invalid."""
 
 
 def parse_duration_to_days(duration: str) -> int:
@@ -83,6 +73,8 @@ def parse_duration_to_days(duration: str) -> int:
 class ExpiryProfile(BaseModel):
     """Configuration for a single expiry profile."""
 
+    model_config = _STRICT
+
     rotation_period: str = Field(description="Rotation period (e.g. '365d', '6m', '1y')")
 
     @field_validator("rotation_period")
@@ -101,12 +93,16 @@ class ExpiryProfile(BaseModel):
 class SecretConfig(BaseModel):
     """Per-secret severity override in config.yaml."""
 
+    model_config = _STRICT
+
     path: str = Field(description="Exact secret path within the engine")
     severity: str = Field(description="Severity override for this specific secret")
 
 
 class EngineConfigNested(BaseModel):
     """Per-engine configuration nested within a vault."""
+
+    model_config = _STRICT
 
     name: str = Field(description="Engine name (mount point)")
     severity: Optional[str] = Field(default=None, description="Severity override for this engine")
@@ -115,6 +111,8 @@ class EngineConfigNested(BaseModel):
 
 class VaultConfig(BaseModel):
     """Configuration for a single Vault instance."""
+
+    model_config = _STRICT
 
     name: str = Field(description="Unique identifier for this Vault instance")
     address: str = Field(description="Vault server address (e.g. https://vault.example.com:8200)")
@@ -280,6 +278,8 @@ class VaultConfig(BaseModel):
 class AppConfig(BaseModel):
     """Root application configuration."""
 
+    model_config = _STRICT
+
     ca_certs_dir: Optional[str] = Field(
         default=None, description="Directory containing CA certificates (all .pem, .crt, .cert files will be loaded)"
     )
@@ -321,27 +321,36 @@ class AppConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_severity_values(self) -> "AppConfig":
-        """Validate configured severity values against configured expiry profiles."""
+        """
+        Reject severity values that match no expiry profile.
+
+        Raises:
+            ValueError: Listing every unknown severity and the allowed values.
+        """
         valid_values = set(self.expiry_profiles) | RESERVED_SEVERITY_VALUES
-        self._warn_invalid_severity_values(valid_values)
+        unknown = [
+            f"'{severity}' in {context}"
+            for severity, context in self._iter_configured_severities()
+            if severity not in valid_values
+        ]
+        if unknown:
+            raise ValueError(
+                f"Unknown severity {', '.join(unknown)}. Allowed values: {', '.join(sorted(valid_values))}"
+            )
         return self
 
-    def _warn_invalid_severity_values(self, valid_values: set[str]) -> None:
-        """Warn for severity values across all config scopes that are not in allowed profiles."""
+    def _iter_configured_severities(self) -> list[tuple[str, str]]:
+        """Return (severity, context) for every severity set at vault, engine or secret level."""
+        found: list[tuple[str, str]] = []
         for vault in self.vaults:
-            _validate_severity_value(vault.severity, f"vault config '{vault.name}'", valid_values)
+            if vault.severity is not None:
+                found.append((vault.severity, f"vault '{vault.name}'"))
             for engine in vault.engines:
-                _validate_severity_value(
-                    engine.severity,
-                    f"engine config '{vault.name}/{engine.name}'",
-                    valid_values,
-                )
+                if engine.severity is not None:
+                    found.append((engine.severity, f"engine '{vault.name}/{engine.name}'"))
                 for secret in engine.secrets:
-                    _validate_severity_value(
-                        secret.severity,
-                        f"secret config '{vault.name}/{engine.name}/{secret.path}'",
-                        valid_values,
-                    )
+                    found.append((secret.severity, f"secret '{vault.name}/{engine.name}/{secret.path}'"))
+        return found
 
     def _get_vault_config(self, vault_name: str) -> Optional[VaultConfig]:
         """
@@ -487,13 +496,17 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
         3. /etc/chronowarden/config.yaml
         4. ./config.yaml
 
-    If no configuration file is found, returns a default (empty) config.
+    If no configuration file exists at the default paths, returns a default (empty) config. An empty file also
+    yields the defaults.
 
     Args:
         config_path: Explicit path to the config file.
 
     Returns:
         Validated application configuration.
+
+    Raises:
+        ConfigError: If an explicitly requested file is missing, or the file can't be read, parsed or validated.
     """
     path = _resolve_config_path(config_path)
 
@@ -503,19 +516,39 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
 
     logger.info("Loading configuration from %s", path)
     try:
-        raw = path.read_text()
-        data = yaml.safe_load(raw)
-    except OSError:
-        logger.exception("Failed to read configuration file")
-        return AppConfig()
-    except yaml.YAMLError:
-        logger.exception("Failed to parse configuration file")
-        return AppConfig()
+        data = yaml.safe_load(path.read_text())
+    except OSError as exc:
+        raise ConfigError(f"Cannot read configuration file {path}: {exc}") from exc
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"Cannot parse configuration file {path}: {exc}") from exc
 
-    if not data:
+    if data is None:
         return AppConfig()
+    if not isinstance(data, dict):
+        raise ConfigError(f"Configuration file {path} must contain a mapping, got {type(data).__name__}")
 
-    return AppConfig.model_validate(data)
+    try:
+        return AppConfig.model_validate(data)
+    except ValidationError as exc:
+        raise ConfigError(_format_validation_errors(path, exc)) from exc
+
+
+def _format_validation_errors(path: pathlib.Path, exc: ValidationError) -> str:
+    """
+    Format every validation error as one line with its key path.
+
+    Args:
+        path: The configuration file that failed validation.
+        exc: The pydantic validation error.
+
+    Returns:
+        Multi-line message, one `key.path: reason` line per error.
+    """
+    lines = [f"Invalid configuration in {path} ({exc.error_count()} error(s)):"]
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error["loc"]) or "(root)"
+        lines.append(f"  {location}: {error['msg']}")
+    return "\n".join(lines)
 
 
 def _resolve_config_path(explicit_path: Optional[str] = None) -> Optional[pathlib.Path]:
@@ -526,22 +559,23 @@ def _resolve_config_path(explicit_path: Optional[str] = None) -> Optional[pathli
         explicit_path: Explicitly provided path (highest priority).
 
     Returns:
-        Path to the config file, or None if not found.
+        Path to the config file, or None if no file exists at the default paths.
+
+    Raises:
+        ConfigError: If the explicit path or the CHRONOWARDEN_CONFIG path does not exist.
     """
     if explicit_path:
         path = pathlib.Path(explicit_path)
         if path.is_file():
             return path
-        logger.warning("Explicit config path does not exist: %s", explicit_path)
-        return None
+        raise ConfigError(f"Configuration file does not exist: {explicit_path}")
 
     env_path = os.environ.get(_ENV_CONFIG_PATH)
     if env_path:
         path = pathlib.Path(env_path)
         if path.is_file():
             return path
-        logger.warning("Config path from %s does not exist: %s", _ENV_CONFIG_PATH, env_path)
-        return None
+        raise ConfigError(f"Configuration file from {_ENV_CONFIG_PATH} does not exist: {env_path}")
 
     for candidate in _DEFAULT_CONFIG_PATHS:
         if candidate.is_file():
