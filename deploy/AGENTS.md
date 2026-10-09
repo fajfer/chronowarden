@@ -51,8 +51,8 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 - Production crashed when the distroless Python differed from the builder's (`pydantic_core` import error, PR #17).
   `PYTHON_VERSION`, the distroless tag and the hard-coded `python3.13/site-packages` path must change together.
 - `docker.yaml` has no smoke test that starts the built image (proposed in PR #17, not merged).
-- Planned: headless image without the frontend, e.g. for a CronJob (#48); `dev-setup.py` rework with podman,
-  testcontainers and auto-cleanup (#31).
+- Planned: headless image without the frontend, e.g. for a CronJob (#48); `dev-setup.py` rework with podman and
+  testcontainers (#78). Cleanup exists: `dev-setup.py --cleanup` (#31).
 - `deployment.yaml` uses the image `ghcr.io/fajfer/chronowarden:main-dev` (the dev target).
 
 ## Related ADRs
