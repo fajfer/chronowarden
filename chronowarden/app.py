@@ -7,10 +7,10 @@ import os
 from contextlib import asynccontextmanager
 from importlib.metadata import metadata, version
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
 import sentry_sdk
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
@@ -142,24 +142,61 @@ def _resolve_frontend_dir() -> Path:
     return Path("/app/frontend/build")
 
 
+_API_PREFIX = "api"
+
+
+def _frontend_file(frontend_dir: Path, full_path: str) -> Optional[Path]:
+    """
+    Return the requested file if it exists inside the frontend build directory.
+
+    The path is resolved first, so `..` segments (also URL-encoded ones) can't escape the directory.
+
+    Args:
+        frontend_dir: The frontend build directory.
+        full_path: The request path without the leading slash.
+
+    Returns:
+        The file to serve, or None if it doesn't exist or lies outside frontend_dir.
+    """
+    root = frontend_dir.resolve()
+    candidate = (root / full_path).resolve()
+    if candidate.is_relative_to(root) and candidate.is_file():
+        return candidate
+    return None
+
+
+def register_frontend(target: FastAPI, frontend_dir: Path) -> None:
+    """
+    Serve the SvelteKit SPA from frontend_dir, falling back to index.html for client-side routes.
+
+    Must be called after all API routers are included: the catch-all route matches every other path.
+    Unknown `/api/...` paths get a 404 instead of the SPA page.
+
+    Args:
+        target: The application to register the routes on.
+        frontend_dir: The frontend build directory (output of `npm run build`).
+    """
+
+    @target.get("/", include_in_schema=False)
+    async def serve_index() -> FileResponse:
+        """Serve the index.html file for the root path."""
+        return FileResponse(frontend_dir / "index.html")
+
+    @target.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str) -> FileResponse:
+        """Serve a file from the build directory, or index.html for client-side routes."""
+        if full_path == _API_PREFIX or full_path.startswith(f"{_API_PREFIX}/"):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+        file_path = _frontend_file(frontend_dir, full_path)
+        return FileResponse(file_path if file_path is not None else frontend_dir / "index.html")
+
+    target.mount("/_app", StaticFiles(directory=frontend_dir / "_app"), name="frontend-assets")
+
+
 _FRONTEND_DIR = _resolve_frontend_dir()
 
 if _FRONTEND_DIR.is_dir():
-
-    @app.get("/", include_in_schema=False)
-    async def serve_index() -> FileResponse:
-        """Serve the index.html file for the root path."""
-        return FileResponse(_FRONTEND_DIR / "index.html")
-
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_spa(full_path: str) -> FileResponse:
-        """Serve SvelteKit SPA with fallback to index.html for client-side routing."""
-        file_path = _FRONTEND_DIR / full_path
-        if file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(_FRONTEND_DIR / "index.html")
-
-    app.mount("/_app", StaticFiles(directory=_FRONTEND_DIR / "_app"), name="frontend-assets")
+    register_frontend(app, _FRONTEND_DIR)
     logger.info("Frontend served from %s", _FRONTEND_DIR)
 else:
     logger.warning("Frontend build not found at %s — UI will not be served", _FRONTEND_DIR)
