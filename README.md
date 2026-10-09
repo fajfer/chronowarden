@@ -140,10 +140,9 @@ This script:
 - Extracts root tokens from logs
 - Creates `config.yaml` with all dev vaults configured
 
-**Cleanup:**
+**Cleanup** (stops and removes both dev containers):
 ```bash
-docker stop vault-dev openbao-dev
-docker rm vault-dev openbao-dev
+uv run python dev-setup.py --cleanup
 ```
 
 ## Vault Permissions
