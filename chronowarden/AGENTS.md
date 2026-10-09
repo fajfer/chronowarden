@@ -22,15 +22,17 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 ## Contracts
 
 - Config lookup order: explicit path → `CHRONOWARDEN_CONFIG` → `/etc/chronowarden/config.yaml` → `./config.yaml`.
-  A missing or unreadable file yields a default `AppConfig()`; startup does not fail.
+  No file at the default paths (or an empty file) yields `AppConfig()`. Anything else that's wrong raises
+  `ConfigError` and startup fails (#12): a missing explicit/env path, unreadable or unparsable YAML, a non-mapping
+  top level, or validation errors (listed one per line as `key.path: reason`).
 - Severity cascade (`AppConfig.resolve_severity`): secret → engine (`vaults[].engines[]`) → vault → `"default"`.
   `resolve_severity_source` names the level that matched. There is one config form per key: no legacy aliases
   (root **Never**, #30).
 - `"none"` is reserved (`RESERVED_SEVERITY_VALUES`): monitored, never rotated; `calculate_ttl` returns `None`.
 - `DEFAULT_EXPIRY_PROFILES` (`default` 365d, `critical` 6m, `pci-dss-4.0` 90d) are always merged with
   user-defined ones (`merge_default_expiry_profiles`). Durations are `<int>[d|m|y]`.
-- Unknown severities in config only log a warning; they don't raise. The value is kept, and `get_rotation_days`
-  falls back to the `default` profile for it.
+- All config models use `extra="forbid"` (`_STRICT`): unknown keys are errors. Severities must match an expiry
+  profile or `none`, otherwise validation fails.
 - Credential resolution order: `*_file` > `*_env` > literal (tokens and AppRole IDs).
 - Config is the source of truth: sync writes the resolved `chronowarden_severity`/`chronowarden_ttl` back to the
   backend when they differ ([ADR-006](../.ai/adr/ADR-006-config-source-of-truth.md)).
@@ -51,8 +53,8 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 - `polling_interval` is parsed but nothing reads it: there is no background sync scheduler. Sync only runs via the
   API. Planned: in-process loop plus headless mode
   ([ADR-013](../.ai/adr/ADR-013-in-process-and-headless-sync.md), #48).
-- Config errors surface poorly (#12): unreadable or invalid YAML is logged and replaced by a default config;
-  schema errors abort startup.
+- Model-level checks (unknown severities, duplicate vault names) only run once every key is valid, so a config
+  with both kinds of mistakes reports them in two rounds.
 - Logs: successful health checks flood the log and lines lack timestamps (#58).
 - `enabled` / `chronowarden_enabled` are leftovers: `severity: none` replaced them (PR #11). Sync always caches
   `enabled=True`, and `is_secret_enabled` is unused. Don't build on them
