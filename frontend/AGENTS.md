@@ -29,16 +29,17 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
 - API base: `VITE_API_BASE_URL`, default `/api/v1`. All calls go through `client.ts`.
 - Types in `src/lib/types/` mirror backend models; the rule is in [models](../chronowarden/models/AGENTS.md).
   `SecretStatus` = `'expired' | 'warning' | 'ok' | 'no_ttl'`.
-- Theme: `PUBLIC_CHRONOWARDEN_THEME` sets the default (`default` or `bison`); the user's choice is stored in
-  `localStorage` (`chronowarden_theme`). Theme CSS overrides live in `src/app.css` under `[data-theme="bison"]`.
+- Theme: a theme the user picked in Settings (`setTheme`, stored in `localStorage` as `chronowarden_theme`) wins;
+  otherwise `initTheme` uses `default_theme` from `GET /api/v1/info` (backend `ui.default_theme`, then
+  `CHRONOWARDEN_THEME`, #57). Only `setTheme` writes to `localStorage`. Theme CSS overrides live in `src/app.css` under `[data-theme="bison"]`.
 - `localStorage` access is wrapped in try/catch and failures are ignored (`014f9e2`).
 
 ## How to
 
 - **Call a new endpoint**: add a typed function in the matching `src/lib/api/*.ts` (doc comment with method and
   path), add or extend the type in `src/lib/types/`.
-- **Add a theme**: add an entry to `THEME_DEFINITIONS` in `stores/theme.ts`, assets to `static/`, and
-  `[data-theme="<id>"]` overrides to `app.css`.
+- **Add a theme**: add an entry to `THEME_DEFINITIONS` in `stores/theme.ts` and its ID to `THEME_IDS` in
+  `chronowarden/config.py`, assets to `static/`, and `[data-theme="<id>"]` overrides to `app.css`.
 - **Add a page**: `src/routes/<name>/+page.svelte`, plus a `{ href, label }` entry in the link groups in
   `components/Sidebar.svelte`.
 
@@ -51,7 +52,7 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
 - Svelte 5 runes (`$derived`, `$state`) are used in pages; stores use `svelte/store`.
 - `npm run check` currently reports 0 errors and 6 warnings; don't add new ones.
 - Don't edit `build/` or `.svelte-kit/`; they are generated.
-- Open UI items: vault URLs on `/vaults` (#19); default theme from instance config (#57); PR #60 TODOs:
+- Open UI items: PR #60 TODOs:
   ExpiryHorizon stacks secrets over 90 days (hide them past 100), remove the navbar theme switcher, larger mascot,
   clickable severities; hat insignia vs hamburger icon (#47).
 
