@@ -213,6 +213,15 @@ class VaultIntegration(BaseIntegration):
             self._set_last_error("vault", str(exc) or "Error checking Vault connection")
             logger.exception("Error checking Vault connection")
             return False
+        except RequestsConnectionError:
+            message = f"Vault at {self._address} appears to be offline"
+            self._set_last_error("offline", message)
+            logger.warning(message)
+            return False
+        except RequestException:
+            self._set_last_error("unexpected", f"Unexpected error checking Vault connection at {self._address}")
+            logger.exception("Unexpected error checking Vault connection at %s", self._address)
+            return False
 
     def get_secret(
         self, path: str, key: Optional[str] = None, mount_point: Optional[str] = None

@@ -10,6 +10,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from hvac.exceptions import Forbidden, InvalidRequest, VaultError
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import ReadTimeout
 from requests.models import Response
 
 from chronowarden.integrations.vault import VaultIntegration
@@ -245,3 +247,21 @@ class TestIsConnectedDiagnostics:
 
         assert connected is False
         assert integration.last_error_kind == "offline"
+
+    def test_unreachable_vault_is_reported_offline(self) -> None:
+        """A network failure during the check returns False with an 'offline' error instead of raising."""
+        integration = VaultIntegration(address="http://example.com:8200")
+        integration._client = MagicMock()
+        integration._client.is_authenticated.side_effect = RequestsConnectionError("connection refused")
+
+        assert integration.is_connected() is False
+        assert integration.last_error_kind == "offline"
+
+    def test_other_request_errors_are_reported_unexpected(self) -> None:
+        """Other HTTP-level failures return False with an 'unexpected' error instead of raising."""
+        integration = VaultIntegration(address="http://example.com:8200")
+        integration._client = MagicMock()
+        integration._client.is_authenticated.side_effect = ReadTimeout("timed out")
+
+        assert integration.is_connected() is False
+        assert integration.last_error_kind == "unexpected"
