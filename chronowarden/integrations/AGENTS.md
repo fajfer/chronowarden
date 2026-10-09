@@ -26,8 +26,8 @@ OpenBao (KV v2) via `hvac`.
 - `last_error_kind` is one of `auth` (not retried), `offline` / `vault` / `unexpected` (retried by the loop).
 - `VaultManager` API used elsewhere: `get(name)`, `vault_names`, `connect_all(config)`, `disconnect_all()`,
   `health()`, `start_reconnect_loop()`.
-- Metadata keys written to the backend: `chronowarden_severity`, `chronowarden_ttl`; `chronowarden_enabled` (a leftover
-  being removed, see [core](../AGENTS.md)) is written by `PATCH /secrets/{id}`.
+- Metadata keys written to the backend: `chronowarden_severity`, `chronowarden_ttl`, only by sync.
+  `chronowarden_enabled` is no longer used (#73).
 - Tokens (static or AppRole-issued) are kept in memory only; never persist them (#10).
 - Required Vault policy: README "Vault Permissions" (`+/metadata/*` list/read/update, `+/metadata` list,
   `sys/mounts` read). A new call must fit this policy (root **Ask First**).

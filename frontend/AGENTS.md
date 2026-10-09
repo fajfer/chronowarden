@@ -47,8 +47,6 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
 - The secrets table filters **client-side** in `routes/secrets/+page.svelte` (`filteredSecrets`) over the full
   `secrets` store. `loadSecrets()` calls `fetchSecrets()` with no params, so the backend query filters are unused
   here. A filter bug is usually in that `$derived.by` block or in `stores/filters.ts`.
-- `FilterState.enabled` and `setEnabled` exist, but the secrets page doesn't apply the filter. `enabled` is being
-  removed ([spec](../.ai/specs/2026-10-09-remove-enabled-flag.md)).
 - `stores/auth.ts` is a placeholder: there is no auth backend, and it defaults to authenticated.
 - Svelte 5 runes (`$derived`, `$state`) are used in pages; stores use `svelte/store`.
 - `npm run check` currently reports 0 errors and 6 warnings; don't add new ones.

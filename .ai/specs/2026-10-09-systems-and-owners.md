@@ -56,8 +56,8 @@ Implements ADR-010. Relies on ADR-005 (SQLite; first schema change on an existin
 
 ## Open questions
 
-- Endpoint shape: `PUT /secrets/{id}/system` and `PUT /secrets/{id}/owners`, or a narrow `PATCH /secrets/{id}` that
-  only accepts `system_id`/`owner_ids` (#73 removes severity and enabled from it)?
+- Endpoint shape: dedicated endpoints (decided 2026-10-09, `PATCH /secrets/{id}` was removed in #73); exact paths
+  such as `PUT /secrets/{id}/system` and `PUT /secrets/{id}/owners` to be settled.
 - Deleting a system or owner that is still assigned: unassign automatically (`ON DELETE SET NULL` needs
   `PRAGMA foreign_keys`, which is off today) or refuse with 409?
 - Should assignment changes already go to the audit log (ADR-014), or does the audit log come after this spec in the

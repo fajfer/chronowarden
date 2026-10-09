@@ -57,11 +57,8 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 - Model-level checks (unknown severities, duplicate vault names) only run once every key is valid, so a config
   with both kinds of mistakes reports them in two rounds.
 - Logs: successful health checks flood the log and lines lack timestamps (#58).
-- `enabled` / `chronowarden_enabled` are leftovers: `severity: none` replaced them (PR #11). Sync always caches
-  `enabled=True`, and `is_secret_enabled` is unused. Don't build on them
-  ([removal spec](../.ai/specs/2026-10-09-remove-enabled-flag.md)).
-- Sync recomputes severity from config, so a severity set through `PATCH /secrets/{id}` is overwritten on the next
-  sync unless config agrees. PR #11 decided secret-level overrides are config-only.
+- Severity is config-only: `severity: none` replaced `chronowarden_enabled`, and there is no API to change it
+  (PR #11 Q4/Q6, #73).
 - Dates: ISO 8601 or `YYYY-MM-DD`/`YYYY-DD-MM`. `date_format` is a hint; with `YYYY-MM-DD`, an invalid month falls
   back to swapped parts.
 - The DB path is `chronowarden.db` relative to the working directory (set in `lifespan`).

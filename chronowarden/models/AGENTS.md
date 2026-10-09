@@ -30,7 +30,8 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 - `Database` uses one shared connection (`check_same_thread=False`) in WAL mode. Every method takes
   `self._conn_lock` (an `RLock`) and calls `_require_connection()`, which logs and returns `None` when the DB is
   not connected. Callers get `None`/empty results instead of an exception.
-- `upsert_secret_metadata` overwrites `updated_time, ttl, severity, enabled, last_synced` on conflict.
+- `upsert_secret_metadata` overwrites `updated_time, ttl, severity, last_synced` on conflict. Pre-0.6 DB files
+  still have an unused `enabled` column (default 1); the 0.6 release notes ask users to delete `chronowarden.db`.
 
 ## How to
 
