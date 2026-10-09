@@ -25,7 +25,9 @@ OpenBao (KV v2) via `hvac`.
   (KV v2 only), `check_health`, `last_error`, `last_error_kind`. `mount_point=` overrides the engine per call.
 - `last_error_kind` is one of `auth` (not retried), `offline` / `vault` / `unexpected` (retried by the loop).
 - `VaultManager` API used elsewhere: `get(name)`, `vault_names`, `connect_all(config)`, `disconnect_all()`,
-  `health()`, `start_reconnect_loop()`.
+  `health()`, `start_reconnect_loop()`, `reconnect(name)` (one blocking attempt), `sync_lock(name)` (one
+  `asyncio.Lock` per vault; every sync holds it) and `set_reconnect_callback(cb)` (`app.py` registers a sync that
+  runs after the background loop reconnects a vault, #59).
 - Metadata keys written to the backend: `chronowarden_severity`, `chronowarden_ttl`, only by sync.
   `chronowarden_enabled` is no longer used (#73).
 - Tokens (static or AppRole-issued) are kept in memory only; never persist them (#10).
@@ -54,6 +56,9 @@ OpenBao (KV v2) via `hvac`.
   recurses).
 - Auth failures stop retries for that vault; offline vaults are retried every `vault_reconnect_interval` s for at
   most `vault_reconnect_max_attempts` cycles. `connect()` closes a previous client before re-authenticating.
+- `connect()`, `is_connected()` and the reconnect loop's passes block on network I/O: call them through
+  `asyncio.to_thread` from async code. `is_connected()` maps network errors to `offline`/`unexpected` instead of
+  raising.
 - `check_health` returns `initialized`/`sealed`, but the UI only shows healthy/offline (#44 follow-up).
 - OpenBao compatibility is a goal (README); test against both if you touch auth or KV calls (`dev-setup.py`).
 

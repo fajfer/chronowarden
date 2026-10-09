@@ -51,8 +51,9 @@ REST API used by the frontend and by operators. Every router is mounted under `/
   `sync` → `(manager, config, db)`.
 - `POST /owners/{id}/test-route/{route_id}` only logs; no notification is sent. Alerts go through
   Alertmanager ([ADR-012](../../.ai/adr/ADR-012-alertmanager-native-alerting.md)), so routes are redundant.
-- Sync on a disconnected vault returns 503 while the reconnect loop runs, and nothing resyncs after the reconnect.
-  The wanted behaviour is to try to reconnect first, then report clearly (#59).
+- `POST /sync/vault/{name}` reconnects a disconnected vault first, then syncs via `sync_vault_now` (per-vault
+  lock, blocking calls in a worker thread). On failure: 503 with a dict `detail` (`message`, `reason`, `error`,
+  `retry_scheduled`); the frontend `stores/sync.ts` parses it (#59).
 - A freshly rotated secret isn't necessarily applied in its environment; rotation confirmation plus an audit log
   is planned (#24, #18).
 - `vault.py` increments `VAULT_OPERATIONS_TOTAL{operation,status}`. Reuse the existing label values (see
