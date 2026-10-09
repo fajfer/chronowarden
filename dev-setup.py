@@ -13,6 +13,7 @@ This script ensures that development Vault instances are running and
 creates a config.yaml with extracted tokens for local development.
 """
 
+import argparse
 import logging
 import random
 import re
@@ -77,6 +78,27 @@ def is_container_running(name: str) -> bool:
         ["docker", "ps", "--filter", f"name={name}", "--format", "{{.Names}}"], capture_output=True
     )
     return success and name in (result or "")
+
+
+def container_exists(name: str) -> bool:
+    """Check if a Docker container with exactly this name exists (running or stopped)."""
+    result, success = run_command(
+        ["docker", "ps", "-a", "--filter", f"name=^{name}$", "--format", "{{.Names}}"], capture_output=True
+    )
+    return success and name in (result or "").split()
+
+
+def cleanup_containers() -> bool:
+    """Stop and remove all development containers; return True if every removal succeeded."""
+    all_removed = True
+    for name in CONTAINERS:
+        if not container_exists(name):
+            logger.info(f"{name} does not exist, nothing to remove")
+            continue
+        logger.info(f"Removing {name}...")
+        if not run_command(["docker", "rm", "--force", name], capture_output=True)[1]:
+            all_removed = False
+    return all_removed
 
 
 def start_container(config: dict) -> bool:
@@ -405,5 +427,18 @@ def main():
     logger.info("=" * 70 + "\n")
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Set up or tear down the Chronowarden development vaults.")
+    parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help=f"stop and remove the dev containers ({', '.join(CONTAINERS)}) and exit",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    if parse_args().cleanup:
+        sys.exit(0 if cleanup_containers() else 1)
     main()
