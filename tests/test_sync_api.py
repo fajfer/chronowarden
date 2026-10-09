@@ -5,8 +5,7 @@
 """Tests for sync API reconnect loop behavior."""
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -58,10 +57,13 @@ class TestSyncApiReconnectLoop:
             )
         ]
 
-        with patch(
-            "chronowarden.api.sync._get_app_dependencies",
-            return_value=(manager, MagicMock(), MagicMock()),
-        ), patch("chronowarden.metadata.detect_changes", return_value=synced):
+        with (
+            patch(
+                "chronowarden.api.sync._get_app_dependencies",
+                return_value=(manager, MagicMock(), MagicMock()),
+            ),
+            patch("chronowarden.metadata.detect_changes", return_value=synced),
+        ):
             response = client.post("/api/v1/sync/vault/dev-vault")
 
         assert response.status_code == 200
