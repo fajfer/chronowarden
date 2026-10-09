@@ -28,7 +28,8 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 - Status mapping used across routers: unknown vault/secret/owner → 404; vault not connected or backend write failed
   → 503; invalid severity → 422, with `detail` listing the allowed values.
 - `severity` input (query or body) must be a configured expiry profile or `"none"` (`_validate_severity_input`).
-- `PATCH /secrets/{id}` writes to the backend first, then the cache. If the backend write fails, the cache is not
+- `PATCH /secrets/{id}` (to be removed: [spec](../../.ai/specs/2026-10-09-remove-enabled-flag.md)) writes to the
+  backend first, then the cache. If the backend write fails, the cache is not
   touched.
 - `POST /sync/vault/{name}` also (re)starts the manager's reconnect loop.
 

@@ -7,7 +7,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 - **Status:** draft
 - **Date:** 2026-10-09
-- **Issue:** none
+- **Issue:** #71
 
 ## Goal
 

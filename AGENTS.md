@@ -81,6 +81,8 @@ User docs in `docs/` (mkdocs) are written by a human; agents don't edit them unl
   values substituted by the agent's own.
 - Python style: black, line length 120 (ruff uses the same); PEP 8 naming (snake_case functions/variables,
   PascalCase classes, UPPER_SNAKE_CASE constants); f-strings for formatting.
+- Divide code into files: keep class/model definitions separate from their implementation (e.g. `models/` vs
+  `api/`, `integrations/`), and don't put everything in one file (#2).
 - Line too long: break strings with parentheses, use multi-line calls, split imports.
 - Types: explicit `None` checks for `Optional`, narrow string types; type-checker version warnings can be ignored
   if checks pass.

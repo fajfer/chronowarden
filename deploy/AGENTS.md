@@ -21,7 +21,8 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   (namespace `chronowarden`; ingress and config Secret are left to the user).
 - `../config.example.yaml`: the full config reference ([core](../chronowarden/AGENTS.md)).
 - `../.github/workflows/`: `docker.yaml` (builds both targets for amd64 and arm64; pushes to `ghcr.io` except on PRs),
-  `scorecard.yml`, `zizmor.yaml`, `agents-docs.yaml`.
+  `ci.yaml` (black, ruff, pytest, `npm run check`), `scorecard.yml`, `zizmor.yaml`,
+  `agents-docs.yaml`.
 
 ## Contracts
 
@@ -49,7 +50,7 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   (README); in Kubernetes, the PVC is the working directory.
 - Production crashed when the distroless Python differed from the builder's (`pydantic_core` import error, PR #17).
   `PYTHON_VERSION`, the distroless tag and the hard-coded `python3.13/site-packages` path must change together.
-- No workflow runs tests or linters (PR #9's `ci.yml` was never merged), and `docker.yaml` has no smoke test.
+- `docker.yaml` has no smoke test that starts the built image (proposed in PR #17, not merged).
 - Planned: headless image without the frontend, e.g. for a CronJob (#48); `dev-setup.py` rework with podman,
   testcontainers and auto-cleanup (#31).
 - `deployment.yaml` uses the image `ghcr.io/fajfer/chronowarden:main-dev` (the dev target).

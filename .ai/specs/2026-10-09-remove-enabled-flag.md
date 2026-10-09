@@ -3,16 +3,17 @@ SPDX-FileCopyrightText: 2026 Damian Fajfer <damian@fajfer.org>
 
 SPDX-License-Identifier: EUPL-1.2
 -->
-# Remove the `enabled` leftover
+# Remove the `enabled` leftover and API severity overrides
 
 - **Status:** draft
 - **Date:** 2026-10-09
-- **Issue:** none (decision: PR #11 Q6, reconfirmed 2026-10-09)
+- **Issue:** #73 (decision: PR #11 Q4 + Q6, reconfirmed 2026-10-09)
 
 ## Goal
 
-`severity: none` is the only way to stop alerting on a secret, as decided in PR #11. The `enabled` field and the
-`chronowarden_enabled` metadata key disappear from the API, DB, sync, UI and README.
+Config is the only place to set severity, as decided in PR #11 (Q4: secret overrides in config only; Q6:
+`severity: none` replaces `chronowarden_enabled`). The `enabled` field, the `chronowarden_enabled` key and
+severity editing through `PATCH /secrets/{id}` disappear from the API, DB, sync, UI and README.
 
 ## Non-goals
 
@@ -41,7 +42,8 @@ None (implements ADR-006).
 | 1 | Remove `enabled` from `SecretMetadataResponse`, `SecretMetadataUpdate`, the `GET /secrets` query and the `PATCH` write of `chronowarden_enabled`; remove it from the sync response | [api](../../chronowarden/api/AGENTS.md), [models](../../chronowarden/models/AGENTS.md) | `tests/test_secrets.py` and `tests/test_sync_api.py` updated and green; `enabled` param gives 422 or is ignored (decide) | todo | |
 | 2 | Drop the `enabled` column and `SecretMetadataCache.enabled`; delete `is_secret_enabled` | [models](../../chronowarden/models/AGENTS.md), core | `tests/test_database.py`, `tests/test_metadata.py` green; plan for existing DB files written down (see models Gotchas: no migrations) | todo | |
 | 3 | Frontend: remove `enabled` from types, `fetchSecrets`, `FilterState`/`setEnabled`, and any enable/disable UI | [frontend](../../frontend/AGENTS.md) | `npm run check` has no new warnings | todo | |
-| 4 | README: drop `chronowarden_enabled`, the `enabled` query param and `enabled` in PATCH; document `severity: none` | core | README matches the API | todo | |
+| 4 | Remove severity from `PATCH /secrets/{id}`; with `enabled` also gone the endpoint has nothing left, so remove it and the unused client functions (`updateSecretMetadata`, `editSecretMetadata`; no component calls them) | [api](../../chronowarden/api/AGENTS.md), [frontend](../../frontend/AGENTS.md) | `PATCH` returns 405; tests updated; `npm run check` clean | todo | |
+| 5 | README: drop `chronowarden_enabled`, the `enabled` query param and `PATCH`; document `severity: none` and config-only overrides | core | README matches the API | todo | |
 
 ## Validation
 
