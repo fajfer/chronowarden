@@ -48,11 +48,15 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 ## Gotchas
 
 - `polling_interval` is parsed but nothing reads it: there is no background sync scheduler. Sync only runs via the
-  API.
-- `sync_secret_metadata` always writes `enabled=True` to the cache and never reads `chronowarden_enabled`
-  (`is_secret_enabled` is unused). See [the spec](../.ai/specs/2026-10-09-honor-enabled-flag-in-sync.md).
+  API (scheduled/headless runs: #48).
+- Config errors surface poorly (#12): unreadable or invalid YAML is logged and replaced by a default config;
+  schema errors abort startup.
+- Logs: successful health checks flood the log and lines lack timestamps (#58).
+- `enabled` / `chronowarden_enabled` are leftovers: `severity: none` replaced them (PR #11). Sync always caches
+  `enabled=True`, and `is_secret_enabled` is unused. Don't build on them
+  ([removal spec](../.ai/specs/2026-10-09-remove-enabled-flag.md)).
 - Sync recomputes severity from config, so a severity set through `PATCH /secrets/{id}` is overwritten on the next
-  sync unless config agrees.
+  sync unless config agrees. PR #11 decided secret-level overrides are config-only.
 - Dates: ISO 8601 or `YYYY-MM-DD`/`YYYY-DD-MM`. `date_format` is a hint; with `YYYY-MM-DD`, an invalid month falls
   back to swapped parts.
 - The DB path is `chronowarden.db` relative to the working directory (set in `lifespan`).

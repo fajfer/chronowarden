@@ -54,7 +54,8 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 
 ## Related ADRs
 
-[ADR-005](../../.ai/adr/ADR-005-sqlite-metadata-cache.md)
+[ADR-005](../../.ai/adr/ADR-005-sqlite-metadata-cache.md),
+[ADR-010](../../.ai/adr/ADR-010-owners-systems-and-permissions.md) (owners, systems, #61)
 
 ## Validate
 

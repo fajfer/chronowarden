@@ -7,7 +7,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 - **Status:** Accepted (retroactive)
 - **Date:** 2026-02-07
-- **Evidence:** `53c4a90` (SvelteKit), `fe68be8` (adapter-static + Dockerfile), `2e1d3b7` (`/api/v1` + SPA catch-all), `1268ede`.
+- **Evidence:** `53c4a90` (SvelteKit), `fe68be8` (adapter-static + Dockerfile), `2e1d3b7` (`/api/v1` + SPA catch-all), `1268ede` (PR #56).
 
 ## Context
 

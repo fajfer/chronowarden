@@ -7,7 +7,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 - **Status:** Accepted (retroactive)
 - **Date:** 2026-02-09
-- **Evidence:** `fe68be8` (Dockerfile), `84ea691` (CI to GHCR), `287cbfa` (Kubernetes manifests).
+- **Evidence:** `fe68be8` (Dockerfile), `84ea691` (CI to GHCR), `287cbfa` (Kubernetes manifests); PR #17 proposed `python:3.12-slim` after a Python-version crash, but distroless was kept (`a82af9b`).
 
 ## Context
 

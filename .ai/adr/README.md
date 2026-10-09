@@ -28,3 +28,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-007](ADR-007-sveltekit-spa-served-by-fastapi.md) | SvelteKit SPA served by FastAPI, API under /api/v1 | Accepted (retroactive) | 2026-02-07 |
 | [ADR-008](ADR-008-container-and-deployment-targets.md) | Distroless image; Compose and bare Kubernetes manifests | Accepted (retroactive) | 2026-02-09 |
 | [ADR-009](ADR-009-offline-tolerant-reconnect.md) | Start with offline vaults and reconnect in the background | Accepted (retroactive) | 2026-03-18 |
+| [ADR-010](ADR-010-owners-systems-and-permissions.md) | Owners as alert-routing targets, systems as CMDB-linked entities, no RBAC yet | Proposed | 2026-07-28 |

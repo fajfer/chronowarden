@@ -47,6 +47,11 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 
 - The DB file is written to the process working directory. In Docker, mount it as `/app/chronowarden.db`
   (README); in Kubernetes, the PVC is the working directory.
+- Production crashed when the distroless Python differed from the builder's (`pydantic_core` import error, PR #17).
+  `PYTHON_VERSION`, the distroless tag and the hard-coded `python3.13/site-packages` path must change together.
+- No workflow runs tests or linters (PR #9's `ci.yml` was never merged), and `docker.yaml` has no smoke test.
+- Planned: headless image without the frontend, e.g. for a CronJob (#48); `dev-setup.py` rework with podman,
+  testcontainers and auto-cleanup (#31).
 - `deployment.yaml` uses the image `ghcr.io/fajfer/chronowarden:main-dev` (the dev target).
 
 ## Related ADRs

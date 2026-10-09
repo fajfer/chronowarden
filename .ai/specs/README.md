@@ -11,6 +11,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 ## Rules
 
 - File name: `YYYY-MM-DD-slug.md`, copied from [TEMPLATE.md](TEMPLATE.md).
+- GitHub issues are the backlog. Write a spec when work starts, and put the issue number in its `Issue` field.
 - **Load** lists exact paths (scoped `AGENTS.md`, ADRs, specific source files). Nothing outside the list is
   needed; if it is, fix the list.
 - Each task row has its own Load (a subset of, or addition to, the spec's Load), a checkable "Done when", a
@@ -23,6 +24,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 | Spec | Goal |
 |---|---|
 | [2026-10-09-per-profile-alert-threshold](2026-10-09-per-profile-alert-threshold.md) | WARNING window per expiry profile instead of fixed 30 days |
-| [2026-10-09-honor-enabled-flag-in-sync](2026-10-09-honor-enabled-flag-in-sync.md) | Sync respects `chronowarden_enabled` instead of resetting it |
+| [2026-10-09-remove-enabled-flag](2026-10-09-remove-enabled-flag.md) | Remove the `enabled` leftover; `severity: none` is the only way to stop alerting |
+| [2026-10-09-remove-deprecation-shims](2026-10-09-remove-deprecation-shims.md) | Drop pre-1.0 deprecation warnings and legacy config paths (#30) |
 | [2026-10-09-wire-prometheus-metrics](2026-10-09-wire-prometheus-metrics.md) | Defined-but-unset metrics get producers |
 | [2026-10-09-generic-provider-registry](2026-10-09-generic-provider-registry.md) | A second provider can plug in without editing Vault-specific code |

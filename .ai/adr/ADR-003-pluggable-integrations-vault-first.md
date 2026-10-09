@@ -7,7 +7,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 - **Status:** Accepted (retroactive)
 - **Date:** 2026-02-07
-- **Evidence:** `28a5a44` (hvac), `ff683ba` (`integrations/base.py`, `vault.py`), README Features/Roadmap.
+- **Evidence:** `28a5a44` (hvac), `ff683ba` (`integrations/base.py`, `vault.py`), README Features/Roadmap; PR #26 gap analysis ("no provider abstraction").
 
 ## Context
 

@@ -36,6 +36,8 @@ the **Task Router** points to. Module detail lives next to the code; decisions l
 - Add a `Co-authored-by:` trailer for an AI assistant (AI assistants are not GitHub users; the convention is
   reserved for human collaborators). Use `Assisted-by:` instead.
 - Use `logger.error()` inside an `except` block, or put the exception into a `logger.exception()` message.
+- Add deprecation warnings or backward-compatibility shims before 1.0: change the code and its config directly
+  (#16, #30).
 - Catch bare `Exception`, except in top-level handlers that must not crash and in cleanup blocks (log at debug).
 
 ## Validation Commands

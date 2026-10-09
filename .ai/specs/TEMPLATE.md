@@ -7,6 +7,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 - **Status:** draft | approved | in progress | implemented
 - **Date:** YYYY-MM-DD
+- **Issue:** #NN or none
 
 ## Goal
 

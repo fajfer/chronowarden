@@ -21,4 +21,9 @@ If a lesson becomes a lasting rule, move it into the narrowest `AGENTS.md` it ap
 
 ## Entries
 
-_None yet._
+### 2026-02-07: gitignore
+
+- **Mistake:** a `lib/` pattern in the root `.gitignore` silently excluded `frontend/src/lib/`, so the files an agent
+  wrote were never committed (PR #5).
+- **Rule:** anchor root-only ignore patterns (`/lib/`), and after adding files check `git status` to confirm they
+  are tracked.

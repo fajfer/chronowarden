@@ -7,7 +7,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 - **Status:** Accepted (retroactive)
 - **Date:** 2026-02-07
-- **Evidence:** `b9baae7` (database.py added), `4add654` (API moved to the DB cache), `2725865` (connection lock).
+- **Evidence:** `b9baae7` (database.py added), `4add654` (API moved to the DB cache), `2725865` (connection lock); PRs #8, #54.
 
 ## Context
 

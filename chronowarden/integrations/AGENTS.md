@@ -26,8 +26,9 @@ OpenBao (KV v2) via `hvac`.
 - `last_error_kind` is one of `auth` (not retried), `offline` / `vault` / `unexpected` (retried by the loop).
 - `VaultManager` API used elsewhere: `get(name)`, `vault_names`, `connect_all(config)`, `disconnect_all()`,
   `health()`, `start_reconnect_loop()`.
-- Metadata keys written to the backend: `chronowarden_severity`, `chronowarden_ttl`; `chronowarden_enabled` is
-  written by `PATCH /secrets/{id}`.
+- Metadata keys written to the backend: `chronowarden_severity`, `chronowarden_ttl`; `chronowarden_enabled` (a leftover
+  being removed, see [core](../AGENTS.md)) is written by `PATCH /secrets/{id}`.
+- Tokens (static or AppRole-issued) are kept in memory only; never persist them (#10).
 - Required Vault policy: README "Vault Permissions" (`+/metadata/*` list/read/update, `+/metadata` list,
   `sys/mounts` read). A new call must fit this policy (root **Ask First**).
 
@@ -53,7 +54,7 @@ OpenBao (KV v2) via `hvac`.
   recurses).
 - Auth failures stop retries for that vault; offline vaults are retried every `vault_reconnect_interval` s for at
   most `vault_reconnect_max_attempts` cycles. `connect()` closes a previous client before re-authenticating.
-- Use the `uvicorn.error` logger like the rest of the package.
+- `check_health` returns `initialized`/`sealed`, but the UI only shows healthy/offline (#44 follow-up).
 - OpenBao compatibility is a goal (README); test against both if you touch auth or KV calls (`dev-setup.py`).
 
 ## Related ADRs

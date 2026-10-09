@@ -7,7 +7,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 - **Status:** Accepted (retroactive)
 - **Date:** 2026-03-18
-- **Evidence:** `6fa3f3f`, `81e61e1`, `542888f`, `49344f8`, `80be914`.
+- **Evidence:** `6fa3f3f`, `81e61e1`, `542888f`, `49344f8`, `80be914`; issues #7, #44, PR #49; open follow-up #59.
 
 ## Context
 
