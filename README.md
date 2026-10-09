@@ -259,3 +259,7 @@ The choice of a goat for the mascot was inspired by the author's daughter, Irena
 Community support is available through [Matrix](https://matrix.to/#/#gcups:fsfe.org) channel as well as issues on GitHub
 
 For commercial support, consultations and training feel free to reach me via email at damian (at) fajfer.org to discuss your needs and get a custom quote.
+
+## Docs
+
+uv run mkdocs serve
