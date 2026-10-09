@@ -9,6 +9,9 @@
 #   - A Kubernetes ConfigMap (mount at /etc/chronowarden/config.yaml)
 #   - Part of a Docker/Podman Compose setup (bind mount into container)
 #
+# Validation is strict: unknown keys (typos), severities without an expiry profile, invalid values,
+# unparsable YAML, or a CHRONOWARDEN_CONFIG path that does not exist all stop Chronowarden at startup.
+#
 # Sensitive values (tokens) can be provided via:
 #   - token:      literal value (for development only)
 #   - token_env:  environment variable name (Docker Compose .env, K8s env from Secret)

@@ -99,7 +99,8 @@ Development — full shell, git, --reload, 286MB \
    ```
 
    See [`config.example.yaml`](config.example.yaml) for every option, including per-engine and per-secret
-   severity overrides.
+   severity overrides. The config is validated strictly: unknown keys, unknown severities and invalid values
+   stop the server at startup with a message naming each problem.
 
 3. **Run the server:**
    ```bash
