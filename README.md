@@ -135,14 +135,14 @@ uv run python dev-setup.py
 ```
 
 This script:
-- Starts OpenBao (port 8200) and Vault (ports 8201, 8202) containers
+- Starts OpenBao (port 8200) and HashiCorp Vault (port 8201) containers
 - Extracts root tokens from logs
 - Creates `config.yaml` with all dev vaults configured
 
 **Cleanup:**
 ```bash
-docker stop dev-vault-1.20.1 dev-vault-1.21.3 openbao-dev
-docker rm dev-vault-1.20.1 dev-vault-1.21.3 openbao-dev
+docker stop vault-dev openbao-dev
+docker rm vault-dev openbao-dev
 ```
 
 ## Vault Permissions
@@ -226,7 +226,7 @@ docker run -p 127.0.0.1:8200:8200 --name openbao-dev --detach quay.io/openbao/op
 ```bash
 docker run -p 127.0.0.1:8201:8201 --cap-add=IPC_LOCK \
   -e 'VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8201' \
-  -d --name=dev-vault hashicorp/vault
+  -d --name=vault-dev hashicorp/vault
 ```
 
 Chronowarden maintains compatibility with both platforms as [OpenBao intends to remain API compatible](https://openbao.org/api-docs/libraries/).
