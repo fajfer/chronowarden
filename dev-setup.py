@@ -28,29 +28,26 @@ import hvac
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("uvicorn.error")
 
-# Container configurations
+# Container configurations, keyed by container name
 CONTAINERS = {
     "openbao-dev": {
-        "image": "quay.io/openbao/openbao:2.5.0",
+        "image": "quay.io/openbao/openbao:2.7.1",
         "ports": ["127.0.0.1:8200:8200"],
         "name": "openbao-dev",
+        "address": "http://localhost:8200",
+        "config_name": "dev-openbao",
+        "severity": "default",
         "token_pattern": r"Root Token:\s*([a-zA-Z0-9._-]+)",
         "ready_pattern": r"OpenBao server started",
     },
-    "dev-vault-1.21.3": {
-        "image": "hashicorp/vault:1.21.3",
+    "vault-dev": {
+        "image": "hashicorp/vault:2.1.2",
         "ports": ["127.0.0.1:8201:8201"],
-        "name": "dev-vault-1.21.3",
+        "name": "vault-dev",
+        "address": "http://localhost:8201",
+        "config_name": "dev-vault",
+        "severity": "critical",
         "env": ["VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8201"],
-        "cap_add": ["IPC_LOCK"],
-        "token_pattern": r"Root Token:\s*([a-zA-Z0-9._-]+)",
-        "ready_pattern": r"Vault server started",
-    },
-    "dev-vault-1.20.1": {
-        "image": "hashicorp/vault:1.20.1",
-        "ports": ["127.0.0.1:8202:8202"],
-        "name": "dev-vault-1.20.1",
-        "env": ["VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8202"],
         "cap_add": ["IPC_LOCK"],
         "token_pattern": r"Root Token:\s*([a-zA-Z0-9._-]+)",
         "ready_pattern": r"Vault server started",
@@ -153,35 +150,16 @@ def create_dev_config(approle_credentials: dict[str, tuple[str, str]]) -> None:
     config = {
         "vaults": [
             {
-                "name": "dev-openbao",
-                "address": "http://localhost:8200",
+                "name": container["config_name"],
+                "address": container["address"],
                 "auth_method": "approle",
                 "approle_mount_point": "chronowarden",
-                "role_id": approle_credentials.get("openbao-dev", ("", ""))[0],
-                "secret_id": approle_credentials.get("openbao-dev", ("", ""))[1],
+                "role_id": approle_credentials.get(container_name, ("", ""))[0],
+                "secret_id": approle_credentials.get(container_name, ("", ""))[1],
                 "verify_ssl": False,
-                "severity": "default",
-            },
-            {
-                "name": "dev-vault-1.21.3",
-                "address": "http://localhost:8201",
-                "auth_method": "approle",
-                "approle_mount_point": "chronowarden",
-                "role_id": approle_credentials.get("dev-vault-1.21.3", ("", ""))[0],
-                "secret_id": approle_credentials.get("dev-vault-1.21.3", ("", ""))[1],
-                "verify_ssl": False,
-                "severity": "critical",
-            },
-            {
-                "name": "dev-vault-1.20.1",
-                "address": "http://localhost:8202",
-                "auth_method": "approle",
-                "approle_mount_point": "chronowarden",
-                "role_id": approle_credentials.get("dev-vault-1.20.1", ("", ""))[0],
-                "secret_id": approle_credentials.get("dev-vault-1.20.1", ("", ""))[1],
-                "verify_ssl": False,
-                "severity": "none",
-            },
+                "severity": container["severity"],
+            }
+            for container_name, container in CONTAINERS.items()
         ]
     }
 
@@ -362,12 +340,6 @@ def main():
     root_tokens = {}
     approle_credentials: dict[str, tuple[str, str]] = {}
 
-    vault_addresses = {
-        "openbao-dev": "http://localhost:8200",
-        "dev-vault-1.21.3": "http://localhost:8201",
-        "dev-vault-1.20.1": "http://localhost:8202",
-    }
-
     for container_name, config in CONTAINERS.items():
         logger.info(f"Checking {container_name}...")
 
@@ -396,8 +368,8 @@ def main():
     logger.info("Setting up vaults with AppRole authentication...")
 
     for container_name, root_token in root_tokens.items():
-        if root_token and container_name in vault_addresses:
-            address = vault_addresses[container_name]
+        if root_token and container_name in CONTAINERS:
+            address = CONTAINERS[container_name]["address"]
 
             # Populate vault with secrets
             populate_vault(container_name, address, root_token)
