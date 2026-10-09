@@ -202,6 +202,9 @@ path "sys/mounts" {
 | 🔴 Expired | Rotation overdue | `days_remaining ≤ 0` |
 | ⚪ No TTL | No rotation configured | `chronowarden_ttl` not set |
 
+`alert_threshold` is set per expiry profile in `config.yaml` (default `30d`); see
+[`config.example.yaml`](config.example.yaml).
+
 ## Testing
 
 **Unit tests:**

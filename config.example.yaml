@@ -39,6 +39,7 @@ vault_reconnect_max_attempts: 5  # Number of reconnect cycles before loop stops 
 
 # Expiry profiles: define rotation periods per severity level
 # Supports: d (days), m (months), y (years)
+# alert_threshold: secrets expiring within this window get the "warning" status (default: 30d)
 # Users can override these defaults or add custom profiles
 expiry_profiles:
   default:
@@ -50,6 +51,7 @@ expiry_profiles:
   # Example custom profile:
   # monthly:
   #   rotation_period: "30d"
+  #   alert_threshold: "7d"
 
 # Severity Cascade (highest to lowest priority):
 #   1. Secret-specific config (vaults[].engines[].secrets[].severity)
