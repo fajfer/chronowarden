@@ -17,6 +17,8 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
   `connect_all` → open DB → `start_reconnect_loop`); routers mounted under `/api/v1`; SPA serving.
 - `config.py`: `AppConfig`, `VaultConfig`, `EngineConfigNested`, `SecretConfig`, `ExpiryProfile`, `load_config`.
 - `metadata.py`: `parse_date`, `calculate_ttl`, `sync_secret_metadata`, `detect_changes`.
+- `logging_config.py`: `configure_logging()` (called when `app.py` is imported) adds timestamps to uvicorn's handlers
+  and drops 2xx access lines for `/api/v1/health`, `/ready`, `/metrics` (`QUIET_PATHS`, #58).
 - `../config.example.yaml`: the reference for every config key. Keep it in sync with `config.py`.
 
 ## Contracts
@@ -56,7 +58,8 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
   ([ADR-013](../.ai/adr/ADR-013-in-process-and-headless-sync.md), #48).
 - Model-level checks (unknown severities, duplicate vault names) only run once every key is valid, so a config
   with both kinds of mistakes reports them in two rounds.
-- Logs: successful health checks flood the log and lines lack timestamps (#58).
+- Use the `uvicorn.error` logger; its lines get timestamps from `configure_logging`. Don't call `logging.basicConfig`.
+- Unknown `/api/v1/...` paths are answered by the SPA catch-all with `index.html` and status 200, not 404.
 - Severity is config-only: `severity: none` replaced `chronowarden_enabled`, and there is no API to change it
   (PR #11 Q4/Q6, #73).
 - Dates: ISO 8601 or `YYYY-MM-DD`/`YYYY-DD-MM`. `date_format` is a hint; with `YYYY-MM-DD`, an invalid month falls
