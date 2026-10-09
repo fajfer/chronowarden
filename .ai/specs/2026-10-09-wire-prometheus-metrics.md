@@ -32,13 +32,13 @@ starting with the secret-expiry gauges the README alerting promise depends on.
 
 ## ADRs affected
 
-None.
+Implements [ADR-012](../adr/ADR-012-alertmanager-native-alerting.md) (Alertmanager-native alerting).
 
 ## Tasks
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | Set `SECRETS_TOTAL`, `SECRETS_EXPIRING_SOON`, `SECRETS_EXPIRED` from the cache after each sync, using the same status rules as `_compute_status`; decide the `engine_type` label value (e.g. `hashicorp_vault`) | metrics, core, [api](../../chronowarden/api/AGENTS.md) | Test asserts gauge values after a sync of fixture data | todo | |
+| 1 | Per ADR-012: expose per-secret series (e.g. days remaining, status) labeled with vault, engine, path and severity, refreshed from the cache after each sync; keep or replace the aggregate `SECRETS_*` gauges; ship example Prometheus alert rules | metrics, core, [api](../../chronowarden/api/AGENTS.md) | Test asserts gauge values after a sync of fixture data | todo | |
 | 2 | Request middleware sets `API_REQUESTS_TOTAL` and `API_REQUEST_DURATION_SECONDS` with the route template (not the raw path) as `endpoint` | metrics, core | Test asserts a counter delta after a request | todo | |
 | 3 | `VAULT_OPERATION_DURATION_SECONDS` around Vault calls in `vault.py` | metrics, [integrations](../../chronowarden/integrations/AGENTS.md) | Test asserts a histogram sample count delta | todo | |
 | 4 | Update the metrics table in `chronowarden/metrics/AGENTS.md` | metrics | Table matches code | todo | |
@@ -49,4 +49,4 @@ None.
 
 ## Open questions
 
-- Gauges per `engine_type` only, or also per `vault`/`severity`?
+- Exact metric names, and whether `secret_path` is a label or hashed (series count).

@@ -28,4 +28,10 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-007](ADR-007-sveltekit-spa-served-by-fastapi.md) | SvelteKit SPA served by FastAPI, API under /api/v1 | Accepted (retroactive) | 2026-02-07 |
 | [ADR-008](ADR-008-container-and-deployment-targets.md) | Distroless image; Compose and bare Kubernetes manifests | Accepted (retroactive) | 2026-02-09 |
 | [ADR-009](ADR-009-offline-tolerant-reconnect.md) | Start with offline vaults and reconnect in the background | Accepted (retroactive) | 2026-03-18 |
-| [ADR-010](ADR-010-owners-systems-and-permissions.md) | Owners as alert-routing targets, systems as CMDB-linked entities, no RBAC yet | Proposed | 2026-07-28 |
+| [ADR-010](ADR-010-owners-systems-and-permissions.md) | Owners and systems assigned to secrets, editable without RBAC for now | Accepted | 2026-10-09 |
+| [ADR-011](ADR-011-provider-registry.md) | Generic provider registry | Proposed | 2026-10-09 |
+| [ADR-012](ADR-012-alertmanager-native-alerting.md) | Alertmanager-native alerting | Accepted | 2026-10-09 |
+| [ADR-013](ADR-013-in-process-and-headless-sync.md) | Scheduled sync in-process, plus a headless one-shot mode | Accepted | 2026-10-09 |
+| [ADR-014](ADR-014-rotation-confirmation-and-audit-log.md) | Rotation confirmation and audit log | Proposed | 2026-10-09 |
+| [ADR-015](ADR-015-authentication.md) | Authentication for UI and API | Proposed | 2026-10-09 |
+| [ADR-016](ADR-016-stability-policy-for-1-0.md) | What 1.0 guarantees | Proposed | 2026-10-09 |

@@ -25,6 +25,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 |---|---|
 | [2026-10-09-per-profile-alert-threshold](2026-10-09-per-profile-alert-threshold.md) | WARNING window per expiry profile instead of fixed 30 days |
 | [2026-10-09-remove-enabled-flag](2026-10-09-remove-enabled-flag.md) | Remove `enabled` and `PATCH` severity overrides; config is the only source |
+| [2026-10-09-systems-and-owners](2026-10-09-systems-and-owners.md) | Systems (CMDB URI, asset number, owners) and owners assigned to secrets (#61) |
 | [2026-10-09-remove-deprecation-shims](2026-10-09-remove-deprecation-shims.md) | Drop pre-1.0 deprecation warnings and legacy config paths (#30) |
 | [2026-10-09-wire-prometheus-metrics](2026-10-09-wire-prometheus-metrics.md) | Defined-but-unset metrics get producers |
 | [2026-10-09-generic-provider-registry](2026-10-09-generic-provider-registry.md) | A second provider can plug in without editing Vault-specific code |

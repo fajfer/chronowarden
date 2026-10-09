@@ -48,7 +48,8 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 ## Gotchas
 
 - `polling_interval` is parsed but nothing reads it: there is no background sync scheduler. Sync only runs via the
-  API (scheduled/headless runs: #48).
+  API. Planned: in-process loop plus headless mode
+  ([ADR-013](../.ai/adr/ADR-013-in-process-and-headless-sync.md), #48).
 - Config errors surface poorly (#12): unreadable or invalid YAML is logged and replaced by a default config;
   schema errors abort startup.
 - Logs: successful health checks flood the log and lines lack timestamps (#58).

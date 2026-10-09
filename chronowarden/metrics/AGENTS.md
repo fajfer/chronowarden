@@ -46,6 +46,7 @@ Metric names and labels are what `/api/v1/metrics` scrapers see. All are prefixe
 
 ## Related ADRs
 
+[ADR-012](../../.ai/adr/ADR-012-alertmanager-native-alerting.md) (alerts via Alertmanager),
 [ADR-009](../../.ai/adr/ADR-009-offline-tolerant-reconnect.md)
 
 ## Validate

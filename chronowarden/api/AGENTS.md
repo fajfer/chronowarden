@@ -50,7 +50,8 @@ REST API used by the frontend and by operators. Every router is mounted under `/
   [the spec](../../.ai/specs/2026-10-09-per-profile-alert-threshold.md).
 - `_get_app_dependencies()` returns a different tuple order per module: `secrets` → `(db, config, manager)`,
   `sync` → `(manager, config, db)`.
-- `POST /owners/{id}/test-route/{route_id}` only logs; no notification is sent yet (owner model: ADR-010).
+- `POST /owners/{id}/test-route/{route_id}` only logs; no notification is sent. Alerts go through
+  Alertmanager ([ADR-012](../../.ai/adr/ADR-012-alertmanager-native-alerting.md)), so routes are redundant.
 - Sync on a disconnected vault returns 503 while the reconnect loop runs, and nothing resyncs after the reconnect.
   The wanted behaviour is to try to reconnect first, then report clearly (#59).
 - A freshly rotated secret isn't necessarily applied in its environment; rotation confirmation plus an audit log
