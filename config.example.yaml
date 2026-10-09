@@ -37,6 +37,11 @@ polling_interval: "6h"     # Global polling interval for all vaults (e.g. '6h', 
 vault_reconnect_interval: 120  # Seconds between reconnection attempts for offline vaults (minimum 10, default: 120)
 vault_reconnect_max_attempts: 5  # Number of reconnect cycles before loop stops (minimum 1, default: 5)
 
+# Instance-wide UI settings (optional)
+ui:
+  default_theme: default  # "default" or "bison"; falls back to the CHRONOWARDEN_THEME env var, then "default".
+                          # Users can still pick their own theme in Settings.
+
 # Expiry profiles: define rotation periods per severity level
 # Supports: d (days), m (months), y (years)
 # alert_threshold: secrets expiring within this window get the "warning" status (default: 30d)

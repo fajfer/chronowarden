@@ -12,6 +12,7 @@
 #       environment:
 #         CHRONOWARDEN_CONFIG: /etc/chronowarden/config.yaml
 #         VAULT_TOKEN: hvs.your-vault-token
+#         CHRONOWARDEN_THEME: bison  # optional default UI theme (or `ui.default_theme` below)
 #       volumes:
 #         - ./deploy/compose/config.yaml:/etc/chronowarden/config.yaml:ro
 #         - ./certs:/etc/chronowarden/certs:ro  # Mount custom CA certificates
