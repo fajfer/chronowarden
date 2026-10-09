@@ -239,11 +239,17 @@ See [deploy/](deploy/) for:
 
 ## Roadmap
 
-- RBAC support
-- Support assigning each secret/engine/provider with internal systems
-- Generate automatic reports from Chronowarden for internal systems
-- Better support for routing alerts
-- Support additional backends for public cloud providers and their vaults
+Milestones are tracked on [GitHub](https://github.com/fajfer/chronowarden/milestones). Design decisions are recorded
+as ADRs in [`.ai/adr/`](.ai/adr/README.md).
+
+| Milestone | Goal | Issues | Decisions |
+|---|---|---|---|
+| **0.6 Foundations** | Clean core: config-only severity, no pre-1.0 shims, validated config, reliable sync, better logs, per-profile alert threshold | #73, #30, #12, #59, #58, #70, #19, #57, #31 | n/a |
+| **0.7 Compliance evidence** | Systems (CMDB URI, asset number, owners) and owners assigned to secrets, rotation confirmation and audit log, automatic reports | #61, #24 | [ADR-010](.ai/adr/ADR-010-owners-systems-and-permissions.md), [ADR-014](.ai/adr/ADR-014-rotation-confirmation-and-audit-log.md) |
+| **0.8 Alerting** | Scheduled and headless sync, per-secret metrics with owner and system labels for Prometheus/Alertmanager | #48, #71 | [ADR-012](.ai/adr/ADR-012-alertmanager-native-alerting.md), [ADR-013](.ai/adr/ADR-013-in-process-and-headless-sync.md) |
+| **0.9 Access control** | Authentication for UI and API (only owners edit their secrets), then RBAC | n/a | [ADR-015](.ai/adr/ADR-015-authentication.md) |
+| **1.0** | Stability promise for config, API, metrics and DB schema | n/a | [ADR-016](.ai/adr/ADR-016-stability-policy-for-1-0.md) |
+| **1.x Backends** | Generic provider registry, then public cloud vaults | #72 | [ADR-011](.ai/adr/ADR-011-provider-registry.md) |
 
 ## License
 
