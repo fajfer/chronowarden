@@ -32,6 +32,11 @@ RESERVED_SEVERITY_VALUES = {"none"}
 
 DEFAULT_ALERT_THRESHOLD = "30d"
 
+# UI theme IDs; keep in sync with THEME_DEFINITIONS in frontend/src/lib/stores/theme.ts
+THEME_IDS = frozenset({"default", "bison"})
+DEFAULT_THEME = "default"
+_ENV_THEME = "CHRONOWARDEN_THEME"
+
 _DURATION_PATTERN = re.compile(r"^(\d+)([dmy])$")
 
 # Unknown keys are rejected so that typos never get silently ignored
@@ -286,6 +291,24 @@ class VaultConfig(BaseModel):
         return self.secret_id
 
 
+class UiConfig(BaseModel):
+    """Instance-wide UI settings."""
+
+    model_config = _STRICT
+
+    default_theme: Optional[str] = Field(
+        default=None, description=f"Default UI theme for this instance ({', '.join(sorted(THEME_IDS))})"
+    )
+
+    @field_validator("default_theme")
+    @classmethod
+    def validate_default_theme(cls, v: Optional[str]) -> Optional[str]:
+        """Reject unknown theme IDs."""
+        if v is not None and v not in THEME_IDS:
+            raise ValueError(f"Unknown theme '{v}'. Allowed values: {', '.join(sorted(THEME_IDS))}")
+        return v
+
+
 class AppConfig(BaseModel):
     """Root application configuration."""
 
@@ -312,6 +335,7 @@ class AppConfig(BaseModel):
         default_factory=lambda: {name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()},
         description="Expiry profiles mapping severity names to rotation periods",
     )
+    ui: UiConfig = Field(default_factory=UiConfig, description="Instance-wide UI settings")
 
     @model_validator(mode="after")
     def validate_unique_names(self) -> "AppConfig":
@@ -457,6 +481,15 @@ class AppConfig(BaseModel):
         """
         return self._resolve_severity_with_source(engine_id, vault_name, secret_path)
 
+    def resolve_default_theme(self) -> str:
+        """
+        Return the instance default UI theme: `ui.default_theme`, then CHRONOWARDEN_THEME, then 'default'.
+
+        Returns:
+            A theme ID from THEME_IDS.
+        """
+        return self.ui.default_theme or os.environ.get(_ENV_THEME) or DEFAULT_THEME
+
     def _profile_for(self, severity: str) -> Optional[ExpiryProfile]:
         """Return the expiry profile for a severity, falling back to the 'default' profile."""
         return self.expiry_profiles.get(severity) or self.expiry_profiles.get("default")
@@ -529,6 +562,7 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
     Raises:
         ConfigError: If an explicitly requested file is missing, or the file can't be read, parsed or validated.
     """
+    _check_theme_env()
     path = _resolve_config_path(config_path)
 
     if path is None:
@@ -552,6 +586,20 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
         return AppConfig.model_validate(data)
     except ValidationError as exc:
         raise ConfigError(_format_validation_errors(path, exc)) from exc
+
+
+def _check_theme_env() -> None:
+    """
+    Validate the CHRONOWARDEN_THEME environment variable, if set.
+
+    Raises:
+        ConfigError: If it names an unknown theme.
+    """
+    theme = os.environ.get(_ENV_THEME)
+    if theme is not None and theme not in THEME_IDS:
+        raise ConfigError(
+            f"{_ENV_THEME}='{theme}' is not a known theme. Allowed values: {', '.join(sorted(THEME_IDS))}"
+        )
 
 
 def _format_validation_errors(path: pathlib.Path, exc: ValidationError) -> str:

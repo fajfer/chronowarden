@@ -26,15 +26,18 @@ async def health_check() -> dict[str, str]:
 @router.get("/info", summary="API information endpoint")
 async def api_info() -> dict[str, str]:
     """
-    Return API name, version and documentation link.
+    Return API name, version, documentation link and the instance default UI theme.
 
     Returns:
         API information dictionary.
     """
+    from chronowarden.app import app_config
+
     return {
         "name": metadata("chronowarden")["Name"] + " API",
         "version": version("chronowarden"),
         "docs": "/docs",
+        "default_theme": app_config.resolve_default_theme(),
     }
 
 

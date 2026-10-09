@@ -557,6 +557,37 @@ class TestAlertThreshold:
             ExpiryProfile(rotation_period="30d", alert_threshold="7 days")
 
 
+class TestDefaultTheme:
+    """Tests for the instance default UI theme (#57)."""
+
+    def test_config_value_wins(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """ui.default_theme takes precedence over the environment variable."""
+        monkeypatch.setenv("CHRONOWARDEN_THEME", "default")
+        config = AppConfig.model_validate({"ui": {"default_theme": "bison"}})
+        assert config.resolve_default_theme() == "bison"
+
+    def test_env_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """CHRONOWARDEN_THEME is used when the config doesn't set a theme."""
+        monkeypatch.setenv("CHRONOWARDEN_THEME", "bison")
+        assert AppConfig().resolve_default_theme() == "bison"
+
+    def test_builtin_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Without config or environment the 'default' theme is used."""
+        monkeypatch.delenv("CHRONOWARDEN_THEME", raising=False)
+        assert AppConfig().resolve_default_theme() == "default"
+
+    def test_unknown_config_theme_is_rejected(self) -> None:
+        """An unknown theme in config fails validation."""
+        with pytest.raises(ValidationError, match="Unknown theme 'goat'"):
+            AppConfig.model_validate({"ui": {"default_theme": "goat"}})
+
+    def test_unknown_env_theme_is_rejected(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        """An unknown CHRONOWARDEN_THEME stops config loading."""
+        monkeypatch.setenv("CHRONOWARDEN_THEME", "goat")
+        with pytest.raises(ConfigError, match="CHRONOWARDEN_THEME='goat'"):
+            load_config(str(tmp_path / "missing.yaml"))
+
+
 class TestUnknownKeys:
     """Tests that typos in config keys are rejected (#12)."""
 

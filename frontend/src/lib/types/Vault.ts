@@ -42,6 +42,8 @@ export interface ApiInfo {
   name: string;
   version: string;
   docs: string;
+  /** Instance default UI theme (`ui.default_theme`, then CHRONOWARDEN_THEME). */
+  default_theme: string;
 }
 
 /**
