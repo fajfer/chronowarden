@@ -18,12 +18,12 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 - `engine.py`, `entity.py`, `router.py`: **reserved for the roadmap, not wired.** Engine kinds (Azure Key Vault,
   X.509, manual), users/groups with permission levels (RBAC), notification routers (email/webhook/Slack). Nothing
   imports them. Wiring or deleting them is in root **Ask First**.
-- `../database.py`: `Database`, `SecretMetadataCache`, `EngineConfigRow`, `DEFAULT_DB_PATH`.
+- `../database.py`: `Database`, `SecretMetadataCache`, `DEFAULT_DB_PATH`.
 
 ## Contracts
 
-- Tables: `secret_metadata_cache` (unique `vault_name, engine_id, secret_path`), `engine_config` (unique
-  `vault_name, engine_id`), `owners`, `notification_routes` (`type IN ('email','webhook')`).
+- Tables: `secret_metadata_cache` (unique `vault_name, engine_id, secret_path`), `owners`,
+  `notification_routes` (`type IN ('email','webhook')`).
 - `SecretMetadataResponse` fields are mirrored in `frontend/src/lib/types/Secret.ts`, `Owner` in `Owner.ts`:
   changing a field means changing both.
 - `full_path` is computed as `vault_name/engine_id/secret_path`.
@@ -49,8 +49,8 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 - `PRAGMA foreign_keys` is not enabled, so `ON DELETE CASCADE` does nothing. `delete_owner` deletes routes
   explicitly.
 - Owner and route IDs are `TEXT` (generated in the API); secret IDs are `INTEGER AUTOINCREMENT`.
-- The `engine_config` table and its methods are only used by tests. The live severity cascade reads YAML config
-  ([core](../AGENTS.md)).
+- `chronowarden.db` files created before 0.6 still contain an unused `engine_config` table (removed from code in
+  #30). It is harmless; nothing reads it.
 
 ## Related ADRs
 

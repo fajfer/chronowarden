@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Remove pre-1.0 deprecation shims
 
-- **Status:** draft
+- **Status:** implemented
 - **Date:** 2026-10-09
 - **Issue:** #30 (also #16)
 
@@ -35,10 +35,10 @@ ADR-006: the cascade loses the "legacy top-level `engines[]`" level; update its 
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | Remove `VaultConfig.default_severity` and `migrate_default_severity` | core, `chronowarden/config.py` | A config with `default_severity` fails validation (or is rejected with a clear error); tests updated | todo | |
-| 2 | Remove top-level `AppConfig.engines`, `EngineConfig`, `AppConfig.get_engine_config` and the `legacy_engine_config` cascade level | core | `resolve_severity_source` has 4 levels; `tests/test_config.py` green | todo | |
-| 3 | Remove the unused `engine_config` table, `EngineConfigRow` and its DB methods | [models](../../chronowarden/models/AGENTS.md) | `tests/test_database.py` green | todo | |
-| 4 | Update core `AGENTS.md` (cascade contract) and ADR-006 | core | No mention of the legacy level remains | todo | |
+| 1 | Remove `VaultConfig.default_severity` and `migrate_default_severity` | core, `chronowarden/config.py` | `default_severity` no longer affects config (rejected outright once #12 forbids unknown keys); tests updated | done | |
+| 2 | Remove top-level `AppConfig.engines`, `EngineConfig`, `AppConfig.get_engine_config` and the `legacy_engine_config` cascade level | core | `resolve_severity_source` has 4 levels; `tests/test_config.py` green | done | |
+| 3 | Remove the unused `engine_config` table, `EngineConfigRow` and its DB methods | [models](../../chronowarden/models/AGENTS.md) | `tests/test_database.py` green | done | |
+| 4 | Update core `AGENTS.md` (cascade contract) and ADR-006 | core | No mention of the legacy level remains | done | |
 
 ## Validation
 

@@ -23,8 +23,9 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 
 - Config lookup order: explicit path → `CHRONOWARDEN_CONFIG` → `/etc/chronowarden/config.yaml` → `./config.yaml`.
   A missing or unreadable file yields a default `AppConfig()`; startup does not fail.
-- Severity cascade (`AppConfig.resolve_severity`): secret → engine (nested) → legacy top-level `engines[]` →
-  vault → `"default"`. `resolve_severity_source` names the level that matched.
+- Severity cascade (`AppConfig.resolve_severity`): secret → engine (`vaults[].engines[]`) → vault → `"default"`.
+  `resolve_severity_source` names the level that matched. There is one config form per key: no legacy aliases
+  (root **Never**, #30).
 - `"none"` is reserved (`RESERVED_SEVERITY_VALUES`): monitored, never rotated; `calculate_ttl` returns `None`.
 - `DEFAULT_EXPIRY_PROFILES` (`default` 365d, `critical` 6m, `pci-dss-4.0` 90d) are always merged with
   user-defined ones (`merge_default_expiry_profiles`). Durations are `<int>[d|m|y]`.
