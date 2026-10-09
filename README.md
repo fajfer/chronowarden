@@ -167,18 +167,18 @@ path "sys/mounts" {
 }
 ```
 
-**Custom metadata fields:**
-- `chronowarden_ttl` - Target rotation period (ISO8601 duration)
-- `chronowarden_severity` - Severity level (user-defined)
-- `chronowarden_enabled` - Whether to track this secret (true/false)
+**Custom metadata fields** (written by Chronowarden from `config.yaml`, which is the source of truth):
+- `chronowarden_ttl` - Expiry date: the secret's last update plus its profile's rotation period
+- `chronowarden_severity` - Severity level resolved from config. `none` means tracked but never rotated
 
 ## API Endpoints
 
 ### Secrets
 - `GET /api/v1/secrets` - List all tracked secrets with metadata
-  - Query params: `vault_name`, `engine_id`, `severity`, `enabled`
+  - Query params: `vault_name`, `engine_id`, `severity`
 - `GET /api/v1/secrets/{id}` - Get secret metadata by ID
-- `PATCH /api/v1/secrets/{id}` - Update secret metadata (severity, enabled, ttl)
+
+Severity is set in `config.yaml` only (per vault, engine or secret); the API is read-only for secrets.
 
 ### Sync
 - `POST /api/v1/sync/vault/{vault_name}` - Trigger synchronization for a specific Vault instance
