@@ -19,7 +19,7 @@ Severity resolves from YAML config via the cascade secret → engine → vault �
 
 ## Consequences
 
-Manual severity changes via the API (`PATCH /secrets/{id}`) are overwritten on the next sync unless config agrees, which conflicts with Q4. The leftover `enabled` field (API, DB, UI) and `chronowarden_enabled` are to be removed (`.ai/specs/2026-10-09-remove-enabled-flag.md`). Severity values are validated against configured `expiry_profiles`.
+Manual severity changes via the API (`PATCH /secrets/{id}`) were overwritten on the next sync and conflicted with Q4. That endpoint, the leftover `enabled` field and `chronowarden_enabled` were removed in 0.6.0 (#73, `.ai/specs/implemented/2026-10-09-remove-enabled-flag.md`). Severity values are validated against configured `expiry_profiles`.
 
 ## Related files
 

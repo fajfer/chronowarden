@@ -27,9 +27,9 @@ severity editing through `PATCH /secrets/{id}` disappear from the API, DB, sync,
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [core](../../chronowarden/AGENTS.md)
-- [ADR-006](../adr/ADR-006-config-source-of-truth.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [core](../../../chronowarden/AGENTS.md)
+- [ADR-006](../../adr/ADR-006-config-source-of-truth.md)
 
 ## ADRs affected
 
@@ -39,10 +39,10 @@ None (implements ADR-006).
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | Remove `enabled` from `SecretMetadataResponse`, `SecretMetadataUpdate`, the `GET /secrets` query and the `PATCH` write of `chronowarden_enabled`; remove it from the sync response | [api](../../chronowarden/api/AGENTS.md), [models](../../chronowarden/models/AGENTS.md) | `tests/test_secrets.py` and `tests/test_sync_api.py` updated and green; `enabled` param gives 422 or is ignored (decide) | done | |
-| 2 | Drop the `enabled` column and `SecretMetadataCache.enabled`; delete `is_secret_enabled` | [models](../../chronowarden/models/AGENTS.md), core | `tests/test_database.py`, `tests/test_metadata.py` green; plan for existing DB files written down (see models Gotchas: no migrations) | done | |
-| 3 | Frontend: remove `enabled` from types, `fetchSecrets`, `FilterState`/`setEnabled`, and any enable/disable UI | [frontend](../../frontend/AGENTS.md) | `npm run check` has no new warnings | done | |
-| 4 | Remove severity from `PATCH /secrets/{id}`; remove the endpoint and the unused client functions (`updateSecretMetadata`, `editSecretMetadata`; no component calls them), unless the [systems spec](2026-10-09-systems-and-owners.md) reuses a narrow `PATCH` for assignments | [api](../../chronowarden/api/AGENTS.md), [frontend](../../frontend/AGENTS.md) | `PATCH` returns 405; tests updated; `npm run check` clean | done | |
+| 1 | Remove `enabled` from `SecretMetadataResponse`, `SecretMetadataUpdate`, the `GET /secrets` query and the `PATCH` write of `chronowarden_enabled`; remove it from the sync response | [api](../../../chronowarden/api/AGENTS.md), [models](../../../chronowarden/models/AGENTS.md) | `tests/test_secrets.py` and `tests/test_sync_api.py` updated and green; `enabled` param gives 422 or is ignored (decide) | done | |
+| 2 | Drop the `enabled` column and `SecretMetadataCache.enabled`; delete `is_secret_enabled` | [models](../../../chronowarden/models/AGENTS.md), core | `tests/test_database.py`, `tests/test_metadata.py` green; plan for existing DB files written down (see models Gotchas: no migrations) | done | |
+| 3 | Frontend: remove `enabled` from types, `fetchSecrets`, `FilterState`/`setEnabled`, and any enable/disable UI | [frontend](../../../frontend/AGENTS.md) | `npm run check` has no new warnings | done | |
+| 4 | Remove severity from `PATCH /secrets/{id}`; remove the endpoint and the unused client functions (`updateSecretMetadata`, `editSecretMetadata`; no component calls them), unless the [systems spec](../2026-10-09-systems-and-owners.md) reuses a narrow `PATCH` for assignments | [api](../../../chronowarden/api/AGENTS.md), [frontend](../../../frontend/AGENTS.md) | `PATCH` returns 405; tests updated; `npm run check` clean | done | |
 | 5 | README: drop `chronowarden_enabled`, the `enabled` query param and `PATCH`; document `severity: none` and config-only overrides | core | README matches the API | done | |
 
 ## Validation

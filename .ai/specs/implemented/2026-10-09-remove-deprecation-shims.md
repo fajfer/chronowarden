@@ -23,9 +23,9 @@ No deprecation warnings or legacy config paths before 1.0. Each config key has e
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [core](../../chronowarden/AGENTS.md)
-- [models](../../chronowarden/models/AGENTS.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [core](../../../chronowarden/AGENTS.md)
+- [models](../../../chronowarden/models/AGENTS.md)
 
 ## ADRs affected
 
@@ -37,7 +37,7 @@ ADR-006: the cascade loses the "legacy top-level `engines[]`" level; update its 
 |---|---|---|---|---|---|
 | 1 | Remove `VaultConfig.default_severity` and `migrate_default_severity` | core, `chronowarden/config.py` | `default_severity` no longer affects config (rejected outright once #12 forbids unknown keys); tests updated | done | |
 | 2 | Remove top-level `AppConfig.engines`, `EngineConfig`, `AppConfig.get_engine_config` and the `legacy_engine_config` cascade level | core | `resolve_severity_source` has 4 levels; `tests/test_config.py` green | done | |
-| 3 | Remove the unused `engine_config` table, `EngineConfigRow` and its DB methods | [models](../../chronowarden/models/AGENTS.md) | `tests/test_database.py` green | done | |
+| 3 | Remove the unused `engine_config` table, `EngineConfigRow` and its DB methods | [models](../../../chronowarden/models/AGENTS.md) | `tests/test_database.py` green | done | |
 | 4 | Update core `AGENTS.md` (cascade contract) and ADR-006 | core | No mention of the legacy level remains | done | |
 
 ## Validation

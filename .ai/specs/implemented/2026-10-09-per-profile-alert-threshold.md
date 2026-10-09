@@ -26,10 +26,10 @@ promises, instead of the fixed 30 days hard-coded in `chronowarden/api/secrets.p
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [core](../../chronowarden/AGENTS.md)
-- [api](../../chronowarden/api/AGENTS.md)
-- [ADR-006](../adr/ADR-006-config-source-of-truth.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [core](../../../chronowarden/AGENTS.md)
+- [api](../../../chronowarden/api/AGENTS.md)
+- [ADR-006](../../adr/ADR-006-config-source-of-truth.md)
 
 ## ADRs affected
 
@@ -42,7 +42,7 @@ None (extends the expiry-profile schema; the cascade is unchanged).
 | 1 | Add `alert_threshold` (duration, same `<int>[d\|m\|y]` format) to `ExpiryProfile` with defaults for the built-in profiles; profiles without it keep 30d | core, `chronowarden/config.py` | `tests/test_config.py` covers default, custom, invalid value | done | |
 | 2 | `_compute_status` takes the threshold of the entry's severity (`none` → never warning) | api, `chronowarden/api/secrets.py` | `tests/test_secrets.py` covers boundary days (threshold, threshold+1, 0) per profile | done | |
 | 3 | Document in `config.example.yaml` and fix the README "Secret Status" table | core | Example and README match the code | done | |
-| 4 | `ExpiryHorizon.svelte` no longer assumes a fixed 30d marker, or the marker is documented as fixed. Result: no change needed, 30d is an axis tick and dot colours come from the backend status; `alert_threshold_days` added to the `Secret` type | [frontend](../../frontend/AGENTS.md) | `npm run check` has no new warnings | done | |
+| 4 | `ExpiryHorizon.svelte` no longer assumes a fixed 30d marker, or the marker is documented as fixed. Result: no change needed, 30d is an axis tick and dot colours come from the backend status; `alert_threshold_days` added to the `Secret` type | [frontend](../../../frontend/AGENTS.md) | `npm run check` has no new warnings | done | |
 
 ## Validation
 
