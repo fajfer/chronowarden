@@ -318,6 +318,12 @@ class AppConfig(BaseModel):
         default=None, description="Directory containing CA certificates (all .pem, .crt, .cert files will be loaded)"
     )
     sentry_dsn: Optional[str] = Field(default=None, description="Sentry DSN for error reporting")
+    sentry_traces_sample_rate: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Sentry transaction tracing sample rate (0.0-1.0)"
+    )
+    sentry_profiles_sample_rate: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Sentry profiling sample rate (0.0-1.0)"
+    )
     vaults: list[VaultConfig] = Field(default_factory=list, description="List of Vault instances to connect to")
     date_format: str = Field(default="YYYY-MM-DD", description="Global date format for chronowarden_ttl")
     polling_interval: str = Field(default="6h", description="Global polling interval for change detection")

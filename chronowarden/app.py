@@ -39,19 +39,13 @@ def _configure_sentry(config: AppConfig) -> None:
 
     sentry_sdk.init(
         dsn=config.sentry_dsn,
-        # Add data like request headers and IP for users,
-        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-        send_default_pii=True,
-        # Enable sending logs to Sentry
+        # Off by default: request headers and client IPs are PII and Chronowarden targets regulated users.
+        # See https://docs.sentry.io/platforms/python/data-management/data-collected/
+        send_default_pii=False,
         enable_logs=True,
-        # Set traces_sample_rate to 1.0 to capture 100%
-        # of transactions for tracing.
-        traces_sample_rate=1.0,
-        # Set profile_session_sample_rate to 1.0 to profile 100%
-        # of profile sessions.
-        profile_session_sample_rate=1.0,
-        # Set profile_lifecycle to "trace" to automatically
-        # run the profiler on when there is an active transaction
+        # Sampling off by default; opt in via config for tracing and profiling.
+        traces_sample_rate=config.sentry_traces_sample_rate,
+        profile_session_sample_rate=config.sentry_profiles_sample_rate,
         profile_lifecycle="trace",
     )
 

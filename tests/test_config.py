@@ -115,6 +115,17 @@ class TestAppConfigDefaults:
         config = AppConfig(sentry_dsn="https://key@o0.sentry.example.com/0")
         assert config.sentry_dsn == "https://key@o0.sentry.example.com/0"
 
+    def test_sentry_sample_rates_default_to_zero(self) -> None:
+        """Tracing and profiling are off unless configured (#security review 0.6.2)."""
+        config = AppConfig()
+        assert config.sentry_traces_sample_rate == 0.0
+        assert config.sentry_profiles_sample_rate == 0.0
+
+    def test_sentry_sample_rate_out_of_range_is_rejected(self) -> None:
+        """Sample rates must be within 0.0-1.0."""
+        with pytest.raises(ValidationError):
+            AppConfig(sentry_traces_sample_rate=1.5)
+
 
 class TestConfigCascade:
     """Tests for the configuration cascade (secret config → engine → vault → global)."""
