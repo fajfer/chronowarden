@@ -14,6 +14,11 @@ Chronowarden is a secret lifecycle observability service that syncs with your se
 
 This is very early work being built with focus on compliance for financial institutions ([PCI DSS 4.0](https://www.pcisecuritystandards.org/document_library/), [DORA](https://www.eiopa.europa.eu/digital-operational-resilience-act-dora_en)) and best practices ([NIST SP 800-63B-4](https://csrc.nist.gov/pubs/sp/800/63/b/4/final)) regarding credential rotation.
 
+> [!WARNING]
+> **The API and UI have no authentication yet** (planned for a later release). Anyone who can reach the HTTP port
+> can read all tracked metadata and trigger syncs. Run Chronowarden only on a trusted network or behind an
+> authenticating reverse proxy, and never expose it directly to the internet.
+
 Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and troubleshoot!
 
 ## Features
