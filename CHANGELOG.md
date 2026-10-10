@@ -12,6 +12,33 @@ Before 1.0, minor versions may contain breaking changes; they are marked **Break
 Releases before 0.6.0 are described in the [GitHub releases](https://github.com/fajfer/chronowarden/releases) and the
 git history.
 
+## [0.6.2] - 2026-10-10
+
+Security release following a review of the rest of the API. **Upgrade** if the API is reachable by anyone you don't
+fully trust.
+
+### Security
+
+- **Vault path injection in the passthrough endpoints (High).** `GET /api/v1/vault/{name}/secrets/list` and
+  `POST /api/v1/vault/{name}/secrets/metadata` passed the request `path`/`mount_point` to Vault without keeping
+  them inside the configured KV mount, so an unauthenticated request could reach other Vault API paths and have
+  their response returned. Both endpoints were unused by the UI and are **removed**. (**Breaking** for direct API
+  users.)
+- urllib3 raised to `>= 2.8.0`, fixing PYSEC-2026-4175, -4176 and -4177.
+
+### Changed
+
+- Sentry no longer sends PII (request headers, client IPs) by default, and transaction tracing and profiling are
+  off unless `sentry_traces_sample_rate` / `sentry_profiles_sample_rate` are set. Previously they were hard-coded on
+  whenever a DSN was configured.
+- The frontend is built on Node 22 LTS (was Node 20, end of life).
+- The Kubernetes example deploys the pinned production image instead of the `main-dev` tag.
+
+### Documentation
+
+- The README warns that the API and UI are unauthenticated and should run only on a trusted network or behind an
+  authenticating proxy.
+
 ## [0.6.1] - 2026-10-09
 
 Security release. **Upgrade as soon as possible** if the UI is reachable by anyone you don't fully trust.
@@ -87,5 +114,6 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
+[0.6.2]: https://github.com/fajfer/chronowarden/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/fajfer/chronowarden/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/fajfer/chronowarden/compare/v0.5.0...v0.6.0
