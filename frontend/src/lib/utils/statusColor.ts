@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-import type { SecretStatus } from '$lib/types';
+import type { SecretStatus } from '#lib/types/index.js';
 
 /**
  * Determine status from days until expiry.

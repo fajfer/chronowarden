@@ -5,9 +5,9 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { currentTheme } from '$lib/stores/theme';
-  import { secretStats } from '$lib/stores/secrets';
-  import { fetchVaultInstances } from '$lib/api/vaults';
+  import { currentTheme } from '#lib/stores/theme.js';
+  import { secretStats } from '#lib/stores/secrets.js';
+  import { fetchVaultInstances } from '#lib/api/vaults.js';
 
   let { open = true }: { open?: boolean } = $props();
 

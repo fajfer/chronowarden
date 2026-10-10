@@ -3,9 +3,9 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import type { Secret } from '$lib/types';
-  import { getStatusDotClasses } from '$lib/utils/statusColor';
-  import { setSeverity, clearFilters } from '$lib/stores/filters';
+  import type { Secret } from '#lib/types/index.js';
+  import { getStatusDotClasses } from '#lib/utils/statusColor.js';
+  import { setSeverity, clearFilters } from '#lib/stores/filters.js';
   import { goto } from '$app/navigation';
 
   let { secrets = [] }: { secrets?: Secret[] } = $props();

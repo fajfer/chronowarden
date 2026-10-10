@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { writable } from 'svelte/store';
-import { ApiError } from '$lib/api/client';
-import { triggerVaultSync } from '$lib/api/sync';
-import type { SyncResult } from '$lib/types';
+import { ApiError } from '#lib/api/client.js';
+import { triggerVaultSync } from '#lib/api/sync.js';
+import type { SyncResult } from '#lib/types/index.js';
 
 export interface ToastMessage {
   id: number;

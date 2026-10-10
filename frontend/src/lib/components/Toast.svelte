@@ -3,7 +3,7 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import { toasts } from '$lib/stores/sync';
+  import { toasts } from '#lib/stores/sync.js';
 
   const typeColors: Record<string, string> = {
     success: 'bg-green-800 border-green-600 text-green-200',

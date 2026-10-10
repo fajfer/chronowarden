@@ -3,9 +3,9 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import { currentUser, logout } from '$lib/stores/auth';
-  import { currentTheme } from '$lib/stores/theme';
-  import { fetchVaultInstances, fetchApiInfo } from '$lib/api/vaults';
+  import { currentUser, logout } from '#lib/stores/auth.js';
+  import { currentTheme } from '#lib/stores/theme.js';
+  import { fetchVaultInstances, fetchApiInfo } from '#lib/api/vaults.js';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import SyncButton from './SyncButton.svelte';

@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { writable, derived } from 'svelte/store';
-import * as secretsApi from '$lib/api/secrets';
-import type { Secret } from '$lib/types';
+import * as secretsApi from '#lib/api/secrets.js';
+import type { Secret } from '#lib/types/index.js';
 
 export const secrets = writable<Secret[]>([]);
 export const secretsLoading = writable<boolean>(false);

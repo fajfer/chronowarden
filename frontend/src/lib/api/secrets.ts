@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { apiGet } from './client';
-import type { Secret } from '$lib/types';
+import type { Secret } from '#lib/types/index.js';
 
 /** GET /api/v1/secrets/ — list cached secret metadata with optional filters. */
 export function fetchSecrets(

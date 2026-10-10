@@ -3,7 +3,7 @@
   //
   // SPDX-License-Identifier: EUPL-1.2
 
-  import { initAuth } from '$lib/stores/auth';
+  import { initAuth } from '#lib/stores/auth.js';
   import { goto } from '$app/navigation';
 
   let name = $state('');

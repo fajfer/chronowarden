@@ -3,8 +3,8 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import { getStatusColor, getStatusBgColor, getStatusLabel, getStatusDotBg } from '$lib/utils/statusColor';
-  import type { SecretStatus } from '$lib/types';
+  import { getStatusColor, getStatusBgColor, getStatusLabel, getStatusDotBg } from '#lib/utils/statusColor.js';
+  import type { SecretStatus } from '#lib/types/index.js';
 
   let { status }: { status: SecretStatus } = $props();
 

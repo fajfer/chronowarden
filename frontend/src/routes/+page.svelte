@@ -3,13 +3,13 @@
   //
   // SPDX-License-Identifier: EUPL-1.2
 
-  import StatusBadge from '$lib/components/StatusBadge.svelte';
-  import SecretModal from '$lib/components/SecretModal.svelte';
-  import ExpiryHorizon from '$lib/components/ExpiryHorizon.svelte';
-  import { currentTheme } from '$lib/stores/theme';
-  import { secrets, secretStats, criticalSecrets, secretsLoading, secretsError } from '$lib/stores/secrets';
-  import { fetchAllVaultHealth } from '$lib/api/vaults';
-  import type { Secret, VaultInstanceHealth } from '$lib/types';
+  import StatusBadge from '#lib/components/StatusBadge.svelte';
+  import SecretModal from '#lib/components/SecretModal.svelte';
+  import ExpiryHorizon from '#lib/components/ExpiryHorizon.svelte';
+  import { currentTheme } from '#lib/stores/theme.js';
+  import { secrets, secretStats, criticalSecrets, secretsLoading, secretsError } from '#lib/stores/secrets.js';
+  import { fetchAllVaultHealth } from '#lib/api/vaults.js';
+  import type { Secret, VaultInstanceHealth } from '#lib/types/index.js';
   import { onMount } from 'svelte';
 
   let selectedSecret = $state<Secret | null>(null);

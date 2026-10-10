@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { writable } from 'svelte/store';
-import type { FilterState, SecretStatus } from '$lib/types';
-import { DEFAULT_FILTERS } from '$lib/types';
+import type { FilterState, SecretStatus } from '#lib/types/index.js';
+import { DEFAULT_FILTERS } from '#lib/types/index.js';
 
 export const filters = writable<FilterState>({ ...DEFAULT_FILTERS });
 
