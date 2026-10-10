@@ -20,19 +20,6 @@ export function fetchVaultHealth(name: string): Promise<VaultInstanceHealth> {
   return apiGet<VaultInstanceHealth>(`/vault/${name}/health`);
 }
 
-/** GET /api/v1/vault/:name/secrets/list — list secrets in a vault. */
-export function fetchVaultSecrets(
-  name: string,
-  path: string = '',
-  mountPoint?: string,
-): Promise<{ vault: string; secrets: string[] }> {
-  const params = new URLSearchParams();
-  if (path) params.set('path', path);
-  if (mountPoint) params.set('mount_point', mountPoint);
-  const qs = params.toString();
-  return apiGet(`/vault/${name}/secrets/list${qs ? `?${qs}` : ''}`);
-}
-
 /** GET /api/v1/health — basic health check. */
 export function fetchHealthCheck(): Promise<HealthStatus> {
   return apiGet<HealthStatus>('/health');

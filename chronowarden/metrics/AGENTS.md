@@ -23,7 +23,7 @@ Metric names and labels are what `/api/v1/metrics` scrapers see. All are prefixe
 |---|---|---|---|
 | `VAULT_CONNECTIONS_TOTAL` | Counter | `status` (`success`/`failure`) | `integrations/manager.py` |
 | `INTEGRATION_HEALTH` | Gauge | `integration` (`vault:<name>`) | `integrations/manager.py` |
-| `VAULT_OPERATIONS_TOTAL` | Counter | `operation` (`list_secrets`/`get_metadata`), `status` (`success`/`not_found`) | `api/vault.py` |
+| `VAULT_OPERATIONS_TOTAL` | Counter | `operation`, `status` | **nothing yet** (set by the removed passthrough endpoints until 0.6.2) |
 | `SECRETS_TOTAL`, `SECRETS_EXPIRING_SOON`, `SECRETS_EXPIRED` | Gauge | `engine_type` | **nothing yet** |
 | `API_REQUESTS_TOTAL`, `API_REQUEST_DURATION_SECONDS` | Counter / Histogram | `method`, `endpoint`(, `status`) | **nothing yet** |
 | `VAULT_OPERATION_DURATION_SECONDS` | Histogram | `operation` | **nothing yet** |

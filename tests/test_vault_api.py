@@ -54,17 +54,11 @@ class TestVaultApiErrors:
         assert response.status_code == 200
         assert response.json()[0]["address"] == "http://localhost:8201"
 
-    def test_list_secrets_returns_reason_when_vault_not_connected(self) -> None:
-        """List endpoint includes connection failure reason in 503 response details."""
+    def test_secrets_passthrough_endpoints_are_removed(self) -> None:
+        """The raw Vault passthrough endpoints are gone (removed in 0.6.2 for the path-injection flaw)."""
         client = _build_client()
         manager = MagicMock()
-        vault = MagicMock()
-        vault.is_connected.return_value = False
-        vault.last_error = "AppRole authentication failed: invalid role_id or secret_id " "(mount point 'chronowarden')"
-        manager.get.return_value = vault
-
+        manager.get.return_value = MagicMock()
         with patch("chronowarden.api.vault._get_vault_manager", return_value=manager):
-            response = client.get("/api/v1/vault/dev-vault/secrets/list")
-
-        assert response.status_code == 503
-        assert "invalid role_id or secret_id" in response.json()["detail"]
+            assert client.get("/api/v1/vault/dev-vault/secrets/list").status_code == 404
+            assert client.post("/api/v1/vault/dev-vault/secrets/metadata", json={"path": "x"}).status_code == 404

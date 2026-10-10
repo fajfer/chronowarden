@@ -16,7 +16,7 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 | `health.py` | none | `GET /health`, `/info`, `/ready`, `/metrics` (Prometheus) |
 | `secrets.py` | `/secrets` | `GET /` (filters `vault_name`, `engine_id`, `severity`), `GET /{id}`; read-only |
 | `sync.py` | `/sync` | `POST /vault/{vault_name}` |
-| `vault.py` | `/vault` | `GET /instances`, `/health`, `/{name}/health`, `/{name}/secrets/list`, `POST /{name}/secrets/metadata` |
+| `vault.py` | `/vault` | `GET /instances`, `/health`, `/{name}/health` |
 | `owners.py` | `/owners` | CRUD for owners, `POST/DELETE` notification routes, `POST /{id}/test-route/{route_id}` |
 | `__init__.py` | n/a | exports `*_router`; add new routers here and include them in `app.py` |
 
@@ -56,8 +56,9 @@ REST API used by the frontend and by operators. Every router is mounted under `/
   `retry_scheduled`); the frontend `stores/sync.ts` parses it (#59).
 - A freshly rotated secret isn't necessarily applied in its environment; rotation confirmation plus an audit log
   is planned (#24, #18).
-- `vault.py` increments `VAULT_OPERATIONS_TOTAL{operation,status}`. Reuse the existing label values (see
-  [metrics](../metrics/AGENTS.md)).
+- The raw Vault passthrough endpoints (`/{name}/secrets/list`, `/{name}/secrets/metadata`) were removed in 0.6.2:
+  `path`/`mount_point` could reach Vault paths outside the KV mount. Don't reintroduce a path straight from the
+  request into an hvac call.
 
 ## Related ADRs
 
