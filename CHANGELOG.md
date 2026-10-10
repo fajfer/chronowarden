@@ -12,6 +12,13 @@ Before 1.0, minor versions may contain breaking changes; they are marked **Break
 Releases before 0.6.0 are described in the [GitHub releases](https://github.com/fajfer/chronowarden/releases) and the
 git history.
 
+## [Unreleased]
+
+### Fixed
+
+- The Docker build no longer runs `npm ci` under arm64 emulation, which could hang the multi-arch build. The
+  frontend is built once on the native build platform; its output is the same for every architecture.
+
 ## [0.6.2] - 2026-10-10
 
 Security release following a review of the rest of the API. **Upgrade** if the API is reachable by anyone you don't
