@@ -31,6 +31,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-10-sveltekit-3](implemented/2026-10-10-sveltekit-3.md) | Frontend on SvelteKit 3 and TypeScript 6 (#79, PR #80) |
 | [2026-10-10-release-0-6-2](implemented/2026-10-10-release-0-6-2.md) | Remove Vault passthrough endpoints, urllib3 bump, Sentry/Node/k8s hardening (released as v0.6.2) |
 | [2026-10-09-release-0-6-1](implemented/2026-10-09-release-0-6-1.md) | Path traversal fix, `/api` 404, CI image smoke test (released as v0.6.1) |
 | [2026-10-09-release-0-6](implemented/2026-10-09-release-0-6.md) | Release 0.6 Foundations: order of work (released as v0.6.0) |
