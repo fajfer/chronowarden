@@ -52,8 +52,8 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
 - Svelte 5 runes (`$derived`, `$state`) are used in pages; stores use `svelte/store`.
 - `npm run check` currently reports 0 errors and 6 warnings; don't add new ones.
 - Don't edit `build/` or `.svelte-kit/`; they are generated.
-- Regenerate `package-lock.json` with the npm the build uses (Node 20, see `Dockerfile` and `ci.yaml`), e.g.
-  `docker run --rm -v $PWD:/w -w /w node:20-alpine npm install --package-lock-only`. A lockfile written by a newer npm
+- Regenerate `package-lock.json` with the npm the build uses (Node 22, see `Dockerfile` and `ci.yaml`), e.g.
+  `docker run --rm -v $PWD:/w -w /w node:22-alpine npm install --package-lock-only`. A lockfile written by a newer npm
   can drop optional entries and make `npm ci` fail in Docker and CI.
 - Open UI items: PR #60 TODOs:
   ExpiryHorizon stacks secrets over 90 days (hide them past 100), remove the navbar theme switcher, larger mascot,

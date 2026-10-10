@@ -13,7 +13,7 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 
 ## Files
 
-- `../Dockerfile`: `frontend-builder` (node:20-alpine, `npm ci && npm run build`) → `backend-builder` (venv,
+- `../Dockerfile`: `frontend-builder` (node:22-alpine, `npm ci && npm run build`) → `backend-builder` (venv,
   `pip install .`) → `dev` target (shell, `--reload`) and `production` (default target,
   `gcr.io/distroless/python3-debian13:nonroot`).
 - `compose/config.yaml`: example config with the Compose service snippet in comments.
