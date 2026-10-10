@@ -20,6 +20,7 @@ dependencies = [
     "pyyaml>=6.0.0",
     "prometheus-client>=0.21.0",
     "requests>=2.32.0",
+    "urllib3>=2.8.0",  # pinned above requests' floor for PYSEC-2026-4175/4176/4177
     "sentry-sdk>=2.63.0",
 ]
 
