@@ -14,6 +14,11 @@ git history.
 
 ## [Unreleased]
 
+### Changed
+
+- The frontend runs on SvelteKit 3 and TypeScript 6 (#79). No visible changes; the build, pages and API calls
+  are the same.
+
 ### Fixed
 
 - The Docker build no longer runs `npm ci` under arm64 emulation, which could hang the multi-arch build. The
