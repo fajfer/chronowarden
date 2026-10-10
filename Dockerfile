@@ -6,8 +6,10 @@ ARG PYTHON_VERSION=3.13.5
 
 # ============================================================================
 # Stage 1: Frontend builder
+#   Runs on the build machine's native platform: the output is static HTML/JS,
+#   identical for every target, and npm under QEMU emulation can hang.
 # ============================================================================
-FROM node:22-alpine AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
