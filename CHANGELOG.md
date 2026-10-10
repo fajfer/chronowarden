@@ -26,7 +26,7 @@ fully trust.
 
 ### Security
 
-- **Vault path injection in the passthrough endpoints (High).** `GET /api/v1/vault/{name}/secrets/list` and
+- **Vault path injection in the passthrough endpoints (High, [GHSA-7p2g-v7c6-vpww](https://github.com/fajfer/chronowarden/security/advisories/GHSA-7p2g-v7c6-vpww)).** `GET /api/v1/vault/{name}/secrets/list` and
   `POST /api/v1/vault/{name}/secrets/metadata` passed the request `path`/`mount_point` to Vault without keeping
   them inside the configured KV mount, so an unauthenticated request could reach other Vault API paths and have
   their response returned. Both endpoints were unused by the UI and are **removed**. (**Breaking** for direct API
@@ -52,7 +52,7 @@ Security release. **Upgrade as soon as possible** if the UI is reachable by anyo
 
 ### Security
 
-- **Path traversal in the UI route (High).** Every release up to and including 0.6.0 served any file readable by
+- **Path traversal in the UI route (High, [GHSA-63g5-x4f2-2rg5](https://github.com/fajfer/chronowarden/security/advisories/GHSA-63g5-x4f2-2rg5)).** Every release up to and including 0.6.0 served any file readable by
   the Chronowarden process for requests such as `GET /..%2f..%2fdata%2fconfig.yaml`, without authentication. This
   includes `config.yaml`, which can hold Vault tokens or AppRole `secret_id`s, and mounted secret files. The route
   now serves only files inside the frontend build directory. After upgrading, **rotate the Vault credentials
