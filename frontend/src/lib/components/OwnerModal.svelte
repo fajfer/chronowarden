@@ -3,7 +3,7 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import type { Owner } from '$lib/types';
+  import type { Owner } from '#lib/types/index.js';
 
   let { owner = null, open = false, onClose, onSave }: {
     owner?: Owner | null;

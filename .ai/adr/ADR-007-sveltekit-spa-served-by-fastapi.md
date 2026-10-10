@@ -24,5 +24,5 @@ One container and one port. API routes must be registered before the SPA catch-a
 ## Related files
 
 - [`chronowarden/app.py`](../../chronowarden/app.py)
-- [`frontend/svelte.config.js`](../../frontend/svelte.config.js)
+- [`frontend/vite.config.ts`](../../frontend/vite.config.ts) (adapter config; `svelte.config.js` until SvelteKit 3)
 - [`frontend/src/lib/api/client.ts`](../../frontend/src/lib/api/client.ts)

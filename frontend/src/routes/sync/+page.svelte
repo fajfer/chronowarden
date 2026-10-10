@@ -3,11 +3,11 @@
   //
   // SPDX-License-Identifier: EUPL-1.2
 
-  import { syncHistory } from '$lib/stores/sync';
-  import { syncVault } from '$lib/stores/sync';
-  import { loadSecrets } from '$lib/stores/secrets';
-  import { fetchVaultInstances } from '$lib/api/vaults';
-  import { formatDate } from '$lib/utils/dateFormat';
+  import { syncHistory } from '#lib/stores/sync.js';
+  import { syncVault } from '#lib/stores/sync.js';
+  import { loadSecrets } from '#lib/stores/secrets.js';
+  import { fetchVaultInstances } from '#lib/api/vaults.js';
+  import { formatDate } from '#lib/utils/dateFormat.js';
 
   let vaultNames = $state<string[]>([]);
   let syncing = $state(false);

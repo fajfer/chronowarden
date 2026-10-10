@@ -13,6 +13,9 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
 
 ## Files
 
+- `vite.config.ts`: Vite plugins and the SvelteKit 3 options, including the `adapter-static` config (`build/`,
+  fallback `index.html`). There is no `svelte.config.js` since SvelteKit 3 (#79). `tsconfig.json` extends
+  `$app/tsconfig`.
 - `src/lib/api/`: `client.ts` (`apiGet/apiPost/apiPatch/...`, `ApiError`), plus one file per backend router
   (`secrets.ts`, `sync.ts`, `vaults.ts`, `owners.ts`).
 - `src/lib/stores/`: `secrets` (list, loading, error, `secretStats`), `filters`, `sync` (+ toasts), `theme`, `auth`.
@@ -36,6 +39,8 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
 
 ## How to
 
+- **Import shared code** as `#lib/<path>.js` (e.g. `#lib/stores/theme.js`): the `.js` extension resolves to the
+  `.ts` file. `#lib` is declared in `package.json` `imports`; the old `$lib` alias no longer exists.
 - **Call a new endpoint**: add a typed function in the matching `src/lib/api/*.ts` (doc comment with method and
   path), add or extend the type in `src/lib/types/`.
 - **Add a theme**: add an entry to `THEME_DEFINITIONS` in `stores/theme.ts` and its ID to `THEME_IDS` in

@@ -3,9 +3,9 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import { syncVault } from '$lib/stores/sync';
-  import { fetchVaultInstances } from '$lib/api/vaults';
-  import { loadSecrets } from '$lib/stores/secrets';
+  import { syncVault } from '#lib/stores/sync.js';
+  import { fetchVaultInstances } from '#lib/api/vaults.js';
+  import { loadSecrets } from '#lib/stores/secrets.js';
 
   let vaultNames = $state<string[]>([]);
   let dropdownOpen = $state(false);

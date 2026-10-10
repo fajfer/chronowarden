@@ -3,8 +3,8 @@
   //
   // SPDX-License-Identifier: EUPL-1.2
 
-  import { fetchAllVaultHealth } from '$lib/api/vaults';
-  import type { VaultInstanceHealth } from '$lib/types';
+  import { fetchAllVaultHealth } from '#lib/api/vaults.js';
+  import type { VaultInstanceHealth } from '#lib/types/index.js';
 
   let vaults = $state<VaultInstanceHealth[]>([]);
   let loading = $state(true);

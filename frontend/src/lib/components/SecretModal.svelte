@@ -3,9 +3,9 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import type { Secret } from '$lib/types';
+  import type { Secret } from '#lib/types/index.js';
   import StatusBadge from './StatusBadge.svelte';
-  import { formatDate } from '$lib/utils/dateFormat';
+  import { formatDate } from '#lib/utils/dateFormat.js';
 
   let { secret, onClose }: {
     secret: Secret | null;

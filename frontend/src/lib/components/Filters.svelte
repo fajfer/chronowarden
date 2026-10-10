@@ -6,10 +6,10 @@
   import {
     filters, setSearch, toggleStatus,
     setVaultName, setSeverity, setEngineId, clearFilters,
-  } from '$lib/stores/filters';
-  import { secrets } from '$lib/stores/secrets';
-  import { getStatusLabel } from '$lib/utils/statusColor';
-  import type { SecretStatus } from '$lib/types';
+  } from '#lib/stores/filters.js';
+  import { secrets } from '#lib/stores/secrets.js';
+  import { getStatusLabel } from '#lib/utils/statusColor.js';
+  import type { SecretStatus } from '#lib/types/index.js';
 
   const statuses: SecretStatus[] = ['ok', 'warning', 'expired', 'no_ttl'];
 

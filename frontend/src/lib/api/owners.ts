@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { apiGet, apiPost, apiPut, apiDelete } from './client';
-import type { Owner, OwnerCreate, OwnerUpdate, NotificationRoute, NotificationRouteCreate } from '$lib/types';
+import type { Owner, OwnerCreate, OwnerUpdate, NotificationRoute, NotificationRouteCreate } from '#lib/types/index.js';
 
 /** GET /api/v1/owners — list all owners. */
 export function fetchOwners(): Promise<Owner[]> {

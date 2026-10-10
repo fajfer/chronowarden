@@ -3,13 +3,13 @@
   //
   // SPDX-License-Identifier: EUPL-1.2
 
-  import { secrets, secretsLoading, secretsError } from '$lib/stores/secrets';
-  import { filters } from '$lib/stores/filters';
-  import Filters from '$lib/components/Filters.svelte';
-  import StatusBadge from '$lib/components/StatusBadge.svelte';
-  import SecretModal from '$lib/components/SecretModal.svelte';
-  import { getStatusDotBg } from '$lib/utils/statusColor';
-  import type { Secret } from '$lib/types';
+  import { secrets, secretsLoading, secretsError } from '#lib/stores/secrets.js';
+  import { filters } from '#lib/stores/filters.js';
+  import Filters from '#lib/components/Filters.svelte';
+  import StatusBadge from '#lib/components/StatusBadge.svelte';
+  import SecretModal from '#lib/components/SecretModal.svelte';
+  import { getStatusDotBg } from '#lib/utils/statusColor.js';
+  import type { Secret } from '#lib/types/index.js';
 
   let selectedSecret = $state<Secret | null>(null);
   let sortField = $state<string>('full_path');

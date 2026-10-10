@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { derived, writable } from 'svelte/store';
-import { fetchApiInfo } from '$lib/api/vaults';
+import { fetchApiInfo } from '#lib/api/vaults.js';
 
 const THEME_STORAGE_KEY = 'chronowarden_theme';
 

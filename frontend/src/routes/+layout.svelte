@@ -4,12 +4,12 @@
   // SPDX-License-Identifier: EUPL-1.2
 
   import '../app.css';
-  import Navbar from '$lib/components/Navbar.svelte';
-  import Sidebar from '$lib/components/Sidebar.svelte';
-  import Toast from '$lib/components/Toast.svelte';
-  import { isAuthenticated, initAuth } from '$lib/stores/auth';
-  import { initTheme } from '$lib/stores/theme';
-  import { loadSecrets } from '$lib/stores/secrets';
+  import Navbar from '#lib/components/Navbar.svelte';
+  import Sidebar from '#lib/components/Sidebar.svelte';
+  import Toast from '#lib/components/Toast.svelte';
+  import { isAuthenticated, initAuth } from '#lib/stores/auth.js';
+  import { initTheme } from '#lib/stores/theme.js';
+  import { loadSecrets } from '#lib/stores/secrets.js';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount } from 'svelte';

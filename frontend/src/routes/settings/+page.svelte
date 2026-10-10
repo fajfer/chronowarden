@@ -3,12 +3,12 @@
   //
   // SPDX-License-Identifier: EUPL-1.2
 
-  import { fetchOwners, createOwner, updateOwner, deleteOwner, testNotificationRoute } from '$lib/api/owners';
-  import { fetchHealthCheck, fetchApiInfo } from '$lib/api/vaults';
-  import OwnerModal from '$lib/components/OwnerModal.svelte';
-  import { availableThemes, currentTheme, setTheme } from '$lib/stores/theme';
-  import { addToast } from '$lib/stores/sync';
-  import type { Owner, ApiInfo } from '$lib/types';
+  import { fetchOwners, createOwner, updateOwner, deleteOwner, testNotificationRoute } from '#lib/api/owners.js';
+  import { fetchHealthCheck, fetchApiInfo } from '#lib/api/vaults.js';
+  import OwnerModal from '#lib/components/OwnerModal.svelte';
+  import { availableThemes, currentTheme, setTheme } from '#lib/stores/theme.js';
+  import { addToast } from '#lib/stores/sync.js';
+  import type { Owner, ApiInfo } from '#lib/types/index.js';
 
   let activeTab = $state<'general' | 'owners'>('general');
 

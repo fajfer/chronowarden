@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { apiGet } from './client';
-import type { VaultInstanceHealth, HealthStatus, ApiInfo } from '$lib/types';
+import type { VaultInstanceHealth, HealthStatus, ApiInfo } from '#lib/types/index.js';
 
 /** GET /api/v1/vault/instances — list configured vault instance names. */
 export function fetchVaultInstances(): Promise<{ instances: string[] }> {
