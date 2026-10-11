@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-import { apiDelete, apiGet, apiPut } from './client';
-import type { PurgeResult, Secret } from '#lib/types/index.js';
+import { apiDelete, apiGet, apiPost, apiPut } from './client';
+import type { AuditEvent, PurgeResult, Secret } from '#lib/types/index.js';
 
 /** GET /api/v1/secrets/ — list cached secret metadata with optional filters. */
 export function fetchSecrets(
@@ -48,4 +48,14 @@ export function purgeRemovedSecrets(vaultName?: string, engineId?: string): Prom
   if (engineId) params.set('engine_id', engineId);
   const qs = params.toString();
   return apiDelete<PurgeResult>(`/secrets/removed${qs ? `?${qs}` : ''}`);
+}
+
+/** GET /api/v1/secrets/:id/history — the secret's audit events, newest first. */
+export function fetchSecretHistory(id: number): Promise<AuditEvent[]> {
+  return apiGet<AuditEvent[]>(`/secrets/${id}/history`);
+}
+
+/** POST /api/v1/secrets/:id/confirmations — confirm the newest version was applied at `appliedAt` (ISO 8601). */
+export function confirmRotation(id: number, appliedAt: string): Promise<Secret> {
+  return apiPost<Secret>(`/secrets/${id}/confirmations`, { applied_at: appliedAt });
 }
