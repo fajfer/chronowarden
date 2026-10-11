@@ -9,15 +9,22 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    # Minor and patch updates come as one PR per ecosystem; majors stay separate for review.
     # Let new releases age a week before proposing them (time for yanks of compromised versions)
     cooldown:
       default-days: 7
+    groups:
+      github-actions-minor-and-patch:
+        update-types: ["minor", "patch"]
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
     cooldown:
       default-days: 7
+    groups:
+      docker-minor-and-patch:
+        update-types: ["minor", "patch"]
     ignore:
       # The builder's Python minor must match the distroless image (deploy/AGENTS.md); Node stays on 22 LTS
       - dependency-name: "python"
@@ -30,6 +37,9 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    groups:
+      uv-minor-and-patch:
+        update-types: ["minor", "patch"]
   - package-ecosystem: "pip"
     directory: "/.clusterfuzzlite"
     schedule:
@@ -42,3 +52,10 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    groups:
+      npm-minor-and-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      # TypeScript 7 is a migration (#106), not a bump
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
