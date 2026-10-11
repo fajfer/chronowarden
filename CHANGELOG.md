@@ -12,6 +12,34 @@ Before 1.0, minor versions may contain breaking changes; they are marked **Break
 Releases before 0.6.0 are described in the [GitHub releases](https://github.com/fajfer/chronowarden/releases) and the
 git history.
 
+## [Unreleased]
+
+### Upgrade notes
+
+- **Back up `chronowarden.db` before upgrading, and keep it from now on.** The database is upgraded automatically at
+  startup (schema migrations, #76); from 0.7 it holds data that can't be rebuilt by syncing. A database from a newer
+  release is refused, so downgrading needs the backup.
+
+### Removed
+
+- **Breaking:** email notification routes. Existing email routes are deleted by the upgrade, and the API refuses
+  `"type": "email"` with `422`. Webhook routes stay; built-in webhook alerting follows in 0.8 (ADR-022).
+
+### Added
+
+- Releases are signed: the production image carries a cosign signature, SLSA Build L3 provenance and CycloneDX/SPDX
+  SBOMs, and the GitHub Release has the wheel, sdist, source SBOMs and provenance. See "Verifying releases" in the
+  README.
+- `SECURITY.md` (private vulnerability reporting, acknowledgement within 7 days) and `CONTRIBUTING.md`.
+- Fuzzing of date parsing, TTL calculation and config loading (ClusterFuzzLite).
+
+### Fixed
+
+- A config file that isn't valid UTF-8 stopped startup with a raw `UnicodeDecodeError`; it is now a configuration
+  error naming the file.
+- TTL calculation crashed for update times near the year 9999, and years before 1000 were written in a form
+  Chronowarden couldn't read back.
+
 ## [0.6.3] - 2026-10-11
 
 **Upgrade promptly if other teams or tools put custom metadata on secrets Chronowarden manages.**
@@ -146,6 +174,7 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
+[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.6.3...HEAD
 [0.6.3]: https://github.com/fajfer/chronowarden/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/fajfer/chronowarden/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/fajfer/chronowarden/compare/v0.6.0...v0.6.1
