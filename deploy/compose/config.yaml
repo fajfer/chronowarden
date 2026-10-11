@@ -17,6 +17,10 @@
 #         - ./deploy/compose/config.yaml:/etc/chronowarden/config.yaml:ro
 #         - ./certs:/etc/chronowarden/certs:ro  # Mount custom CA certificates
 
+# Prometheus metrics at /api/v1/metrics (off by default; uncomment to let Prometheus scrape them)
+# metrics:
+#   enabled: true
+
 # Global CA certificates directory (uncomment for production with custom certs)
 # ca_certs_dir: /etc/chronowarden/certs
 

@@ -6,7 +6,7 @@
 
 from importlib.metadata import metadata, version
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException, Response, status
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 router = APIRouter(tags=["health"])
@@ -55,11 +55,21 @@ async def readiness_check() -> dict[str, str]:
 @router.get("/metrics", summary="Prometheus metrics endpoint")
 async def metrics() -> Response:
     """
-    Expose Prometheus-compatible metrics.
+    Expose Prometheus-compatible metrics when `metrics.enabled` is set (off by default, ADR-022).
 
     Returns:
         Prometheus metrics in OpenMetrics format.
+
+    Raises:
+        HTTPException: 404 while metrics are disabled.
     """
+    from chronowarden.app import app_config
+
+    if not app_config.metrics.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metrics are disabled; set metrics.enabled: true in config.yaml to serve them",
+        )
     return Response(
         content=generate_latest(),
         media_type=CONTENT_TYPE_LATEST,

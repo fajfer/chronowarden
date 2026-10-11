@@ -40,6 +40,10 @@ polling_interval: "6h"     # Global polling interval for all vaults (e.g. '6h', 
 vault_reconnect_interval: 120  # Seconds between reconnection attempts for offline vaults (minimum 10, default: 120)
 vault_reconnect_max_attempts: 5  # Number of reconnect cycles before loop stops (minimum 1, default: 5)
 
+# Prometheus metrics at /api/v1/metrics. Off by default since 0.7: turn them on if Prometheus scrapes Chronowarden.
+metrics:
+  enabled: false
+
 # Instance-wide UI settings (optional)
 ui:
   default_theme: default  # "default" or "bison"; falls back to the CHRONOWARDEN_THEME env var, then "default".

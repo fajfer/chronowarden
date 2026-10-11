@@ -20,6 +20,11 @@ git history.
   startup (schema migrations, #76); from 0.7 it holds data that can't be rebuilt by syncing. A database from a newer
   release is refused, so downgrading needs the backup.
 
+### Changed
+
+- **Breaking:** Prometheus metrics are off by default. `GET /api/v1/metrics` returns `404` until you set
+  `metrics.enabled: true` in `config.yaml`; turn it on if Prometheus scrapes Chronowarden (#96, ADR-022).
+
 ### Removed
 
 - **Breaking:** email notification routes. Existing email routes are deleted by the upgrade, and the API refuses

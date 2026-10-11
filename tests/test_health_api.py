@@ -33,3 +33,20 @@ class TestInfoEndpoint:
         body = response.json()
         assert body["default_theme"] == "bison"
         assert set(body) == {"name", "version", "docs", "default_theme"}
+
+
+class TestMetricsEndpoint:
+    """GET /api/v1/metrics is served only when metrics.enabled is set (ADR-022)."""
+
+    def test_disabled_by_default_is_404(self) -> None:
+        with patch("chronowarden.app.app_config", AppConfig()):
+            response = _build_client().get("/api/v1/metrics")
+        assert response.status_code == 404
+        assert "metrics.enabled" in response.json()["detail"]
+
+    def test_enabled_serves_prometheus_text(self) -> None:
+        config = AppConfig.model_validate({"metrics": {"enabled": True}})
+        with patch("chronowarden.app.app_config", config):
+            response = _build_client().get("/api/v1/metrics")
+        assert response.status_code == 200
+        assert "chronowarden_" in response.text

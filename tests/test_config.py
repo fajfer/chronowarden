@@ -8,6 +8,7 @@ import logging
 import pathlib
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from chronowarden.config import (
@@ -597,6 +598,25 @@ class TestDefaultTheme:
         monkeypatch.setenv("CHRONOWARDEN_THEME", "goat")
         with pytest.raises(ConfigError, match="CHRONOWARDEN_THEME='goat'"):
             load_config(str(tmp_path / "missing.yaml"))
+
+
+class TestMetricsConfig:
+    """Prometheus metrics are opt-in since 0.7 (ADR-022)."""
+
+    def test_off_by_default(self) -> None:
+        assert AppConfig().metrics.enabled is False
+
+    def test_enabled(self) -> None:
+        assert AppConfig.model_validate({"metrics": {"enabled": True}}).metrics.enabled is True
+
+    def test_unknown_key_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="port"):
+            AppConfig.model_validate({"metrics": {"enabled": True, "port": 9090}})
+
+    def test_example_config_keeps_them_off(self) -> None:
+        """config.example.yaml states the default explicitly."""
+        example = yaml.safe_load((pathlib.Path(__file__).parent.parent / "config.example.yaml").read_text())
+        assert example["metrics"] == {"enabled": False}
 
 
 class TestUnknownKeys:

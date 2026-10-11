@@ -20,6 +20,11 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: chronowarden
+      # Metrics are off by default. To scrape them, set `metrics.enabled: true` in the config Secret and uncomment:
+      # annotations:
+      #   prometheus.io/scrape: "true"
+      #   prometheus.io/port: "8000"
+      #   prometheus.io/path: /api/v1/metrics
     spec:
       securityContext:
         runAsNonRoot: true

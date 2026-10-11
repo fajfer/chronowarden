@@ -291,6 +291,14 @@ class VaultConfig(BaseModel):
         return self.secret_id
 
 
+class MetricsConfig(BaseModel):
+    """Prometheus metrics settings (ADR-022)."""
+
+    model_config = _STRICT
+
+    enabled: bool = Field(default=False, description="Serve Prometheus metrics at /api/v1/metrics")
+
+
 class UiConfig(BaseModel):
     """Instance-wide UI settings."""
 
@@ -342,6 +350,7 @@ class AppConfig(BaseModel):
         description="Expiry profiles mapping severity names to rotation periods",
     )
     ui: UiConfig = Field(default_factory=UiConfig, description="Instance-wide UI settings")
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig, description="Prometheus metrics (off by default)")
 
     @model_validator(mode="after")
     def validate_unique_names(self) -> "AppConfig":
