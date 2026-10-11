@@ -29,7 +29,9 @@ OpenBao (KV v2) via `hvac`.
   `asyncio.Lock` per vault; every sync holds it) and `set_reconnect_callback(cb)` (`app.py` registers a sync that
   runs after the background loop reconnects a vault, #59).
 - Metadata keys written to the backend: `chronowarden_severity`, `chronowarden_ttl`, only by sync.
-  `chronowarden_enabled` is no longer used (#73).
+  `chronowarden_enabled` is no longer used (#73). `write_secret_metadata` reads first and **merges** into the
+  existing `custom_metadata`, sending `delete_version_after` back unchanged: Vault replaces the whole map on write and
+  hvac defaults `delete_version_after` to `0s`. Never call `update_metadata` without that merge (0.6.3).
 - Tokens (static or AppRole-issued) are kept in memory only; never persist them (#10).
 - Required Vault policy: README "Vault Permissions" (`+/metadata/*` list/read/update, `+/metadata` list,
   `sys/mounts` read). A new call must fit this policy (root **Ask First**).
