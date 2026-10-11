@@ -35,7 +35,8 @@ function errorDetail(text: string): string {
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const options: RequestInit = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    // Lets the audit log tell changes made in the UI from other API clients (source `ui`, ADR-014)
+    headers: { 'Content-Type': 'application/json', 'X-Chronowarden-Client': 'ui' },
   };
   if (body !== undefined) {
     options.body = JSON.stringify(body);

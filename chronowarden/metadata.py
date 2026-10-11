@@ -316,8 +316,14 @@ def _reconcile_removed(
     removed, reappeared = db.reconcile_engine(vault_name, engine_path, set(secret_paths), now)
     for path in removed:
         logger.info("Secret %s/%s/%s is no longer in the backend; marked removed", vault_name, engine_path, path)
+        db.append_audit_event(
+            "secret.removed", "sync", identity=(vault_name, engine_path, path), after={"removed_at": now}
+        )
     for path in reappeared:
         logger.info("Secret %s/%s/%s is back in the backend", vault_name, engine_path, path)
+        db.append_audit_event(
+            "secret.reappeared", "sync", identity=(vault_name, engine_path, path), after={"removed_at": None}
+        )
 
 
 def detect_changes(

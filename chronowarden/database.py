@@ -13,6 +13,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from chronowarden.audit.chain import GENESIS_HASH, canonical_json, event_hash
 from chronowarden.migrations import migrate
 
 logger = logging.getLogger("uvicorn.error")
@@ -23,6 +24,22 @@ DEFAULT_DB_PATH = Path("chronowarden.db")
 SecretIdentity = tuple[str, str, str]
 
 _SYSTEM_COLUMNS = ("name", "description", "cmdb_uri", "asset_number")
+
+_AUDIT_COLUMNS = (
+    "id, timestamp, source, actor, event_type, subject, vault_name, engine_id, secret_path, before, after, "
+    "prev_hash, hash"
+)
+# Filters of list_audit_events and the column each compares
+_AUDIT_FILTERS = {
+    "vault_name": "vault_name = ?",
+    "engine_id": "engine_id = ?",
+    "secret_path": "secret_path = ?",
+    "event_type": "event_type = ?",
+    "subject": "subject = ?",
+    "since": "timestamp >= ?",
+    "until": "timestamp <= ?",
+    "before_id": "id < ?",
+}
 
 # Columns of secret_metadata_cache in the order SecretMetadataCache expects them
 _CACHE_COLUMNS = "id, vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced, removed_at"
@@ -639,3 +656,111 @@ class Database:
             ):
                 owners.setdefault((row["vault_name"], row["engine_id"], row["secret_path"]), []).append(row["owner_id"])
             return systems, owners
+
+    def append_audit_event(
+        self,
+        event_type: str,
+        source: str,
+        identity: Optional[SecretIdentity] = None,
+        subject: Optional[str] = None,
+        before: object = None,
+        after: object = None,
+        actor: Optional[str] = None,
+    ) -> Optional[dict]:
+        """
+        Append an event to the hash-chained audit log (ADR-014).
+
+        The head is read and the event inserted under the connection lock, so concurrent writers can't fork the chain.
+
+        Args:
+            event_type: What happened, e.g. `secret.system`.
+            source: Where the change came from: `sync`, `ui`, `api` or `config`.
+            identity: The secret it concerns, if any.
+            subject: What else it concerns, e.g. `system:<id>`, `owner:<id>` or `config`.
+            before: The previous value (JSON-serializable), or None.
+            after: The new value (JSON-serializable), or None.
+            actor: Who made the change; None until authentication (0.9).
+
+        Returns:
+            The stored event, or None when the database isn't connected.
+        """
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            head = conn.execute("SELECT id, hash FROM audit_events ORDER BY id DESC LIMIT 1").fetchone()
+            vault_name, engine_id, secret_path = identity if identity is not None else (None, None, None)
+            event = {
+                "id": head["id"] + 1 if head else 1,
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+                "source": source,
+                "actor": actor,
+                "event_type": event_type,
+                "subject": subject,
+                "vault_name": vault_name,
+                "engine_id": engine_id,
+                "secret_path": secret_path,
+                "before": None if before is None else canonical_json(before),
+                "after": None if after is None else canonical_json(after),
+                "prev_hash": head["hash"] if head else GENESIS_HASH,
+            }
+            event["hash"] = event_hash(event)
+            columns = ", ".join(event)
+            conn.execute(
+                f"INSERT INTO audit_events ({columns}) VALUES ({', '.join('?' * len(event))})", list(event.values())
+            )
+            conn.commit()
+            return event
+
+    def list_audit_events(self, limit: int = 200, **filters: Optional[object]) -> list[dict]:
+        """
+        List audit events, newest first.
+
+        Args:
+            limit: Maximum number of events.
+            **filters: Any of `_AUDIT_FILTERS`; None values are ignored. `before_id` pages backwards.
+
+        Returns:
+            Stored events (before/after as stored JSON text).
+        """
+        clauses = [_AUDIT_FILTERS[name] for name, value in filters.items() if value is not None]
+        params = [value for value in filters.values() if value is not None]
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            rows = conn.execute(
+                f"SELECT {_AUDIT_COLUMNS} FROM audit_events {where} ORDER BY id DESC LIMIT ?", [*params, limit]
+            )
+            return [dict(row) for row in rows]
+
+    def iter_audit_events(self) -> list[dict]:
+        """Return every audit event in id order, as stored (for verifying and exporting the chain)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            return [dict(row) for row in conn.execute(f"SELECT {_AUDIT_COLUMNS} FROM audit_events ORDER BY id")]
+
+    def get_audit_state(self, key: str) -> Optional[str]:
+        """Return a value the audit log remembers between runs (e.g. the last config fingerprint)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute("SELECT value FROM audit_state WHERE key = ?", (key,)).fetchone()
+            return row["value"] if row else None
+
+    def set_audit_state(self, key: str, value: str) -> None:
+        """Remember a value between runs."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "INSERT INTO audit_state (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, value),
+            )
+            conn.commit()

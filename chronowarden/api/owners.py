@@ -8,8 +8,9 @@ import logging
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Path, status
+from fastapi import APIRouter, HTTPException, Path, Request, status
 
+from chronowarden.api.audit import request_source
 from chronowarden.models.owner import (
     NotificationRoute,
     NotificationRouteCreate,
@@ -28,6 +29,11 @@ def _get_db() -> Any:
     from chronowarden.app import db
 
     return db
+
+
+def _owner_view(owner: dict) -> dict:
+    """An owner's fields as recorded in audit events."""
+    return {"name": owner["name"], "email": owner["email"]}
 
 
 def _build_owner(owner_dict: dict, routes: list[dict]) -> Owner:
@@ -64,7 +70,7 @@ async def list_owners() -> list[Owner]:
 
 
 @router.post("/", response_model=Owner, status_code=status.HTTP_201_CREATED, summary="Create an owner profile")
-async def create_owner(data: OwnerCreate) -> Owner:
+async def create_owner(data: OwnerCreate, request: Request) -> Owner:
     """Create a new owner profile."""
     db = _get_db()
     owner_id = str(uuid.uuid4())
@@ -72,6 +78,9 @@ async def create_owner(data: OwnerCreate) -> Owner:
     owner_dict = db.get_owner(owner_id)
     if owner_dict is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create owner")
+    db.append_audit_event(
+        "owner.created", request_source(request), subject=f"owner:{owner_id}", after=_owner_view(owner_dict)
+    )
     return _build_owner(owner_dict, [])
 
 
@@ -87,7 +96,7 @@ async def get_owner(owner_id: str = Path(description="Owner ID")) -> Owner:
 
 
 @router.put("/{owner_id}", response_model=Owner, summary="Update an owner profile")
-async def update_owner(data: OwnerUpdate, owner_id: str = Path(description="Owner ID")) -> Owner:
+async def update_owner(data: OwnerUpdate, request: Request, owner_id: str = Path(description="Owner ID")) -> Owner:
     """Update an existing owner profile."""
     db = _get_db()
     existing = db.get_owner(owner_id)
@@ -97,18 +106,50 @@ async def update_owner(data: OwnerUpdate, owner_id: str = Path(description="Owne
     owner_dict = db.get_owner(owner_id)
     if owner_dict is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update owner")
+    if _owner_view(existing) != _owner_view(owner_dict):
+        db.append_audit_event(
+            "owner.updated",
+            request_source(request),
+            subject=f"owner:{owner_id}",
+            before=_owner_view(existing),
+            after=_owner_view(owner_dict),
+        )
     routes = db.list_notification_routes(owner_id)
     return _build_owner(owner_dict, routes)
 
 
 @router.delete("/{owner_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete an owner profile")
-async def delete_owner(owner_id: str = Path(description="Owner ID")) -> None:
+async def delete_owner(request: Request, owner_id: str = Path(description="Owner ID")) -> None:
     """Delete an owner profile and all its notification routes."""
     db = _get_db()
     existing = db.get_owner(owner_id)
     if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Owner '{owner_id}' not found")
+    source = request_source(request)
+    _, secret_owners = db.get_assignments()
+    systems_before = {system["id"]: system["owner_ids"] for system in db.list_systems()}
+    names = {owner["id"]: owner["name"] for owner in db.list_owners()}
     db.delete_owner(owner_id)
+    db.append_audit_event("owner.deleted", source, subject=f"owner:{owner_id}", before=_owner_view(existing))
+    # The owner disappears from every secret and system it was assigned to; record those changes too
+    for identity, owner_ids in secret_owners.items():
+        if owner_id in owner_ids:
+            db.append_audit_event(
+                "secret.owners",
+                source,
+                identity=identity,
+                before={"owners": [{"id": oid, "name": names.get(oid)} for oid in owner_ids]},
+                after={"owners": [{"id": oid, "name": names.get(oid)} for oid in owner_ids if oid != owner_id]},
+            )
+    for system_id, owner_ids in systems_before.items():
+        if owner_id in owner_ids:
+            db.append_audit_event(
+                "system.owners",
+                source,
+                subject=f"system:{system_id}",
+                before={"owner_ids": owner_ids},
+                after={"owner_ids": [oid for oid in owner_ids if oid != owner_id]},
+            )
 
 
 @router.post(

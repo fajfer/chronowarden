@@ -18,6 +18,7 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 | `sync.py` | `/sync` | `POST /vault/{vault_name}` |
 | `vault.py` | `/vault` | `GET /instances`, `/health`, `/{name}/health` |
 | `owners.py` | `/owners` | CRUD for owners, `POST/DELETE` notification routes, `POST /{id}/test-route/{route_id}` |
+| `audit.py` | `/audit` | `GET /events` (filters, `before_id` paging), `/events.jsonl` (export as stored), `/verify`; see [audit](../audit/AGENTS.md) |
 | `systems.py` | `/systems` | CRUD for systems, `PUT /{id}/owners`; `DELETE` is 409 (with the secret list) while secrets are assigned |
 | `__init__.py` | n/a | exports `*_router`; add new routers here and include them in `app.py` |
 
@@ -31,7 +32,7 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 - `severity` input (query or body) must be a configured expiry profile or `"none"` (`_validate_severity_input`).
 - Severity is read-only via the API: it comes from config (ADR-006). Assignments (#61) use `PUT /secrets/{id}/system`
   and `/owners`, which replace the whole value and resolve `{id}` to the secret identity before storing (ADR-017).
-  Each change is a `logger.info` line until the audit log (#24). Effective owners and the filters come from
+  Each change is an audit event (`secret.system`, `secret.owners`); `GET /secrets/{id}/history` lists them. Effective owners and the filters come from
   `chronowarden/assignments.py` (`AssignmentIndex`, loaded once per request).
 - `POST /sync/vault/{name}` also (re)starts the manager's reconnect loop.
 
