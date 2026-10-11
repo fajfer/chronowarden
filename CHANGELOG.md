@@ -12,7 +12,11 @@ Before 1.0, minor versions may contain breaking changes; they are marked **Break
 Releases before 0.6.0 are described in the [GitHub releases](https://github.com/fajfer/chronowarden/releases) and the
 git history.
 
-## [Unreleased]
+## [0.7.0] - unreleased
+
+Milestone [0.7 Compliance evidence](https://github.com/fajfer/chronowarden/milestone/4): Chronowarden now produces
+evidence an auditor accepts, about your secrets and about itself. **Read the upgrade notes first: back up
+`chronowarden.db`.** See also the [upgrade guide](https://fajfer.github.io/chronowarden/guides/upgrading-to-0.7/).
 
 ### Upgrade notes
 
@@ -209,7 +213,7 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
-[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.6.3...HEAD
+[0.7.0]: https://github.com/fajfer/chronowarden/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/fajfer/chronowarden/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/fajfer/chronowarden/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/fajfer/chronowarden/compare/v0.6.0...v0.6.1
