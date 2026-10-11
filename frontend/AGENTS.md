@@ -17,7 +17,8 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
   fallback `index.html`). There is no `svelte.config.js` since SvelteKit 3 (#79). `tsconfig.json` extends
   `$app/tsconfig`.
 - `src/lib/api/`: `client.ts` (`apiGet/apiPost/apiPatch/...`, `ApiError`), plus one file per backend router
-  (`secrets.ts`, `sync.ts`, `vaults.ts`, `owners.ts`, `systems.ts`). `ApiError.message` is the backend's `detail`
+  (`secrets.ts`, `sync.ts`, `vaults.ts`, `owners.ts`, `systems.ts`, `audit.ts`). Every request sends
+  `X-Chronowarden-Client: ui` so the audit log records the source `ui`. `ApiError.message` is the backend's `detail`
   (string, `{ message }` or the 422 list), ready for a toast.
 - `src/lib/stores/`: `secrets` (secrets that exist; stats and dashboard use it), `removedSecrets` (gone from the
   backend, shown with "Show removed"), loading, error, `secretStats`, `updateSecret`; `filters` (incl. `systemId`,
@@ -26,8 +27,9 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
 - `src/lib/components/`: `Filters`, `SecretModal` (details + system/owner assignment), `OwnerModal`, `SystemModal`,
   `StatusBadge`, `ExpiryHorizon`, `Navbar`,
   `Sidebar`, …
-- `src/lib/utils/`: `dateFormat.ts`, `statusColor.ts` (status → label and colour).
-- `src/routes/`: `/` dashboard, `/secrets`, `/vaults`, `/sync`, `/settings`, `/login`; `+layout.ts` sets
+- `src/lib/utils/`: `dateFormat.ts`, `statusColor.ts` (status → label and colour), `auditFormat.ts` (event labels,
+  one-line summaries, which events show Revert; the server re-checks).
+- `src/routes/`: `/` dashboard, `/secrets`, `/vaults`, `/sync`, `/audit`, `/settings`, `/login`; `+layout.ts` sets
   `ssr = false`.
 - `static/`: logos and mascots per theme. `mockups/`: standalone HTML mockups the UI was built from (`4ee2142`).
 

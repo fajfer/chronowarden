@@ -258,7 +258,14 @@
                 <td class="px-4 py-3 text-right font-mono font-semibold {daysColor(secret)}">
                   {secret.days_remaining != null ? secret.days_remaining + 'd' : '—'}
                 </td>
-                <td class="px-4 py-3"><StatusBadge status={secret.status} /></td>
+                <td class="px-4 py-3">
+                  <StatusBadge status={secret.status} />
+                  {#if secret.awaiting_confirmation}
+                    <span class="block mt-1 text-[11px] {secret.confirmation_overdue ? 'text-red-400' : 'text-amber-400'}">
+                      {secret.confirmation_overdue ? 'Confirmation overdue' : 'Awaiting confirmation'}
+                    </span>
+                  {/if}
+                </td>
                 <td class="px-4 py-3 whitespace-nowrap">
                   {#if secret.removed_at}
                     <button onclick={() => handlePurge(secret)} class="text-xs px-2 py-1 mr-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-300">Purge</button>

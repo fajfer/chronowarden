@@ -5,7 +5,7 @@
 """API routes for reading cached secret metadata."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -13,9 +13,17 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from chronowarden.api.audit import request_source
 from chronowarden.assignments import AssignmentIndex
 from chronowarden.config import AppConfig
+from chronowarden.confirmations import confirmation_status, current_version, refresh_cached_ttl
 from chronowarden.database import SecretIdentity, SecretMetadataCache
+from chronowarden.metadata import parse_date
 from chronowarden.models.audit import AuditEvent
-from chronowarden.models.secret import PurgeResult, SecretMetadataResponse, SecretStatus
+from chronowarden.models.secret import (
+    Confirmation,
+    ConfirmationCreate,
+    PurgeResult,
+    SecretMetadataResponse,
+    SecretStatus,
+)
 from chronowarden.models.system import OwnerIds, SystemAssignment
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
@@ -92,8 +100,6 @@ def _enrich_secret(entry: SecretMetadataCache, config: AppConfig, index: Assignm
     Returns:
         Enriched response model.
     """
-    from chronowarden.metadata import parse_date
-
     severity = entry.severity or "default"
     rotation_days = config.get_rotation_days(severity)
     alert_days = config.get_alert_days(severity)
@@ -129,10 +135,23 @@ def _enrich_secret(entry: SecretMetadataCache, config: AppConfig, index: Assignm
         last_synced=last_synced,
         status=_compute_status(days_remaining, alert_days),
         removed_at=parse_date(entry.removed_at) if entry.removed_at else None,
+        **_confirmation_fields(index.db, config, _identity(entry), severity),
         system=index.system_of(_identity(entry)),
         owners=index.owners_of(_identity(entry)),
         effective_owners=index.effective_owners_of(_identity(entry)),
     )
+
+
+def _confirmation_fields(database: Any, config: AppConfig, identity: SecretIdentity, severity: str) -> dict[str, Any]:
+    """The confirmation fields of a secret response (ADR-021)."""
+    status_ = confirmation_status(database, config, identity, severity)
+    latest = status_.latest
+    return {
+        "confirmation_required": status_.required,
+        "awaiting_confirmation": status_.awaiting,
+        "confirmation_overdue": status_.overdue,
+        "last_confirmation": Confirmation(**{k: latest[k] for k in Confirmation.model_fields}) if latest else None,
+    }
 
 
 def _identity(entry: SecretMetadataCache) -> SecretIdentity:
@@ -369,3 +388,55 @@ async def secret_history(secret_id: int) -> list[AuditEvent]:
     vault_name, engine_id, secret_path = _identity(_require_secret(database, secret_id))
     rows = database.list_audit_events(limit=1000, vault_name=vault_name, engine_id=engine_id, secret_path=secret_path)
     return [AuditEvent.from_stored(row) for row in rows]
+
+
+@router.post(
+    "/{secret_id}/confirmations",
+    response_model=SecretMetadataResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Confirm a rotation was applied",
+)
+async def confirm_rotation(data: ConfirmationCreate, secret_id: int, request: Request) -> SecretMetadataResponse:
+    """
+    Confirm that the newest version of a secret is applied where it is used (ADR-021).
+
+    The next rotation then counts from the applied date when that is later than the backend's update.
+
+    Args:
+        data: When it was applied (may be in the past) and, for automation, who confirmed it.
+        secret_id: The secret metadata cache row ID.
+
+    Returns:
+        The secret with its new confirmation state.
+
+    Raises:
+        HTTPException: 404 if the secret isn't cached, 409 before its first sync, 422 for an applied date before the
+            version was created or in the future.
+    """
+    database, config, _ = _get_app_dependencies()
+    entry = _require_secret(database, secret_id)
+    identity = _identity(entry)
+    version = current_version(database, identity)
+    if version is None or version.get("current") is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="The secret's versions aren't known yet; sync it first"
+        )
+    applied = data.applied_at if data.applied_at.tzinfo else data.applied_at.replace(tzinfo=timezone.utc)
+    created = parse_date(version.get("created_time") or "")
+    if applied > datetime.now(tz=timezone.utc) + timedelta(minutes=5):
+        raise HTTPException(status_code=422, detail="applied_at is in the future")
+    if created is not None and applied < created:
+        raise HTTPException(
+            status_code=422,
+            detail=f"applied_at is before version {version['current']} was created ({version['created_time']})",
+        )
+    applied_text = applied.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    confirmation = database.add_confirmation(identity, version["current"], applied_text, data.confirmed_by)
+    database.append_audit_event(
+        "secret.confirmed",
+        request_source(request),
+        identity=identity,
+        after={k: confirmation[k] for k in ("id", "version", "applied_at", "confirmed_by")},
+    )
+    refresh_cached_ttl(database, config, identity)
+    return _enrich_secret(database.get_secret_by_id(secret_id), config, AssignmentIndex(database))

@@ -34,8 +34,16 @@ git history.
 
 - **Audit log (#24, ADR-014).** Every change Chronowarden makes is recorded in an append-only, hash-chained log:
   system and owner assignments, systems, owners, secrets removed, reappearing or purged, and config changes that
-  affect secrets (recorded at startup). `GET /api/v1/audit/events`, `/audit/events.jsonl` (export) and
-  `/audit/verify` (recompute the chain); `GET /api/v1/secrets/{id}/history` per secret. The log is kept forever.
+  affect secrets (recorded at startup). Sync also records changes made in the backend: custom metadata keys
+  added, changed or removed (with values), version-cleanup settings, and new versions (rotations; values are never
+  read). `GET /api/v1/audit/events`, `/audit/events.jsonl` (export) and
+  `/audit/verify` (recompute the chain); `GET /api/v1/secrets/{id}/history` per secret; assignment changes can be
+  reverted with `POST /api/v1/audit/events/{id}/revert`. The log is kept forever.
+- **Rotation confirmation (#24, ADR-021).** `confirmation_required` (per vault, engine or secret, default off) marks
+  a secret's new versions as awaiting confirmation until someone confirms they were applied where the secret is
+  used: in the API (`POST /api/v1/secrets/{id}/confirmations`, with an optional `confirmed_by` for pipelines) with an
+  applied date that may lie in the past. The next rotation then counts from that date. Overdue after
+  `confirmation_grace` (global, per profile). Confirmations can be reverted.
 - **Systems and owners for secrets (#61).** Create systems (name, description, CMDB link, asset number, owners) under
   `/api/v1/systems`, assign a secret to one system and to owners with `PUT /api/v1/secrets/{id}/system` and
   `/owners`, and filter secrets by `system_id`, `owner_id` (effective owner) or `unassigned`. A secret's effective

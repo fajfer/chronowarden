@@ -64,6 +64,12 @@ expiry_profiles:
   # monthly:
   #   rotation_period: "30d"
   #   alert_threshold: "7d"
+  #   confirmation_grace: "2d"  # overrides the global confirmation_grace below
+
+# Rotation confirmation (ADR-021): when a secret's rotations must be confirmed as applied where it is used
+# (confirmation_required below), a new version shows "awaiting confirmation" until someone confirms it in the UI or
+# through POST /api/v1/secrets/{id}/confirmations. It becomes overdue after this grace period.
+confirmation_grace: "7d"
 
 # Severity Cascade (highest to lowest priority):
 #   1. Secret-specific config (vaults[].engines[].secrets[].severity)
@@ -86,6 +92,8 @@ vaults:
 
     # Vault-wide default severity (applies to ALL engines automatically)
     severity: critical
+    # Rotations must be confirmed as applied: secret → engine → vault, default false
+    # confirmation_required: true
 
     # OPTIONAL: Only list engines that need overrides
     # All discovered engines automatically inherit vault severity
@@ -93,6 +101,7 @@ vaults:
       # Override: temporary tokens rotate annually
       - name: temporary-tokens
         severity: default
+        # confirmation_required: false  # e.g. rotated by trusted automation
 
       # Override with specific secret exceptions
       - name: certificates
@@ -104,6 +113,9 @@ vaults:
             severity: none   # Monitor but never rotate
           - path: test-cert
             severity: default  # Less critical
+          # A secret entry may set severity, confirmation_required, or both
+          # - path: db-password
+          #   confirmation_required: true
 
   # Staging Vault (OpenBao fork)
   - name: staging

@@ -27,7 +27,6 @@ files an agent must read (**Load**), so it can be done with only those files.
 | [2026-10-10-release-0-7](2026-10-10-release-0-7.md) | Release 0.7 Compliance evidence, extended scope: order of work |
 | [2026-10-10-supply-chain-security](2026-10-10-supply-chain-security.md) | Scorecard 6.8 → ~8.7, SLSA Build L3, cosign, CycloneDX + SPDX SBOMs, fuzzing, signed Releases |
 | [2026-10-11-compliance-evidence](2026-10-11-compliance-evidence.md) | Privileged flag in Vault, snapshots with scope and cadences, gap warnings, Compliance tab |
-| [2026-10-11-audit-log-and-rotation-confirmation](2026-10-11-audit-log-and-rotation-confirmation.md) | #24: hash-chained audit log, change history with revert, rotation confirmation |
 | [2026-10-10-compliance-policies-and-reports](2026-10-10-compliance-policies-and-reports.md) | 0.7.x: policies in config with example YAML, PDF reports with Typst |
 | [2026-10-09-generic-provider-registry](2026-10-09-generic-provider-registry.md) | A second provider can plug in without editing Vault-specific code |
 
@@ -35,6 +34,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-11-audit-log-and-rotation-confirmation](implemented/2026-10-11-audit-log-and-rotation-confirmation.md) | #24: hash-chained audit log, change history with revert, rotation confirmation |
 | [2026-10-11-optional-metrics](implemented/2026-10-11-optional-metrics.md) | Prometheus metrics off by default (ADR-022) |
 | [2026-10-09-systems-and-owners](implemented/2026-10-09-systems-and-owners.md) | Systems (CMDB URI, asset number, owners) and owners assigned to secrets (#61) |
 | [2026-10-11-release-0-6-3](implemented/2026-10-11-release-0-6-3.md) | Sync merges custom metadata instead of replacing it (released as v0.6.3) |

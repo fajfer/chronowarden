@@ -14,6 +14,9 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
 
 - `chain.py`: `canonical_json`, `event_hash`, `verify_chain`, `GENESIS_HASH`. Pure functions, no I/O.
 - `config_events.py`: `record_config_change(db, config)`, called in `app.py` `lifespan` after the DB opens.
+- `revert.py`: `revert_event(db, event, source)`, `RevertError` (422 not revertible, 409 changed since or gone).
+- `observe.py`: `observed_state(metadata)`, `record_observed_changes`, `record_config_applied`; called from
+  `metadata.sync_secret_metadata`. The last state per secret is in `observed_state` (migration 6).
 - `../database.py`: `append_audit_event`, `list_audit_events`, `iter_audit_events`, `get/set_audit_state`.
 - `../api/audit.py`: `GET /audit/events`, `/audit/events.jsonl`, `/audit/verify`; `request_source(request)`.
 - `../models/audit.py`: `AuditEvent` (before/after parsed), `AuditChainStatus`.
@@ -30,10 +33,16 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
   `api`. `actor` stays null until authentication (0.9).
 - Event types: `secret.system`, `secret.owners` (`{"owners": [{id, name}]}`), `secret.removed`, `secret.reappeared`,
   `secret.purged` (with the assignments that went), `system.created|updated|owners|deleted` (subject `system:<id>`),
-  `owner.created|updated|deleted` (subject `owner:<id>`), `config.baseline|changed` (subject `config`).
+  `owner.created|updated|deleted` (subject `owner:<id>`), `config.baseline|changed` (subject `config`). From sync:
+  `secret.baseline` (first sight), `secret.metadata` (custom keys, values included), `secret.settings`,
+  `secret.version` (rotation; values never read), `secret.config_applied` (Chronowarden's own severity/TTL write).
+  `secret.confirmed` (rotation confirmed as applied, ADR-021).
 - Secret events are keyed by identity (`vault_name`, `engine_id`, `secret_path`), so history survives a rebuilt
   cache (ADR-017). Unchanged values record nothing.
 - Config events store only expiry profiles and the severity cascade, never addresses or credentials.
+- Revert (`POST /audit/events/{id}/revert`) restores `before` for `secret.system` / `secret.owners`, and revokes
+  the confirmation of a `secret.confirmed` event (TTL recalculated), only while the event's `after` is still current; the new event's `after` carries `"reverts": <id>`. Everything else is 422:
+  backend data isn't Chronowarden's to change (ADR-004), severity/TTL come from config (ADR-006).
 
 ## How to
 
@@ -45,8 +54,10 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
 
 - `verify_chain` can't see the newest events being cut off; snapshots record the head hash for that (#94).
 - The change and its event are separate commits; a crash between them loses the event, not the change.
-- Other teams' metadata values will be stored here once sync observes them (task 2 of the audit spec); accepted
-  and documented next to the README "unauthenticated" warning.
+- Other teams' metadata values are stored here and readable by anyone who reaches the API until 0.9; accepted and
+  documented next to the README "unauthenticated" warning.
+- Every write of Chronowarden's own keys must go through `record_config_applied`, or the next sync reports it as a
+  backend change.
 
 ## Related ADRs
 

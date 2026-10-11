@@ -227,3 +227,70 @@ class TestConfigEvents:
         record_config_change(db, config)
         stored = db.list_audit_events()[0]["after"]
         assert "secret-host" not in stored and "hvs.SECRET" not in stored
+
+
+class TestRevert:
+    """POST /audit/events/{id}/revert."""
+
+    def _secret_id(self, db: Database) -> int:
+        entry = db.get_secret_metadata("prod", "apps", "db")
+        assert entry is not None and entry.id is not None
+        return entry.id
+
+    def test_revert_system_assignment(self, client: TestClient, db: Database) -> None:
+        billing = client.post("/api/v1/systems/", json={"name": "Billing"}).json()
+        crm = client.post("/api/v1/systems/", json={"name": "CRM"}).json()
+        url = f"/api/v1/secrets/{self._secret_id(db)}/system"
+        client.put(url, json={"system_id": billing["id"]})
+        client.put(url, json={"system_id": crm["id"]})
+        last = db.list_audit_events(event_type="secret.system")[0]
+        response = client.post(f"/api/v1/audit/events/{last['id']}/revert", headers=UI)
+        assert response.status_code == 201
+        event = response.json()
+        assert event["source"] == "ui" and event["after"]["reverts"] == last["id"]
+        assert event["after"]["system"]["name"] == "Billing" and event["before"]["system"]["name"] == "CRM"
+        assert client.get(f"/api/v1/secrets/{self._secret_id(db)}").json()["system"]["name"] == "Billing"
+
+    def test_revert_owners(self, client: TestClient, db: Database) -> None:
+        url = f"/api/v1/secrets/{self._secret_id(db)}/owners"
+        client.put(url, json={"owner_ids": ["alice"]})
+        client.put(url, json={"owner_ids": ["alice", "bob"]})
+        last = db.list_audit_events(event_type="secret.owners")[0]
+        assert client.post(f"/api/v1/audit/events/{last['id']}/revert").status_code == 201
+        assert [o["id"] for o in client.get(f"/api/v1/secrets/{self._secret_id(db)}").json()["owners"]] == ["alice"]
+
+    def test_older_event_after_a_newer_change_is_409(self, client: TestClient, db: Database) -> None:
+        url = f"/api/v1/secrets/{self._secret_id(db)}/owners"
+        client.put(url, json={"owner_ids": ["alice"]})
+        client.put(url, json={"owner_ids": ["bob"]})
+        first = db.list_audit_events(event_type="secret.owners")[-1]
+        response = client.post(f"/api/v1/audit/events/{first['id']}/revert")
+        assert response.status_code == 409 and "changed since" in response.json()["detail"]
+
+    def test_deleted_system_is_409(self, client: TestClient, db: Database) -> None:
+        billing = client.post("/api/v1/systems/", json={"name": "Billing"}).json()
+        url = f"/api/v1/secrets/{self._secret_id(db)}/system"
+        client.put(url, json={"system_id": billing["id"]})
+        client.put(url, json={"system_id": None})
+        client.delete(f"/api/v1/systems/{billing['id']}")
+        last = db.list_audit_events(event_type="secret.system")[0]
+        response = client.post(f"/api/v1/audit/events/{last['id']}/revert")
+        assert response.status_code == 409 and "no longer exists" in response.json()["detail"]
+
+    @pytest.mark.parametrize(
+        "event_type,reason",
+        [
+            ("secret.metadata", "other teams"),
+            ("secret.settings", "backend"),
+            ("secret.config_applied", "config.yaml"),
+            ("system.created", "only system and owner assignments"),
+        ],
+    )
+    def test_refused_types_are_422(self, client: TestClient, db: Database, event_type: str, reason: str) -> None:
+        event = db.append_audit_event(event_type, "sync", identity=("prod", "apps", "db"), before={}, after={})
+        assert event is not None
+        response = client.post(f"/api/v1/audit/events/{event['id']}/revert")
+        assert response.status_code == 422 and reason in response.json()["detail"]
+
+    def test_unknown_event_is_404(self, client: TestClient) -> None:
+        assert client.post("/api/v1/audit/events/999/revert").status_code == 404

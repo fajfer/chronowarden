@@ -16,8 +16,9 @@ This is very early work being built with focus on compliance for financial insti
 
 > [!WARNING]
 > **The API and UI have no authentication yet** (planned for a later release). Anyone who can reach the HTTP port
-> can read all tracked metadata and trigger syncs. Run Chronowarden only on a trusted network or behind an
-> authenticating reverse proxy, and never expose it directly to the internet.
+> can read all tracked metadata (including other teams' custom metadata values kept in the audit log) and trigger
+> syncs. Run Chronowarden only on a trusted network or behind an authenticating reverse proxy, and never expose it
+> directly to the internet.
 
 Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and troubleshoot!
 
@@ -190,6 +191,8 @@ path "sys/mounts" {
 - `GET /api/v1/secrets/{id}` - Get secret metadata by ID, including its system, owners and effective owners
 - `PUT /api/v1/secrets/{id}/system` - Assign the secret to a system (`{"system_id": "..."}`, or `null` to unassign)
 - `PUT /api/v1/secrets/{id}/owners` - Replace the secret's owners (`{"owner_ids": [...]}`)
+- `POST /api/v1/secrets/{id}/confirmations` - Confirm the newest version is applied (`{"applied_at": "...",
+  "confirmed_by": "pipeline"}`); the next rotation counts from that date if it is later than the backend update
 - `DELETE /api/v1/secrets/{id}`, `DELETE /api/v1/secrets/removed` - Purge secrets that sync no longer finds in their
   backend, with their assignments (`removed` takes `vault_name`/`engine_id`); a secret that still exists gives `409`
 
@@ -215,6 +218,8 @@ or else its system's owners.
   `event_type`, `subject`, `since`, `until`; paging with `before_id`)
 - `GET /api/v1/audit/events.jsonl` - Export of the whole log as stored, for archiving or independent checks
 - `GET /api/v1/audit/verify` - Recompute the hash chain; returns the head hash to note down
+- `POST /api/v1/audit/events/{id}/revert` - Undo a system or owner assignment change (recorded as a new event);
+  backend data, severity and TTL can't be reverted from Chronowarden
 - `GET /api/v1/secrets/{id}/history` - Changes to one secret
 
 ### Vaults
@@ -234,6 +239,9 @@ or else its system's owners.
 | 🟡 Warning | Rotation needed soon | `0 < days_remaining ≤ alert_threshold` |
 | 🔴 Expired | Rotation overdue | `days_remaining ≤ 0` |
 | ⚪ No TTL | No rotation configured | `chronowarden_ttl` not set |
+
+Where rotations must be confirmed (`confirmation_required`, per vault, engine or secret), a new version is also
+shown as **awaiting confirmation** until someone confirms it was applied, and as overdue after `confirmation_grace`.
 
 `alert_threshold` is set per expiry profile in `config.yaml` (default `30d`); see
 [`config.example.yaml`](config.example.yaml).

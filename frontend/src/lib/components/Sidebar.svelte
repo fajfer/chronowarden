@@ -32,7 +32,7 @@
         { href: '/vaults', label: 'Vaults', badge: () => vaultCount },
       ],
     },
-    { title: 'Operate', links: [{ href: '/sync', label: 'Sync history' }] },
+    { title: 'Operate', links: [{ href: '/sync', label: 'Sync history' }, { href: '/audit', label: 'Audit log' }] },
     { title: 'Configure', links: [{ href: '/settings', label: 'Settings' }] },
   ];
 </script>

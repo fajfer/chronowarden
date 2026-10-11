@@ -26,6 +26,13 @@ export interface Secret {
   alert_threshold_days: number;
   last_synced: string | null;
   status: SecretStatus;
+  /** Rotations must be confirmed as applied (ADR-021). */
+  confirmation_required: boolean;
+  /** The newest version isn't confirmed yet. */
+  awaiting_confirmation: boolean;
+  /** Awaiting longer than the grace period. */
+  confirmation_overdue: boolean;
+  last_confirmation: Confirmation | null;
   /** When sync stopped finding the secret in its backend (#86); null while it exists. */
   removed_at: string | null;
   /** Assigned system, or null when unassigned (#61). */
@@ -42,4 +49,15 @@ export interface Secret {
 export interface PurgeResult {
   purged: number;
   secrets: string[];
+}
+
+/**
+ * A confirmation that a secret's version was applied where it is used.
+ */
+export interface Confirmation {
+  id: number;
+  version: number;
+  applied_at: string;
+  confirmed_by: string | null;
+  recorded_at: string;
 }

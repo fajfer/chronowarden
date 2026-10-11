@@ -29,7 +29,8 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 - Tables: `secret_metadata_cache` (unique `vault_name, engine_id, secret_path`), `owners`,
   `notification_routes` (`type = 'webhook'`), `systems` (unique `name`), `system_owners`, and the assignments
   `secret_systems` / `secret_owners` keyed by `vault_name, engine_id, secret_path`, never the cache `id` (ADR-017).
-  `audit_events` (append-only, [audit](../audit/AGENTS.md)) and `audit_state`. `PRAGMA user_version` is the
+  `audit_events` (append-only, [audit](../audit/AGENTS.md)), `audit_state`, `observed_state`,
+  `rotation_confirmations` (revoked, never deleted, except by purge). `PRAGMA user_version` is the
   number of the last migration applied.
 - `SecretMetadataResponse` fields are mirrored in `frontend/src/lib/types/Secret.ts`, `Owner` in `Owner.ts`:
   changing a field means changing both.

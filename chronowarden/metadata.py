@@ -13,6 +13,7 @@ from typing import Optional
 from hvac.exceptions import VaultError
 from requests.exceptions import RequestException
 
+from chronowarden.audit.observe import observed_state, record_config_applied, record_observed_changes
 from chronowarden.config import AppConfig
 from chronowarden.database import Database, SecretMetadataCache
 from chronowarden.integrations.vault import VaultIntegration
@@ -169,6 +170,9 @@ def sync_secret_metadata(
 
     custom_metadata = vault_metadata.get("custom_metadata") or {}
     updated_time = vault_metadata.get("updated_time", "")
+    identity = (vault_name, engine_id, secret_path)
+    state = observed_state(vault_metadata)
+    record_observed_changes(db, identity, state)
 
     # Resolve severity purely from config — never from Vault metadata
     severity = config.resolve_severity(engine_id, vault_name, secret_path=secret_path)
@@ -180,8 +184,10 @@ def sync_secret_metadata(
     # Read what the internal database currently has
     cached = db.get_secret_metadata(vault_name, engine_id, secret_path)
 
-    # Calculate the desired TTL from config
-    desired_ttl = calculate_ttl(updated_time, severity, config)
+    # Calculate the desired TTL from config, counting from a confirmed applied date when it is later (ADR-021)
+    from chronowarden.confirmations import rotation_base  # here: confirmations imports parse_date from this module
+
+    desired_ttl = calculate_ttl(rotation_base(db, identity, updated_time), severity, config)
 
     # Determine if the remote backend needs updating
     remote_needs_update = False
@@ -228,6 +234,7 @@ def sync_secret_metadata(
         if desired_ttl is not None:
             metadata_fields["chronowarden_ttl"] = desired_ttl
         if vault.write_secret_metadata(secret_path, metadata_fields, mount_point=engine_id):
+            record_config_applied(db, identity, state, metadata_fields)
             logger.info(
                 "Updated backend metadata for %s/%s (severity=%s, ttl=%s)",
                 engine_id,

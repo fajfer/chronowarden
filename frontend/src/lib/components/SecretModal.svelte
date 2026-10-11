@@ -8,8 +8,11 @@
   import { formatDate } from '#lib/utils/dateFormat.js';
   import { fetchOwners } from '#lib/api/owners.js';
   import { fetchSystems } from '#lib/api/systems.js';
-  import { setSecretOwners, setSecretSystem } from '#lib/api/secrets.js';
-  import { updateSecret } from '#lib/stores/secrets.js';
+  import { confirmRotation, fetchSecret, fetchSecretHistory, setSecretOwners, setSecretSystem } from '#lib/api/secrets.js';
+  import { revertAuditEvent } from '#lib/api/audit.js';
+  import { updateSecret, loadSecrets } from '#lib/stores/secrets.js';
+  import AuditEventList from './AuditEventList.svelte';
+  import type { AuditEvent } from '#lib/types/index.js';
   import { addToast } from '#lib/stores/sync.js';
 
   let { secret, onClose }: {
@@ -22,6 +25,53 @@
   let systemId = $state('');
   let ownerIds = $state<string[]>([]);
   let saving = $state(false);
+  let history = $state<AuditEvent[]>([]);
+  let appliedAt = $state('');
+  let confirming = $state(false);
+
+  /** Now, as a value for a datetime-local input (local time, minutes). */
+  function nowLocal(): string {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+
+  async function loadHistory(id: number) {
+    try {
+      history = await fetchSecretHistory(id);
+    } catch {
+      history = [];
+    }
+  }
+
+  async function handleConfirm() {
+    if (!secret || !appliedAt) return;
+    confirming = true;
+    try {
+      const updated = await confirmRotation(secret.id, new Date(appliedAt).toISOString());
+      updateSecret(updated);
+      secret = updated;
+      addToast(`Confirmed ${updated.full_path} applied`, 'success');
+      await loadHistory(updated.id);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Confirming failed', 'error');
+    } finally {
+      confirming = false;
+    }
+  }
+
+  async function handleRevert(event: AuditEvent) {
+    if (!secret) return;
+    try {
+      await revertAuditEvent(event.id);
+      addToast(`Reverted #${event.id}`, 'success');
+      const fresh = await fetchSecret(secret.id);
+      updateSecret(fresh);
+      secret = fresh;
+      await loadSecrets();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Revert failed', 'error');
+    }
+  }
 
   // Reload the choices and reset the form whenever another secret is opened
   $effect(() => {
@@ -30,6 +80,8 @@
     ownerIds = secret.owners.map((o) => o.id);
     fetchSystems().then((s) => (systems = s)).catch(() => (systems = []));
     fetchOwners().then((o) => (owners = o)).catch(() => (owners = []));
+    appliedAt = nowLocal();
+    loadHistory(secret.id);
   });
 
   const assignedSystem = $derived(systems.find((s) => s.id === systemId) ?? null);
@@ -52,6 +104,7 @@
       updateSecret(updated);
       secret = updated;
       addToast(`Updated assignment of ${updated.full_path}`, 'success');
+      await loadHistory(updated.id);
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Saving the assignment failed', 'error');
     } finally {
@@ -78,8 +131,13 @@
             longer needed for reporting.
           </div>
         {/if}
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <StatusBadge status={secret.status} />
+          {#if secret.awaiting_confirmation}
+            <span class="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium {secret.confirmation_overdue ? 'text-red-400 border-red-500' : 'text-amber-400 border-amber-500'}">
+              {secret.confirmation_overdue ? 'Confirmation overdue' : 'Awaiting confirmation'}
+            </span>
+          {/if}
           <span class="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium text-blue-400 border-blue-500">
             {secret.severity}
           </span>
@@ -120,6 +178,33 @@
           </div>
         </div>
 
+        {#if secret.confirmation_required || secret.last_confirmation}
+          <div class="border-t border-gray-700 pt-4 space-y-2">
+            <h3 class="text-xs text-gray-500 uppercase">Rotation confirmation</h3>
+            <p class="text-xs text-gray-400">
+              {#if secret.last_confirmation}
+                Last confirmed: version {secret.last_confirmation.version} applied {formatDate(secret.last_confirmation.applied_at)}{secret.last_confirmation.confirmed_by ? ` by ${secret.last_confirmation.confirmed_by}` : ''}.
+              {:else}
+                Never confirmed.
+              {/if}
+              {#if secret.awaiting_confirmation}The newest version waits for confirmation that it is applied where it's used.{/if}
+            </p>
+            {#if secret.awaiting_confirmation || !secret.confirmation_required}
+              <div class="flex items-end gap-2">
+                <div>
+                  <label for="applied-at" class="block text-gray-500 text-xs mb-1">Applied at (your local time)</label>
+                  <input id="applied-at" type="datetime-local" bind:value={appliedAt}
+                         class="px-3 py-1.5 bg-gray-900 border border-gray-600 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-indigo-500" />
+                </div>
+                <button onclick={handleConfirm} disabled={confirming || !appliedAt}
+                        class="px-3 py-1.5 text-sm rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition-colors disabled:opacity-50">
+                  {confirming ? 'Confirming…' : 'Confirm applied'}
+                </button>
+              </div>
+            {/if}
+          </div>
+        {/if}
+
         <div class="border-t border-gray-700 pt-4 space-y-3">
           <h3 class="text-xs text-gray-500 uppercase">Assignment</h3>
           <div>
@@ -159,6 +244,13 @@
             {/if}
           </p>
         </div>
+
+        <details class="border-t border-gray-700 pt-4">
+          <summary class="cursor-pointer text-xs text-gray-500 uppercase">History ({history.length})</summary>
+          <div class="mt-2 -mx-4 max-h-64 overflow-y-auto">
+            <AuditEventList events={history} showTarget={false} onRevert={handleRevert} />
+          </div>
+        </details>
       </div>
 
       <div class="px-6 py-4 border-t border-gray-700 flex justify-end gap-2">
