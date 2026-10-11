@@ -261,7 +261,18 @@ cosign verify "ghcr.io/fajfer/chronowarden@${DIGEST}" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-The wheel and sdist on the [GitHub release](https://github.com/fajfer/chronowarden/releases) are covered by
+Each release also carries SBOMs in [CycloneDX 1.6](https://cyclonedx.org/) and [SPDX 2.3](https://spdx.dev/)
+JSON: one per image platform (`chronowarden-image-{amd64,arm64}.*`) and one for the source
+(`chronowarden-source.*`, from `uv.lock` and `frontend/package-lock.json`). The image SBOMs are also attested to the
+image:
+
+```bash
+cosign verify-attestation "ghcr.io/fajfer/chronowarden@${DIGEST}" --type cyclonedx \
+  --certificate-identity-regexp '^https://github.com/fajfer/chronowarden/\.github/workflows/docker\.yaml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+The wheel, sdist and source SBOMs on the [GitHub release](https://github.com/fajfer/chronowarden/releases) are covered by
 `chronowarden.intoto.jsonl`:
 
 ```bash
