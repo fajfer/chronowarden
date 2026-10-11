@@ -20,10 +20,10 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 - `kubernetes/`: `deployment.yaml`, `service.yaml` (ClusterIP :8000), `pvc.yaml` (1Gi RWO), `kustomization.yaml`
   (namespace `chronowarden`; ingress and config Secret are left to the user).
 - `../config.example.yaml`: the full config reference ([core](../chronowarden/AGENTS.md)).
-- `../.github/workflows/`: `docker.yaml` (builds both targets for amd64 and arm64; pushes to `ghcr.io` except on PRs),
-  `ci.yaml` (black, ruff, pytest, `npm run check`), `scorecard.yml`, `zizmor.yaml`,
-  `agents-docs.yaml`, `cflite_pr.yml` / `cflite_batch.yml` (ClusterFuzzLite: 5 min on PRs touching the code,
-  30 min weekly).
+- `../.github/workflows/`: `docker.yaml` (both targets, amd64 + arm64, pushed except on PRs; on `v*` tags: cosign
+  signature + SLSA provenance), `release.yaml` (`v*` tags: wheel, sdist, provenance, Release notes from
+  `scripts/release_notes.sh`; `-rc.N` = pre-release), `ci.yaml`, `scorecard.yml`, `zizmor.yaml`, `agents-docs.yaml`,
+  `cflite_pr.yml` / `cflite_batch.yml` (ClusterFuzzLite: 5 min on code PRs, 30 min weekly).
 
 ## Contracts
 
@@ -60,6 +60,8 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   `.clusterfuzzlite/` on the OSS-Fuzz builder, which runs **Python 3.11** (the project declares 3.12+):
   `build.sh` installs the `uv.lock` versions with uv (hash-pinned in `.clusterfuzzlite/requirements.txt`) and the
   package with `--ignore-requires-python`. Code the fuzzers import must keep running on 3.11.
+- The SLSA generator is referenced by tag (`@v2.1.0`; the verifier trusts only tagged releases, ADR-018): the one
+  `zizmor: ignore[unpinned-uses]`. A release tag fails unless `pyproject.toml` and `CHANGELOG.md` match it.
 - `frontend-builder` runs on `$BUILDPLATFORM`: its output is arch-independent, and `npm ci` under QEMU arm64
   emulation hung intermittently (v0.6.2 tag build). Keep it native.
 - Planned: headless image without the frontend, e.g. for a CronJob (#48); `dev-setup.py` rework with podman and
