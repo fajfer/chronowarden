@@ -33,6 +33,7 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
   `resolve_severity_source` names the level that matched. There is one config form per key: no legacy aliases
   (root **Never**, #30).
 - `"none"` is reserved (`RESERVED_SEVERITY_VALUES`): monitored, never rotated; `calculate_ttl` returns `None`.
+- `confirmation_required`: secret → engine → vault → false (ADR-021); `confirmations.py`: awaiting, overdue, TTL base.
 - `DEFAULT_EXPIRY_PROFILES` (`default` 365d, `critical` 6m, `pci-dss-4.0` 90d) are always merged with
   user-defined ones (`merge_default_expiry_profiles`). Each profile has `rotation_period` and `alert_threshold`
   (default `30d`); durations are `<int>[d|m|y]`.
@@ -59,8 +60,7 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 - `polling_interval` is parsed but nothing reads it: there is no background sync scheduler. Sync only runs via the
   API. Planned: in-process loop plus headless mode
   ([ADR-013](../.ai/adr/ADR-013-in-process-and-headless-sync.md), #48).
-- Model-level checks (unknown severities, duplicate vault names) only run once every key is valid, so a config
-  with both kinds of mistakes reports them in two rounds.
+- Model-level checks (unknown severities, duplicate vaults) run only once all keys are valid: two error rounds.
 - Use the `uvicorn.error` logger; its lines get timestamps from `configure_logging`. Don't call `logging.basicConfig`.
 - Unknown `/api/v1/...` paths are answered by the SPA catch-all with `index.html` and status 200, not 404.
 - Severity is config-only: `severity: none` replaced `chronowarden_enabled`, and there is no API to change it
