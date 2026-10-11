@@ -62,7 +62,7 @@ metadata only, never values), methodology and limitations. PDF/A. `GET /api/v1/c
 - [root AGENTS.md](../../AGENTS.md)
 - [core](../../chronowarden/AGENTS.md), [api](../../chronowarden/api/AGENTS.md), [frontend](../../frontend/AGENTS.md)
 - [ADR-006](../adr/ADR-006-config-source-of-truth.md)
-- [compliance evidence spec](2026-10-11-compliance-evidence.md)
+- [compliance evidence spec](implemented/2026-10-11-compliance-evidence.md)
 
 ## ADRs affected
 

@@ -49,7 +49,8 @@ frozen, hashed snapshots. Chronowarden stores **no review state** (no checkboxes
 
 ## Related ADRs
 
-[ADR-014](../../.ai/adr/ADR-014-rotation-confirmation-and-audit-log.md), [ADR-017](../../.ai/adr/ADR-017-sqlite-holds-assignments.md),
+[ADR-014](../../.ai/adr/ADR-014-rotation-confirmation-and-audit-log.md),
+[ADR-017](../../.ai/adr/ADR-017-sqlite-holds-assignments.md),
 [ADR-004](../../.ai/adr/ADR-004-metadata-only-access.md)
 
 ## Validate
