@@ -14,6 +14,14 @@ git history.
 
 ## [Unreleased]
 
+### Fixed (metadata)
+
+- **Sync no longer deletes other custom metadata.** Whenever sync wrote `chronowarden_severity` or
+  `chronowarden_ttl`, Vault replaced the secret's whole `custom_metadata` map, deleting keys set by other teams or
+  tools, and reset the secret's `delete_version_after` to `0s` (old versions never deleted). Chronowarden now merges
+  its keys into the existing metadata and keeps `delete_version_after`. It still uses only the `read` and `update`
+  capabilities of the documented policy.
+
 ### Changed
 
 - The frontend runs on SvelteKit 3 and TypeScript 6 (#79). No visible changes; the build, pages and API calls
