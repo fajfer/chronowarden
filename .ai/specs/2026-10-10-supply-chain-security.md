@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Supply chain: Scorecard, SLSA Build L3 provenance, SBOMs
 
-- **Status:** in progress
+- **Status:** in progress (task 8: the maintainer's Best Practices questionnaire)
 - **Date:** 2026-10-11
 - **Issue:** #87, #88, #89, #90, #91, #92
 
@@ -66,12 +66,12 @@ New **ADR-018 Release integrity** (task 9). Extends ADR-008.
 | 1 | `SECURITY.md`: supported versions (latest minor), reporting through GitHub private vulnerability reporting, **acknowledgement within 7 days**, links to GHSA-63g5-x4f2-2rg5 and GHSA-7p2g-v7c6-vpww; maintainer turns on private reporting | root | Security-Policy 10 | done | 41da102 |
 | 2 | Token permissions: `docker.yaml` top level `permissions: {}`; `packages: write` (and `id-token` for cosign) on the job only | deploy | zizmor clean; Token-Permissions 10 | done | 8a8e157 |
 | 3 | Pin the build: commit `uv.lock` (remove from `.gitignore`); every `FROM` by digest with the tag in a comment, keeping `--platform=$BUILDPLATFORM` on the frontend stage; replace `pip install .` with `uv` from a digest-pinned image and `uv sync --locked --no-dev --no-editable`; CI `uv sync --locked`; Dependabot `docker`, `uv`, `npm` (`/frontend`) | deploy, `Dockerfile` | Both targets build; the `docker.yaml` smoke test passes; distroless `site-packages` path still matches; Pinned-Dependencies 10 | done | d262b84 |
-| 4 | `release.yaml` on `v*` tags: `uv build` (wheel + sdist), source SBOMs, SHA-256 of every asset → `generator_generic_slsa3.yml` → `gh release create` (pre-release for `-rc.N`) with the matching `CHANGELOG.md` section as notes and all files + `*.intoto.jsonl`; rc tags pushed by the agent on the maintainer's go | deploy | `v0.7.0-rc.1` produces a pre-release; `slsa-verifier verify-artifact` passes for the wheel | doing | |
-| 5 | Image: `docker.yaml` exposes the production manifest digest; on tags `generator_container_slsa3.yml` (provenance in GHCR) and cosign keyless signing of the digest | deploy | `slsa-verifier verify-image …` and `cosign verify …` pass | doing | |
-| 6 | SBOMs with syft (SHA-pinned action): production image per platform and source (`uv.lock` + `frontend/package-lock.json`), each CycloneDX 1.6 JSON and SPDX 2.3 JSON; attached to the Release and bound to the image digest with `cosign attest`; schemas validated in CI | deploy | 6 SBOMs per release; `cosign verify-attestation` finds them | doing | |
+| 4 | `release.yaml` on `v*` tags: `uv build` (wheel + sdist), source SBOMs, SHA-256 of every asset → `generator_generic_slsa3.yml` → `gh release create` (pre-release for `-rc.N`) with the matching `CHANGELOG.md` section as notes and all files + `*.intoto.jsonl`; rc tags pushed by the agent on the maintainer's go | deploy | `v0.7.0-rc.1` produces a pre-release; `slsa-verifier verify-artifact` passes for the wheel | done | c678bf6, 473b686 |
+| 5 | Image: `docker.yaml` exposes the production manifest digest; on tags `generator_container_slsa3.yml` (provenance in GHCR) and cosign keyless signing of the digest | deploy | `slsa-verifier verify-image …` and `cosign verify …` pass | done | c678bf6 |
+| 6 | SBOMs with syft (SHA-pinned action): production image per platform and source (`uv.lock` + `frontend/package-lock.json`), each CycloneDX 1.6 JSON and SPDX 2.3 JSON; attached to the Release and bound to the image digest with `cosign attest`; schemas validated in CI | deploy | 6 SBOMs per release; `cosign verify-attestation` finds them | done | cc8c890 |
 | 7 | zizmor and Scorecard: the SLSA generator is called by tag (`@v2.x.y`), with a justified zizmor ignore for that `uses:` only; Scorecard gets `repo_token: ${{ secrets.SCORECARD_TOKEN }}` | deploy | zizmor clean; Scorecard green | done | |
 | 8 | Maintainer, manual (agent drafts instructions and questionnaire answers in a scratch file): ruleset on `main` (PR required for everyone, CI and zizmor required, 0 approvals, no force push or deletion), tag ruleset for `v*`, `SCORECARD_TOKEN`, OpenSSF Best Practices "passing" (evidence per criterion in [openssf-best-practices](../openssf-best-practices.md)) | none | Branch-Protection and CII scored | doing | |
-| 9 | ADR-018; README "Verifying releases" (`slsa-verifier`, `cosign verify`, `cosign verify-attestation`); `deploy/AGENTS.md`; CHANGELOG | [.ai/adr](../adr/README.md), deploy | ADR indexed; commands run against the release | doing | |
+| 9 | ADR-018; README "Verifying releases" (`slsa-verifier`, `cosign verify`, `cosign verify-attestation`); `deploy/AGENTS.md`; CHANGELOG | [.ai/adr](../adr/README.md), deploy | ADR indexed; commands run against the release | done | 7a5ff7d |
 | 10 | **Required:** ClusterFuzzLite (`.clusterfuzzlite/`, PR + weekly batch) with atheris fuzzers for `parse_date`, `calculate_ttl` and `load_config` (YAML bytes) | [core](../../chronowarden/AGENTS.md) | Fuzzing 10; crashes found are fixed with regression tests | done | 76c2bc4 |
 
 ## Validation
