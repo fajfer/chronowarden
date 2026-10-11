@@ -12,25 +12,37 @@ Before 1.0, minor versions may contain breaking changes; they are marked **Break
 Releases before 0.6.0 are described in the [GitHub releases](https://github.com/fajfer/chronowarden/releases) and the
 git history.
 
-## [Unreleased]
+## [0.6.3] - 2026-10-11
 
-### Fixed (metadata)
-
-- **Sync no longer deletes other custom metadata.** Whenever sync wrote `chronowarden_severity` or
-  `chronowarden_ttl`, Vault replaced the secret's whole `custom_metadata` map, deleting keys set by other teams or
-  tools, and reset the secret's `delete_version_after` to `0s` (old versions never deleted). Chronowarden now merges
-  its keys into the existing metadata and keeps `delete_version_after`. It still uses only the `read` and `update`
-  capabilities of the documented policy.
-
-### Changed
-
-- The frontend runs on SvelteKit 3 and TypeScript 6 (#79). No visible changes; the build, pages and API calls
-  are the same.
+**Upgrade promptly if other teams or tools put custom metadata on secrets Chronowarden manages.**
 
 ### Fixed
 
+- **Sync deleted other custom metadata and reset version cleanup.** Every time sync wrote `chronowarden_severity`
+  or `chronowarden_ttl` (on a secret's first sync, and whenever its severity or TTL changed, e.g. after a rotation),
+  Vault replaced the secret's whole `custom_metadata` map. That deleted every other key on the secret, and reset its
+  `delete_version_after` to `0s`, so old versions were no longer cleaned up. All earlier releases are affected.
+  Chronowarden now merges its keys into the existing metadata and keeps `delete_version_after`; it still needs only
+  the `read` and `update` capabilities of the documented policy.
 - The Docker build no longer runs `npm ci` under arm64 emulation, which could hang the multi-arch build. The
   frontend is built once on the native build platform; its output is the same for every architecture.
+
+### Check your secrets after upgrading
+
+Vault keeps no history of custom metadata, so lost values can only come from your own records (IaC, scripts,
+documentation):
+
+- Look for secrets that should carry other teams' keys but only have `chronowarden_*` keys:
+  `vault kv metadata get <mount>/<path>`.
+- Check `delete_version_after` on secrets where you set a version cleanup period; it may now be `0s`.
+- The Vault audit log shows which secrets were affected: `update` operations on `<mount>/metadata/<path>` by
+  Chronowarden's token.
+
+### Changed
+
+- The frontend runs on SvelteKit 3 and TypeScript 6 (#79). No visible changes; the build, pages and API calls are
+  the same.
+- The Kubernetes example deploys `v0.6.3`.
 
 ## [0.6.2] - 2026-10-10
 
@@ -134,6 +146,7 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
+[0.6.3]: https://github.com/fajfer/chronowarden/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/fajfer/chronowarden/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/fajfer/chronowarden/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/fajfer/chronowarden/compare/v0.5.0...v0.6.0
