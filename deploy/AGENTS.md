@@ -56,7 +56,8 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   emulation hung intermittently (v0.6.2 tag build). Keep it native.
 - Planned: headless image without the frontend, e.g. for a CronJob (#48); `dev-setup.py` rework with podman and
   testcontainers (#78). Cleanup exists: `dev-setup.py --cleanup` (#31).
-- `deployment.yaml` uses the image `ghcr.io/fajfer/chronowarden:main-dev` (the dev target).
+- `deployment.yaml` pins the production image (`ghcr.io/fajfer/chronowarden:v0.6.2`); bump the tag with each
+  release.
 
 ## Related ADRs
 
