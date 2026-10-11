@@ -3,14 +3,61 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import type { Secret } from '#lib/types/index.js';
+  import type { Owner, Secret, System } from '#lib/types/index.js';
   import StatusBadge from './StatusBadge.svelte';
   import { formatDate } from '#lib/utils/dateFormat.js';
+  import { fetchOwners } from '#lib/api/owners.js';
+  import { fetchSystems } from '#lib/api/systems.js';
+  import { setSecretOwners, setSecretSystem } from '#lib/api/secrets.js';
+  import { updateSecret } from '#lib/stores/secrets.js';
+  import { addToast } from '#lib/stores/sync.js';
 
   let { secret, onClose }: {
     secret: Secret | null;
     onClose: () => void;
   } = $props();
+
+  let systems = $state<System[]>([]);
+  let owners = $state<Owner[]>([]);
+  let systemId = $state('');
+  let ownerIds = $state<string[]>([]);
+  let saving = $state(false);
+
+  // Reload the choices and reset the form whenever another secret is opened
+  $effect(() => {
+    if (!secret) return;
+    systemId = secret.system?.id ?? '';
+    ownerIds = secret.owners.map((o) => o.id);
+    fetchSystems().then((s) => (systems = s)).catch(() => (systems = []));
+    fetchOwners().then((o) => (owners = o)).catch(() => (owners = []));
+  });
+
+  const assignedSystem = $derived(systems.find((s) => s.id === systemId) ?? null);
+  const dirty = $derived(
+    !!secret &&
+      (systemId !== (secret.system?.id ?? '') ||
+        [...ownerIds].sort().join() !== secret.owners.map((o) => o.id).sort().join()),
+  );
+
+  function toggleOwner(id: string) {
+    ownerIds = ownerIds.includes(id) ? ownerIds.filter((x) => x !== id) : [...ownerIds, id];
+  }
+
+  async function saveAssignment() {
+    if (!secret) return;
+    saving = true;
+    try {
+      let updated = await setSecretSystem(secret.id, systemId || null);
+      updated = await setSecretOwners(secret.id, ownerIds);
+      updateSecret(updated);
+      secret = updated;
+      addToast(`Updated assignment of ${updated.full_path}`, 'success');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Saving the assignment failed', 'error');
+    } finally {
+      saving = false;
+    }
+  }
 </script>
 
 {#if secret}
@@ -66,9 +113,53 @@
             <p class="text-gray-200">{formatDate(secret.last_synced)}</p>
           </div>
         </div>
+
+        <div class="border-t border-gray-700 pt-4 space-y-3">
+          <h3 class="text-xs text-gray-500 uppercase">Assignment</h3>
+          <div>
+            <label for="secret-system" class="block text-gray-500 text-xs mb-1">System</label>
+            <select id="secret-system" bind:value={systemId}
+                    class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-indigo-500">
+              <option value="">Unassigned</option>
+              {#each systems as system (system.id)}<option value={system.id}>{system.name}</option>{/each}
+            </select>
+            {#if assignedSystem?.cmdb_uri}
+              <a href={assignedSystem.cmdb_uri} target="_blank" rel="noopener noreferrer"
+                 class="inline-block mt-1 text-xs text-indigo-400 hover:text-indigo-300">Open in CMDB{assignedSystem.asset_number ? ` (${assignedSystem.asset_number})` : ''}</a>
+            {/if}
+          </div>
+          <fieldset>
+            <legend class="block text-gray-500 text-xs mb-1">Owners of this secret</legend>
+            {#if owners.length === 0}
+              <p class="text-gray-500">No owners yet: create them in Settings → Owners.</p>
+            {:else}
+              <div class="flex flex-wrap gap-x-4 gap-y-1">
+                {#each owners as owner (owner.id)}
+                  <label class="flex items-center gap-2 text-gray-200">
+                    <input type="checkbox" checked={ownerIds.includes(owner.id)} onchange={() => toggleOwner(owner.id)} class="accent-indigo-500" />
+                    {owner.name}
+                  </label>
+                {/each}
+              </div>
+            {/if}
+          </fieldset>
+          <p class="text-xs text-gray-400">
+            Responsible:
+            {#if secret.effective_owners.length}
+              <span class="text-gray-200">{secret.effective_owners.map((o) => o.name).join(', ')}</span>
+              {#if secret.owners.length === 0}<span class="text-gray-500">(from the system)</span>{/if}
+            {:else}
+              <span class="text-yellow-400">nobody (unassigned)</span>
+            {/if}
+          </p>
+        </div>
       </div>
 
-      <div class="px-6 py-4 border-t border-gray-700 flex justify-end">
+      <div class="px-6 py-4 border-t border-gray-700 flex justify-end gap-2">
+        <button onclick={saveAssignment} disabled={!dirty || saving}
+                class="px-4 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save assignment'}
+        </button>
         <button
           onclick={onClose}
           class="px-4 py-2 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 transition-colors"

@@ -42,3 +42,8 @@ export function setSeverity(severity: string | null): void {
 export function setEngineId(engineId: string | null): void {
   filters.update((f) => ({ ...f, engineId }));
 }
+
+/** Set the system filter (`UNASSIGNED_SYSTEM` for secrets without a system). */
+export function setSystemId(systemId: string | null): void {
+  filters.update((f) => ({ ...f, systemId }));
+}

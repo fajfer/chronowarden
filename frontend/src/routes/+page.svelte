@@ -9,11 +9,53 @@
   import { currentTheme } from '#lib/stores/theme.js';
   import { secrets, secretStats, criticalSecrets, secretsLoading, secretsError } from '#lib/stores/secrets.js';
   import { fetchAllVaultHealth } from '#lib/api/vaults.js';
+  import { setSystemId, clearFilters } from '#lib/stores/filters.js';
+  import { UNASSIGNED_SYSTEM } from '#lib/types/index.js';
   import type { Secret, VaultInstanceHealth } from '#lib/types/index.js';
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
 
   let selectedSecret = $state<Secret | null>(null);
   let vaults = $state<VaultInstanceHealth[]>([]);
+  let horizonSystem = $state('');
+
+  interface SystemGroup {
+    id: string;
+    name: string;
+    total: number;
+    expired: number;
+    warning: number;
+    noTtl: number;
+  }
+
+  /** Status counts per system, unassigned secrets last. */
+  const systemGroups = $derived.by(() => {
+    const groups = new Map<string, SystemGroup>();
+    for (const s of $secrets) {
+      const id = s.system?.id ?? UNASSIGNED_SYSTEM;
+      const group = groups.get(id) ?? { id, name: s.system?.name ?? 'Unassigned', total: 0, expired: 0, warning: 0, noTtl: 0 };
+      group.total += 1;
+      if (s.status === 'expired') group.expired += 1;
+      if (s.status === 'warning') group.warning += 1;
+      if (s.status === 'no_ttl') group.noTtl += 1;
+      groups.set(id, group);
+    }
+    return Array.from(groups.values()).sort((a, b) =>
+      a.id === UNASSIGNED_SYSTEM ? 1 : b.id === UNASSIGNED_SYSTEM ? -1 : a.name.localeCompare(b.name),
+    );
+  });
+
+  const horizonSecrets = $derived(
+    horizonSystem === ''
+      ? $secrets
+      : $secrets.filter((s) => (s.system?.id ?? UNASSIGNED_SYSTEM) === horizonSystem),
+  );
+
+  function showSystem(id: string) {
+    clearFilters();
+    setSystemId(id);
+    goto('/secrets');
+  }
 
   const coveragePct = $derived(
     $secretStats.total > 0
@@ -75,8 +117,17 @@
       </div>
     </div>
 
-    <!-- Expiry horizon -->
-    <ExpiryHorizon secrets={$secrets} />
+    <!-- Expiry horizon, optionally for one system -->
+    {#if systemGroups.length > 1 || systemGroups[0]?.id !== UNASSIGNED_SYSTEM}
+      <div class="flex justify-end">
+        <select bind:value={horizonSystem} aria-label="System shown in the expiry horizon"
+                class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-indigo-500">
+          <option value="">All systems</option>
+          {#each systemGroups as group (group.id)}<option value={group.id}>{group.name}</option>{/each}
+        </select>
+      </div>
+    {/if}
+    <ExpiryHorizon secrets={horizonSecrets} />
 
     <!-- Bottom row -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -138,6 +189,22 @@
               {$secretStats.total - $secretStats.noTtl} of {$secretStats.total} secrets carry a rotation policy. Secrets with no TTL are invisible to alerting.
             </p>
           </div>
+        </div>
+
+        <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-700"><h2 class="text-base font-semibold text-white">By system</h2></div>
+          {#each systemGroups as group (group.id)}
+            <button onclick={() => showSystem(group.id)}
+                    class="w-full flex items-center gap-3 px-5 py-3 border-b border-gray-700/50 last:border-0 hover:bg-gray-700/30 text-left transition-colors">
+              <span class="flex-1 text-sm {group.id === UNASSIGNED_SYSTEM ? 'text-gray-500' : 'text-gray-200'}">{group.name}</span>
+              {#if group.expired}<span class="text-xs font-mono text-red-400" title="Overdue">{group.expired}</span>{/if}
+              {#if group.warning}<span class="text-xs font-mono text-yellow-400" title="Rotation due soon">{group.warning}</span>{/if}
+              {#if group.noTtl}<span class="text-xs font-mono text-gray-500" title="No rotation policy">{group.noTtl}</span>{/if}
+              <span class="text-xs font-mono text-gray-400" title="Tracked secrets">{group.total}</span>
+            </button>
+          {:else}
+            <div class="px-5 py-6 text-sm text-gray-500">No secrets tracked yet.</div>
+          {/each}
         </div>
 
         <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">

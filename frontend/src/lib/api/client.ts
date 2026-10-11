@@ -17,6 +17,21 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Readable message from an error body: FastAPI's `detail` as a string, a `{ message }` object, or a 422 list.
+ */
+function errorDetail(text: string): string {
+  try {
+    const detail = JSON.parse(text)?.detail;
+    if (typeof detail === 'string') return detail;
+    if (detail && typeof detail.message === 'string') return detail.message;
+    if (Array.isArray(detail)) return detail.map((d) => d?.msg ?? String(d)).join('; ');
+  } catch {
+    // not JSON: use the text as it is
+  }
+  return text;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const options: RequestInit = {
     method,
@@ -27,8 +42,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   const response = await fetch(`${BASE_URL}${path}`, options);
   if (!response.ok) {
-    const detail = await response.text().catch(() => response.statusText);
-    throw new ApiError(response.status, detail);
+    const text = await response.text().catch(() => response.statusText);
+    throw new ApiError(response.status, errorDetail(text));
   }
   if (response.status === 204) {
     return undefined as T;

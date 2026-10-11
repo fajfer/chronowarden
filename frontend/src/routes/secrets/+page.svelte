@@ -9,6 +9,7 @@
   import StatusBadge from '#lib/components/StatusBadge.svelte';
   import SecretModal from '#lib/components/SecretModal.svelte';
   import { getStatusDotBg } from '#lib/utils/statusColor.js';
+  import { UNASSIGNED_SYSTEM } from '#lib/types/index.js';
   import type { Secret } from '#lib/types/index.js';
 
   let selectedSecret = $state<Secret | null>(null);
@@ -27,12 +28,14 @@
     if (f.vaultName) result = result.filter((s) => s.vault_name === f.vaultName);
     if (f.severity) result = result.filter((s) => s.severity === f.severity);
     if (f.engineId) result = result.filter((s) => s.engine_id === f.engineId);
+    if (f.systemId === UNASSIGNED_SYSTEM) result = result.filter((s) => s.system === null);
+    else if (f.systemId) result = result.filter((s) => s.system?.id === f.systemId);
     if (f.statuses.length > 0) result = result.filter((s) => f.statuses.includes(s.status));
 
     result.sort((a, b) => {
       let cmp = 0;
-      const aVal = (a as unknown as Record<string, unknown>)[sortField];
-      const bVal = (b as unknown as Record<string, unknown>)[sortField];
+      const aVal = sortValue(a, sortField);
+      const bVal = sortValue(b, sortField);
 
       if (aVal == null && bVal == null) cmp = 0;
       else if (aVal == null) cmp = 1;
@@ -50,6 +53,12 @@
   const allVisibleSelected = $derived(
     filteredSecrets.length > 0 && filteredSecrets.every((s) => selectedIds.includes(s.id)),
   );
+
+  /** Value a column sorts by; the system column sorts by name. */
+  function sortValue(s: Secret, field: string): unknown {
+    if (field === 'system') return s.system?.name ?? null;
+    return (s as unknown as Record<string, unknown>)[field];
+  }
 
   function toggleSort(field: string) {
     if (sortField === field) {
@@ -90,12 +99,22 @@
   }
 
   function exportCsv() {
-    const cols = ['full_path', 'engine_id', 'vault_name', 'owner', 'severity', 'rotation_period_days', 'days_remaining', 'status'];
-    const header = cols.join(',');
+    const columns: [string, (s: Secret) => unknown][] = [
+      ['full_path', (s) => s.full_path],
+      ['engine_id', (s) => s.engine_id],
+      ['vault_name', (s) => s.vault_name],
+      ['system', (s) => s.system?.name],
+      ['owners', (s) => s.effective_owners.map((o) => o.name).join('; ')],
+      ['severity', (s) => s.severity],
+      ['rotation_period_days', (s) => s.rotation_period_days],
+      ['days_remaining', (s) => s.days_remaining],
+      ['status', (s) => s.status],
+    ];
+    const header = columns.map(([name]) => name).join(',');
     const rows = filteredSecrets.map((s) =>
-      cols.map((c) => {
-        const v = (s as unknown as Record<string, unknown>)[c];
-        return v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
+      columns.map(([, get]) => {
+        const v = get(s);
+        return v == null || v === '' ? '' : `"${String(v).replace(/"/g, '""')}"`;
       }).join(','),
     );
     const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' });
@@ -146,7 +165,8 @@
               </th>
               <th class="px-4 py-3 text-left font-semibold cursor-pointer hover:text-gray-300" onclick={() => toggleSort('secret_path')}>Secret {sortIcon('secret_path')}</th>
               <th class="px-4 py-3 text-left font-semibold cursor-pointer hover:text-gray-300" onclick={() => toggleSort('engine_id')}>Engine {sortIcon('engine_id')}</th>
-              <th class="px-4 py-3 text-left font-semibold">Owner</th>
+              <th class="px-4 py-3 text-left font-semibold cursor-pointer hover:text-gray-300" onclick={() => toggleSort('system')}>System {sortIcon('system')}</th>
+              <th class="px-4 py-3 text-left font-semibold">Owners</th>
               <th class="px-4 py-3 text-left font-semibold cursor-pointer hover:text-gray-300" onclick={() => toggleSort('severity')}>Severity {sortIcon('severity')}</th>
               <th class="px-4 py-3 text-left font-semibold">Rotation cycle</th>
               <th class="px-4 py-3 text-right font-semibold cursor-pointer hover:text-gray-300" onclick={() => toggleSort('days_remaining')}>Remaining {sortIcon('days_remaining')}</th>
@@ -169,6 +189,7 @@
                 <td class="px-4 py-3">
                   <span class="font-mono text-xs text-gray-400 bg-gray-700/50 rounded px-1.5 py-0.5">{secret.engine_id}</span>
                 </td>
+                <td class="px-4 py-3 {secret.system ? 'text-gray-300' : 'text-gray-600'}">{secret.system?.name ?? 'Unassigned'}</td>
                 <td class="px-4 py-3 {secret.effective_owners.length ? 'text-gray-300' : 'text-gray-600'}">{secret.effective_owners.length ? secret.effective_owners.map((o) => o.name).join(', ') : 'Unassigned'}</td>
                 <td class="px-4 py-3">
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700/60 text-gray-300">{secret.severity}</span>
