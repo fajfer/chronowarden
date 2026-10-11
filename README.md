@@ -30,7 +30,7 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 - **Severity Levels** - Classify secrets by (user-defined) compliance requirements (PCI-DSS, Critical, Default)
 - **Secure** - Never reads actual secret values, only metadata
 - **Real-Time Sync** - Live and on-demand synchronization with backends
-- **Prometheus Metrics** - Built-in monitoring endpoint for alerting
+- **Prometheus Metrics** - Optional monitoring endpoint (`metrics.enabled: true`; off by default)
 - **Modern Web UI** - SvelteKit frontend with dark mode
 
 ## How does it work?
@@ -215,7 +215,7 @@ or else its system's owners.
 - `GET /api/v1/health` - Health check endpoint (used by Kubernetes probes)
 - `GET /api/v1/ready` - Readiness check endpoint
 - `GET /api/v1/info` - API name and version
-- `GET /api/v1/metrics` - Prometheus metrics
+- `GET /api/v1/metrics` - Prometheus metrics, when `metrics.enabled: true` is set (otherwise `404`)
 
 ## Secret Status
 
