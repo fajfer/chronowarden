@@ -398,11 +398,16 @@ class VaultIntegration(BaseIntegration):
         mount_point: Optional[str] = None,
     ) -> bool:
         """
-        Write custom metadata fields to a Vault secret.
+        Merge custom metadata fields into a Vault secret's existing metadata.
+
+        Vault replaces the whole custom_metadata map on write, and hvac always sends delete_version_after
+        (default "0s"). So the current metadata is read first: keys not in custom_metadata are kept, and the
+        secret's delete_version_after is sent back unchanged. If the current metadata can't be read, nothing is
+        written. Uses only the read and update capabilities of the documented policy.
 
         Args:
             path: Path to the secret.
-            custom_metadata: Dictionary of custom metadata key-value pairs to write.
+            custom_metadata: Custom metadata key-value pairs to set; other existing keys are preserved.
             mount_point: Override the default mount point for this request.
 
         Returns:
@@ -415,10 +420,27 @@ class VaultIntegration(BaseIntegration):
         mount = mount_point if mount_point is not None else self._mount_path
 
         try:
+            current = self._client.secrets.kv.v2.read_secret_metadata(path=path, mount_point=mount)["data"]
+        except Forbidden:
+            logger.exception(
+                "Permission denied reading metadata for '%s/%s' before writing - token lacks 'read' on "
+                "%s/metadata; check the Vault policy",
+                mount,
+                path,
+                mount,
+            )
+            return False
+        except VaultError:
+            logger.exception("Error reading metadata before writing to Vault")
+            return False
+
+        merged = {**(current.get("custom_metadata") or {}), **custom_metadata}
+        try:
             self._client.secrets.kv.v2.update_metadata(
                 path=path,
                 mount_point=mount,
-                custom_metadata=custom_metadata,
+                custom_metadata=merged,
+                delete_version_after=current.get("delete_version_after") or "0s",
             )
             logger.debug("Updated custom metadata for %s/%s", mount, path)
             return True

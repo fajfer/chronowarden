@@ -9,7 +9,7 @@ import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
-from hvac.exceptions import Forbidden, InvalidRequest, VaultError
+from hvac.exceptions import Forbidden, InvalidPath, InvalidRequest, VaultError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import ReadTimeout
 from requests.models import Response
@@ -265,3 +265,76 @@ class TestIsConnectedDiagnostics:
 
         assert integration.is_connected() is False
         assert integration.last_error_kind == "unexpected"
+
+
+class TestWriteSecretMetadataMerge:
+    """Regression tests: writing Chronowarden's keys must not clobber other metadata (0.6.3)."""
+
+    def _integration(self, current: dict) -> VaultIntegration:
+        """Build an integration whose secret currently has the given metadata."""
+        integration = VaultIntegration(address="http://example.com:8200")
+        integration._client = MagicMock()
+        integration._client.secrets.kv.v2.read_secret_metadata.return_value = {"data": current}
+        return integration
+
+    def test_other_custom_metadata_keys_are_kept(self) -> None:
+        """Keys set by other teams survive; Chronowarden's own keys are updated."""
+        integration = self._integration(
+            {
+                "custom_metadata": {
+                    "owner_team": "payments",
+                    "chronowarden_privileged": "true",
+                    "chronowarden_ttl": "old",
+                },
+                "delete_version_after": "720h0m0s",
+            }
+        )
+
+        assert integration.write_secret_metadata("db", {"chronowarden_ttl": "2027-04-09"}, mount_point="apps") is True
+
+        kwargs = integration._client.secrets.kv.v2.update_metadata.call_args.kwargs
+        assert kwargs["custom_metadata"] == {
+            "owner_team": "payments",
+            "chronowarden_privileged": "true",
+            "chronowarden_ttl": "2027-04-09",
+        }
+        assert kwargs["mount_point"] == "apps"
+
+    def test_delete_version_after_is_preserved(self) -> None:
+        """The secret's version cleanup setting is sent back unchanged instead of hvac's '0s' default."""
+        integration = self._integration({"custom_metadata": {}, "delete_version_after": "720h0m0s"})
+
+        integration.write_secret_metadata("db", {"chronowarden_severity": "critical"})
+
+        assert integration._client.secrets.kv.v2.update_metadata.call_args.kwargs["delete_version_after"] == "720h0m0s"
+
+    def test_secret_without_custom_metadata(self) -> None:
+        """A secret with no custom metadata (null) gets just Chronowarden's keys."""
+        integration = self._integration({"custom_metadata": None, "delete_version_after": "0s"})
+
+        integration.write_secret_metadata("db", {"chronowarden_severity": "critical"})
+
+        kwargs = integration._client.secrets.kv.v2.update_metadata.call_args.kwargs
+        assert kwargs["custom_metadata"] == {"chronowarden_severity": "critical"}
+        assert kwargs["delete_version_after"] == "0s"
+
+    @pytest.mark.parametrize("error", [VaultError("boom"), Forbidden("Permission denied"), InvalidPath("gone")])
+    def test_nothing_is_written_when_the_read_fails(self, error: Exception) -> None:
+        """If the current metadata can't be read, no write happens (it could clobber unknown keys)."""
+        integration = VaultIntegration(address="http://example.com:8200")
+        integration._client = MagicMock()
+        integration._client.secrets.kv.v2.read_secret_metadata.side_effect = error
+
+        assert integration.write_secret_metadata("db", {"chronowarden_severity": "critical"}) is False
+        integration._client.secrets.kv.v2.update_metadata.assert_not_called()
+
+    def test_read_permission_error_names_the_read_capability(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A failed read logs that 'read' is missing, not 'update'."""
+        integration = VaultIntegration(address="http://example.com:8200")
+        integration._client = MagicMock()
+        integration._client.secrets.kv.v2.read_secret_metadata.side_effect = Forbidden("Permission denied")
+
+        with caplog.at_level(logging.ERROR):
+            integration.write_secret_metadata("db", {"chronowarden_severity": "critical"}, mount_point="apps")
+
+        assert "lacks 'read' on apps/metadata" in caplog.text
