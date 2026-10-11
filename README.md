@@ -191,6 +191,8 @@ path "sys/mounts" {
 - `GET /api/v1/secrets/{id}` - Get secret metadata by ID, including its system, owners and effective owners
 - `PUT /api/v1/secrets/{id}/system` - Assign the secret to a system (`{"system_id": "..."}`, or `null` to unassign)
 - `PUT /api/v1/secrets/{id}/owners` - Replace the secret's owners (`{"owner_ids": [...]}`)
+- `POST /api/v1/secrets/{id}/confirmations` - Confirm the newest version is applied (`{"applied_at": "...",
+  "confirmed_by": "pipeline"}`); the next rotation counts from that date if it is later than the backend update
 - `DELETE /api/v1/secrets/{id}`, `DELETE /api/v1/secrets/removed` - Purge secrets that sync no longer finds in their
   backend, with their assignments (`removed` takes `vault_name`/`engine_id`); a secret that still exists gives `409`
 
@@ -237,6 +239,9 @@ or else its system's owners.
 | 🟡 Warning | Rotation needed soon | `0 < days_remaining ≤ alert_threshold` |
 | 🔴 Expired | Rotation overdue | `days_remaining ≤ 0` |
 | ⚪ No TTL | No rotation configured | `chronowarden_ttl` not set |
+
+Where rotations must be confirmed (`confirmation_required`, per vault, engine or secret), a new version is also
+shown as **awaiting confirmation** until someone confirms it was applied, and as overdue after `confirmation_grace`.
 
 `alert_threshold` is set per expiry profile in `config.yaml` (default `30d`); see
 [`config.example.yaml`](config.example.yaml).
