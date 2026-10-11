@@ -121,6 +121,8 @@ async def revert(request: Request, event_id: int = Path(description="Audit event
     if event is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Audit event {event_id} not found")
     try:
-        return AuditEvent.from_stored(revert_event(db, event, request_source(request)))
+        from chronowarden.app import app_config
+
+        return AuditEvent.from_stored(revert_event(db, event, request_source(request), app_config))
     except RevertError as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc)) from None

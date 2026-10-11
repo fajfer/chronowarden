@@ -163,6 +163,26 @@ def _observed_state(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _rotation_confirmations(conn: sqlite3.Connection) -> None:
+    """Record that a rotated version was applied where it is used (ADR-021); revoking keeps the row."""
+    conn.execute("""
+        CREATE TABLE rotation_confirmations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vault_name TEXT NOT NULL,
+            engine_id TEXT NOT NULL,
+            secret_path TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            applied_at TEXT NOT NULL,
+            confirmed_by TEXT,
+            recorded_at TEXT NOT NULL,
+            revoked_at TEXT
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX rotation_confirmations_secret ON rotation_confirmations (vault_name, engine_id, secret_path)"
+    )
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "baseline 0.6 schema", _baseline),
     Migration(2, "webhook notification routes only", _webhook_routes_only),
@@ -170,6 +190,7 @@ MIGRATIONS: list[Migration] = [
     Migration(4, "removed_at on cached secrets", _removed_at),
     Migration(5, "audit log", _audit_log),
     Migration(6, "observed backend state", _observed_state),
+    Migration(7, "rotation confirmations", _rotation_confirmations),
 ]
 
 

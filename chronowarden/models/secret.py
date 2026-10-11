@@ -40,6 +40,10 @@ class SecretMetadataResponse(BaseModel):
     status: SecretStatus = SecretStatus.NO_TTL
     system: Optional[SystemRef] = Field(default=None, description="Assigned system, or null when unassigned")
     owners: list[OwnerRef] = Field(default_factory=list, description="Owners assigned to the secret itself")
+    confirmation_required: bool = Field(default=False, description="Rotations must be confirmed as applied (ADR-021)")
+    awaiting_confirmation: bool = Field(default=False, description="The newest version isn't confirmed yet")
+    confirmation_overdue: bool = Field(default=False, description="Awaiting longer than the grace period")
+    last_confirmation: Optional["Confirmation"] = None
     removed_at: Optional[datetime] = Field(
         default=None, description="When sync stopped finding the secret in its backend; null while it exists"
     )
@@ -53,3 +57,25 @@ class PurgeResult(BaseModel):
 
     purged: int = Field(description="Number of removed secrets deleted with their assignments")
     secrets: list[str] = Field(description="Full paths of the purged secrets")
+
+
+class Confirmation(BaseModel):
+    """A confirmation that a secret's version was applied where it is used."""
+
+    id: int
+    version: int
+    applied_at: str
+    confirmed_by: Optional[str] = None
+    recorded_at: str
+
+
+class ConfirmationCreate(BaseModel):
+    """Request body confirming the newest version of a secret."""
+
+    applied_at: datetime = Field(description="When it was applied; may be in the past, never before the version")
+    confirmed_by: Optional[str] = Field(
+        default=None, max_length=200, description="Who or what confirmed it, e.g. a pipeline name"
+    )
+
+
+SecretMetadataResponse.model_rebuild()

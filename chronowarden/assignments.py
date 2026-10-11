@@ -20,6 +20,7 @@ class AssignmentIndex:
         Args:
             db: The Chronowarden database.
         """
+        self.db = db
         self._systems = {system["id"]: system for system in db.list_systems()}
         self._owner_names = {owner["id"]: owner["name"] for owner in db.list_owners()}
         self._secret_systems, self._secret_owners = db.get_assignments()

@@ -365,7 +365,13 @@ class Database:
                 return []
             identities = [(r["vault_name"], r["engine_id"], r["secret_path"]) for r in conn.execute(query, params)]
             where = "WHERE vault_name = ? AND engine_id = ? AND secret_path = ?"
-            for table in ("secret_metadata_cache", "secret_systems", "secret_owners", "observed_state"):
+            for table in (
+                "secret_metadata_cache",
+                "secret_systems",
+                "secret_owners",
+                "observed_state",
+                "rotation_confirmations",
+            ):
                 conn.executemany(f"DELETE FROM {table} {where}", identities)
             conn.commit()
             return identities
@@ -798,3 +804,53 @@ class Database:
                 return None
             row = conn.execute(f"SELECT {_AUDIT_COLUMNS} FROM audit_events WHERE id = ?", (event_id,)).fetchone()
             return dict(row) if row else None
+
+    def add_confirmation(
+        self, identity: SecretIdentity, version: int, applied_at: str, confirmed_by: Optional[str]
+    ) -> Optional[dict]:
+        """
+        Record that a secret's version was applied where it is used (ADR-021).
+
+        Returns:
+            The stored confirmation.
+        """
+        recorded_at = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            cursor = conn.execute(
+                "INSERT INTO rotation_confirmations "
+                "(vault_name, engine_id, secret_path, version, applied_at, confirmed_by, recorded_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (*identity, version, applied_at, confirmed_by, recorded_at),
+            )
+            conn.commit()
+            row = conn.execute("SELECT * FROM rotation_confirmations WHERE id = ?", (cursor.lastrowid,)).fetchone()
+            return dict(row)
+
+    def latest_confirmation(self, identity: SecretIdentity) -> Optional[dict]:
+        """Return a secret's newest confirmation that wasn't revoked, or None."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute(
+                "SELECT * FROM rotation_confirmations WHERE vault_name = ? AND engine_id = ? AND secret_path = ? "
+                "AND revoked_at IS NULL ORDER BY id DESC LIMIT 1",
+                identity,
+            ).fetchone()
+            return dict(row) if row else None
+
+    def revoke_confirmation(self, confirmation_id: int) -> None:
+        """Mark a confirmation revoked (the row stays, for the record)."""
+        revoked_at = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "UPDATE rotation_confirmations SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+                (revoked_at, confirmation_id),
+            )
+            conn.commit()

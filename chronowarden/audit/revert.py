@@ -8,6 +8,8 @@ import json
 from typing import Any
 
 from chronowarden.assignments import AssignmentIndex
+from chronowarden.config import AppConfig
+from chronowarden.confirmations import refresh_cached_ttl
 
 # Why each kind of event can't be reverted from Chronowarden
 _NOT_REVERTIBLE = {
@@ -37,7 +39,25 @@ def _owners_value(index: AssignmentIndex, identity: tuple[str, str, str]) -> Any
     return {"owners": [owner.model_dump() for owner in index.owners_of(identity)]}
 
 
-def revert_event(db: Any, event: dict, source: str) -> dict:
+def _revert_confirmation(db: Any, config: AppConfig, event: dict, source: str) -> dict:
+    """Revoke the confirmation an event recorded, so the secret awaits confirmation again (ADR-021)."""
+    identity = (event["vault_name"], event["engine_id"], event["secret_path"])
+    confirmed = json.loads(event["after"])
+    latest = db.latest_confirmation(identity)
+    if confirmed.get("id") is None or latest is None or latest["id"] != confirmed["id"]:
+        raise RevertError(409, f"Event {event['id']} can't be reverted: it isn't the secret's current confirmation")
+    db.revoke_confirmation(latest["id"])
+    refresh_cached_ttl(db, config, identity)
+    return db.append_audit_event(
+        "secret.confirmed",
+        source,
+        identity=identity,
+        before=confirmed,
+        after={"revoked": latest["id"], "reverts": event["id"]},
+    )
+
+
+def revert_event(db: Any, event: dict, source: str, config: AppConfig) -> dict:
     """
     Restore the value an event replaced, and record that as a new event of the same type.
 
@@ -45,6 +65,7 @@ def revert_event(db: Any, event: dict, source: str) -> dict:
         db: The Chronowarden database.
         event: The stored event to revert.
         source: Audit source of the request (`ui` or `api`).
+        config: Application configuration (TTL recalculation when a confirmation is revoked).
 
     Returns:
         The new event.
@@ -54,8 +75,12 @@ def revert_event(db: Any, event: dict, source: str) -> dict:
             refers to no longer exists.
     """
     event_type = event["event_type"]
+    if event_type == "secret.confirmed" and "revoked" not in json.loads(event["after"]):
+        return _revert_confirmation(db, config, event, source)
     if event_type not in ("secret.system", "secret.owners"):
-        reason = _NOT_REVERTIBLE.get(event_type, "only system and owner assignments of secrets can be reverted")
+        reason = _NOT_REVERTIBLE.get(
+            event_type, "only system and owner assignments and rotation confirmations of secrets can be reverted"
+        )
         raise RevertError(422, f"Event {event['id']} ({event_type}) can't be reverted: {reason}")
 
     identity = (event["vault_name"], event["engine_id"], event["secret_path"])

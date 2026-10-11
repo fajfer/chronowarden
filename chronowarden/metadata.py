@@ -184,8 +184,10 @@ def sync_secret_metadata(
     # Read what the internal database currently has
     cached = db.get_secret_metadata(vault_name, engine_id, secret_path)
 
-    # Calculate the desired TTL from config
-    desired_ttl = calculate_ttl(updated_time, severity, config)
+    # Calculate the desired TTL from config, counting from a confirmed applied date when it is later (ADR-021)
+    from chronowarden.confirmations import rotation_base  # here: confirmations imports parse_date from this module
+
+    desired_ttl = calculate_ttl(rotation_base(db, identity, updated_time), severity, config)
 
     # Determine if the remote backend needs updating
     remote_needs_update = False

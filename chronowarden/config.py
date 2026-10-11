@@ -87,12 +87,17 @@ class ExpiryProfile(BaseModel):
         default=DEFAULT_ALERT_THRESHOLD,
         description="Secrets expiring within this window get the 'warning' status (e.g. '30d', '1m')",
     )
+    confirmation_grace: Optional[str] = Field(
+        default=None,
+        description="How long a rotation may stay unconfirmed before it is overdue (default: confirmation_grace)",
+    )
 
-    @field_validator("rotation_period", "alert_threshold")
+    @field_validator("rotation_period", "alert_threshold", "confirmation_grace")
     @classmethod
-    def validate_duration(cls, v: str) -> str:
+    def validate_duration(cls, v: Optional[str]) -> Optional[str]:
         """Validate the duration format."""
-        parse_duration_to_days(v)
+        if v is not None:
+            parse_duration_to_days(v)
         return v
 
     @property
@@ -107,12 +112,22 @@ class ExpiryProfile(BaseModel):
 
 
 class SecretConfig(BaseModel):
-    """Per-secret severity override in config.yaml."""
+    """Per-secret overrides in config.yaml."""
 
     model_config = _STRICT
 
     path: str = Field(description="Exact secret path within the engine")
-    severity: str = Field(description="Severity override for this specific secret")
+    severity: Optional[str] = Field(default=None, description="Severity override for this specific secret")
+    confirmation_required: Optional[bool] = Field(
+        default=None, description="Whether rotations of this secret must be confirmed as applied (ADR-021)"
+    )
+
+    @model_validator(mode="after")
+    def check_has_override(self) -> "SecretConfig":
+        """A secret entry must override something."""
+        if self.severity is None and self.confirmation_required is None:
+            raise ValueError(f"secret '{self.path}' sets neither severity nor confirmation_required")
+        return self
 
 
 class EngineConfigNested(BaseModel):
@@ -122,6 +137,9 @@ class EngineConfigNested(BaseModel):
 
     name: str = Field(description="Engine name (mount point)")
     severity: Optional[str] = Field(default=None, description="Severity override for this engine")
+    confirmation_required: Optional[bool] = Field(
+        default=None, description="Whether rotations in this engine must be confirmed as applied"
+    )
     secrets: list[SecretConfig] = Field(default_factory=list, description="Per-secret overrides")
 
 
@@ -153,6 +171,9 @@ class VaultConfig(BaseModel):
     verify_ssl: bool = Field(default=True, description="Whether to verify TLS certificates")
     date_format: Optional[str] = Field(default=None, description="Date format override for this vault (YYYY-MM-DD)")
     severity: Optional[str] = Field(default=None, description="Default severity for all secrets in this vault")
+    confirmation_required: Optional[bool] = Field(
+        default=None, description="Whether rotations in this vault must be confirmed as applied (default: false)"
+    )
     engines: list[EngineConfigNested] = Field(
         default_factory=list, description="Nested engine configurations with optional overrides"
     )
@@ -334,6 +355,9 @@ class AppConfig(BaseModel):
     )
     vaults: list[VaultConfig] = Field(default_factory=list, description="List of Vault instances to connect to")
     date_format: str = Field(default="YYYY-MM-DD", description="Global date format for chronowarden_ttl")
+    confirmation_grace: str = Field(
+        default="7d", description="How long a rotation may stay unconfirmed before it is overdue (per profile override)"
+    )
     polling_interval: str = Field(default="6h", description="Global polling interval for change detection")
     vault_reconnect_interval: int = Field(
         default=120,
@@ -351,6 +375,13 @@ class AppConfig(BaseModel):
     )
     ui: UiConfig = Field(default_factory=UiConfig, description="Instance-wide UI settings")
     metrics: MetricsConfig = Field(default_factory=MetricsConfig, description="Prometheus metrics (off by default)")
+
+    @field_validator("confirmation_grace")
+    @classmethod
+    def validate_confirmation_grace(cls, v: str) -> str:
+        """Validate the duration format."""
+        parse_duration_to_days(v)
+        return v
 
     @model_validator(mode="after")
     def validate_unique_names(self) -> "AppConfig":
@@ -399,7 +430,8 @@ class AppConfig(BaseModel):
                 if engine.severity is not None:
                     found.append((engine.severity, f"engine '{vault.name}/{engine.name}'"))
                 for secret in engine.secrets:
-                    found.append((secret.severity, f"secret '{vault.name}/{engine.name}/{secret.path}'"))
+                    if secret.severity is not None:
+                        found.append((secret.severity, f"secret '{vault.name}/{engine.name}/{secret.path}'"))
         return found
 
     def _get_vault_config(self, vault_name: str) -> Optional[VaultConfig]:
@@ -444,7 +476,7 @@ class AppConfig(BaseModel):
 
         if vault_config and engine_id and secret_path:
             secret_config = vault_config.get_secret_config(engine_id, secret_path)
-            if secret_config:
+            if secret_config and secret_config.severity:
                 return secret_config.severity, "secret_config"
 
         if vault_config and engine_id:
@@ -504,6 +536,36 @@ class AppConfig(BaseModel):
             A theme ID from THEME_IDS.
         """
         return self.ui.default_theme or os.environ.get(_ENV_THEME) or DEFAULT_THEME
+
+    def resolve_confirmation_required(self, engine_id: str, vault_name: str, secret_path: str) -> bool:
+        """
+        Resolve whether a secret's rotations must be confirmed: secret → engine → vault → false (ADR-021).
+
+        Args:
+            engine_id: Engine mount path.
+            vault_name: Vault name.
+            secret_path: Secret path within the engine.
+
+        Returns:
+            Whether confirmation is required.
+        """
+        vault_config = self._get_vault_config(vault_name)
+        if vault_config is None:
+            return False
+        secret_config = vault_config.get_secret_config(engine_id, secret_path)
+        if secret_config and secret_config.confirmation_required is not None:
+            return secret_config.confirmation_required
+        engine_config = vault_config.get_engine_config(engine_id)
+        if engine_config and engine_config.confirmation_required is not None:
+            return engine_config.confirmation_required
+        return bool(vault_config.confirmation_required)
+
+    def get_confirmation_grace_days(self, severity: str) -> int:
+        """Return how many days a rotation may stay unconfirmed: the profile's grace, else the global one."""
+        profile = self._profile_for(severity)
+        if profile and profile.confirmation_grace:
+            return parse_duration_to_days(profile.confirmation_grace)
+        return parse_duration_to_days(self.confirmation_grace)
 
     def _profile_for(self, severity: str) -> Optional[ExpiryProfile]:
         """Return the expiry profile for a severity, falling back to the 'default' profile."""
