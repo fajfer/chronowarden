@@ -29,7 +29,8 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
   `Sidebar`, …
 - `src/lib/utils/`: `dateFormat.ts`, `statusColor.ts` (status → label and colour), `auditFormat.ts` (event labels,
   one-line summaries, which events show Revert; the server re-checks).
-- `src/routes/`: `/` dashboard, `/secrets`, `/vaults`, `/sync`, `/audit`, `/settings`, `/login`; `+layout.ts` sets
+- `src/routes/`: `/` dashboard, `/secrets`, `/vaults`, `/sync`, `/compliance` (tabs; gap dialog before every
+  snapshot), `/audit`, `/settings`, `/login`; `+layout.ts` sets
   `ssr = false`.
 - `static/`: logos and mascots per theme. `mockups/`: standalone HTML mockups the UI was built from (`4ee2142`).
 

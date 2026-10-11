@@ -11,6 +11,8 @@ export interface FilterState {
   severity: string | null;
   /** System ID, `UNASSIGNED_SYSTEM` for secrets without a system, or null for all. */
   systemId: string | null;
+  /** Only secrets with the privileged flag. */
+  privilegedOnly: boolean;
   statuses: SecretStatus[];
 }
 
@@ -23,5 +25,6 @@ export const DEFAULT_FILTERS: FilterState = {
   engineId: null,
   severity: null,
   systemId: null,
+  privilegedOnly: false,
   statuses: [],
 };

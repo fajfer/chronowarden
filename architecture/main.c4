@@ -37,6 +37,11 @@ model {
       description 'Append-only, hash-chained audit log of every change Chronowarden makes or sees; verifiable and exportable as JSON Lines'
     }
 
+    component compliance {
+      technology 'Python'
+      description 'Compliance evidence: summaries, gaps, reporting periods and frozen, SHA-256 hashed inventory snapshots'
+    }
+
     // User uses the UI
     user -> chronowarden.frontend 'Views secret metadata, manages owners and systems, assigns secrets, triggers sync'
     // Frontend interacts with the database
@@ -46,6 +51,8 @@ model {
     // Every change is recorded in the audit log, stored in the database
     chronowarden.backend -[api]-> chronowarden.audit 'Records changes and verifies the hash chain'
     chronowarden.audit -[api]-> chronowarden.database 'Appends events to audit_events (never updates or deletes)'
+    chronowarden.backend -[api]-> chronowarden.compliance 'Builds summaries, gap reports and snapshots'
+    chronowarden.compliance -[api]-> chronowarden.database 'Stores snapshots in compliance_snapshots (never updated or deleted)'
     // Backend uses metadata module
     chronowarden.backend -[api]-> chronowarden.metadata 'TTL calculation and sync'
 

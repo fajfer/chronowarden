@@ -31,6 +31,7 @@ class SecretMetadataResponse(BaseModel):
     secret_path: str
     full_path: str = Field(description="Computed: vault_name/engine_id/secret_path")
     ttl: Optional[str] = None
+    updated_time: Optional[str] = Field(default=None, description="Backend's last update (rotation) of the secret")
     ttl_date: Optional[datetime] = None
     days_remaining: Optional[int] = None
     severity: str = "default"
@@ -40,6 +41,7 @@ class SecretMetadataResponse(BaseModel):
     status: SecretStatus = SecretStatus.NO_TTL
     system: Optional[SystemRef] = Field(default=None, description="Assigned system, or null when unassigned")
     owners: list[OwnerRef] = Field(default_factory=list, description="Owners assigned to the secret itself")
+    privileged: bool = Field(default=False, description='chronowarden_privileged is "true" in the backend (#93)')
     confirmation_required: bool = Field(default=False, description="Rotations must be confirmed as applied (ADR-021)")
     awaiting_confirmation: bool = Field(default=False, description="The newest version isn't confirmed yet")
     confirmation_overdue: bool = Field(default=False, description="Awaiting longer than the grace period")
@@ -76,6 +78,12 @@ class ConfirmationCreate(BaseModel):
     confirmed_by: Optional[str] = Field(
         default=None, max_length=200, description="Who or what confirmed it, e.g. a pipeline name"
     )
+
+
+class PrivilegedUpdate(BaseModel):
+    """Request body setting the privileged flag."""
+
+    privileged: bool
 
 
 SecretMetadataResponse.model_rebuild()

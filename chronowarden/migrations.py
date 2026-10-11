@@ -183,6 +183,33 @@ def _rotation_confirmations(conn: sqlite3.Connection) -> None:
     )
 
 
+def _privileged(conn: sqlite3.Connection) -> None:
+    """Cache the chronowarden_privileged flag read from the backend (#93)."""
+    conn.execute("ALTER TABLE secret_metadata_cache ADD COLUMN privileged INTEGER NOT NULL DEFAULT 0")
+
+
+def _compliance_snapshots(conn: sqlite3.Connection) -> None:
+    """Frozen, hashed inventory snapshots (#94); triggers refuse UPDATE and DELETE like the audit log."""
+    conn.execute("""
+        CREATE TABLE compliance_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL,
+            label TEXT,
+            cadence TEXT,
+            period TEXT,
+            supersedes INTEGER,
+            row_count INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            sha256 TEXT NOT NULL
+        )
+    """)
+    for action in ("UPDATE", "DELETE"):
+        conn.execute(f"""
+            CREATE TRIGGER compliance_snapshots_no_{action.lower()} BEFORE {action} ON compliance_snapshots
+            BEGIN SELECT RAISE(ABORT, 'compliance_snapshots is append-only'); END
+        """)
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "baseline 0.6 schema", _baseline),
     Migration(2, "webhook notification routes only", _webhook_routes_only),
@@ -191,6 +218,8 @@ MIGRATIONS: list[Migration] = [
     Migration(5, "audit log", _audit_log),
     Migration(6, "observed backend state", _observed_state),
     Migration(7, "rotation confirmations", _rotation_confirmations),
+    Migration(8, "privileged flag on cached secrets", _privileged),
+    Migration(9, "compliance snapshots", _compliance_snapshots),
 ]
 
 

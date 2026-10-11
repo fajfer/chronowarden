@@ -34,6 +34,7 @@
     if (f.engineId) result = result.filter((s) => s.engine_id === f.engineId);
     if (f.systemId === UNASSIGNED_SYSTEM) result = result.filter((s) => s.system === null);
     else if (f.systemId) result = result.filter((s) => s.system?.id === f.systemId);
+    if (f.privilegedOnly) result = result.filter((s) => s.privileged);
     if (f.statuses.length > 0) result = result.filter((s) => f.statuses.includes(s.status));
 
     result.sort((a, b) => {
@@ -136,6 +137,7 @@
       ['vault_name', (s) => s.vault_name],
       ['system', (s) => s.system?.name],
       ['owners', (s) => s.effective_owners.map((o) => o.name).join('; ')],
+      ['privileged', (s) => (s.privileged ? 'yes' : 'no')],
       ['severity', (s) => s.severity],
       ['rotation_period_days', (s) => s.rotation_period_days],
       ['days_remaining', (s) => s.days_remaining],
@@ -229,6 +231,7 @@
                 <td class="px-4 py-3">
                   <button onclick={() => (selectedSecret = secret)} class="text-left block">
                     <span class="font-mono text-gray-200">{secret.secret_path}</span>
+                    {#if secret.privileged}<span class="ml-1 rounded bg-rose-900/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-rose-300">Privileged</span>{/if}
                     <span class="block text-xs text-gray-500 mt-0.5">{secret.vault_name}</span>
                     {#if secret.removed_at}
                       <span class="block text-xs text-red-400 mt-0.5">Removed from the backend {formatDate(secret.removed_at)}</span>

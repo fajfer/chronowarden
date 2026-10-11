@@ -43,7 +43,9 @@ _AUDIT_FILTERS = {
 }
 
 # Columns of secret_metadata_cache in the order SecretMetadataCache expects them
-_CACHE_COLUMNS = "id, vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced, removed_at"
+_CACHE_COLUMNS = (
+    "id, vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced, removed_at, privileged"
+)
 
 
 class SecretMetadataCache(BaseModel):
@@ -58,6 +60,7 @@ class SecretMetadataCache(BaseModel):
     severity: Optional[str] = None
     last_synced: Optional[str] = None
     removed_at: Optional[str] = None
+    privileged: bool = False
 
 
 def _row_to_cache(row: sqlite3.Row) -> SecretMetadataCache:
@@ -122,13 +125,14 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO secret_metadata_cache
-                    (vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced, privileged)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(vault_name, engine_id, secret_path) DO UPDATE SET
                     updated_time = excluded.updated_time,
                     ttl = excluded.ttl,
                     severity = excluded.severity,
-                    last_synced = excluded.last_synced
+                    last_synced = excluded.last_synced,
+                    privileged = excluded.privileged
                 """,
                 (
                     entry.vault_name,
@@ -138,6 +142,7 @@ class Database:
                     entry.ttl,
                     entry.severity,
                     entry.last_synced or datetime.now(tz=timezone.utc).isoformat(),
+                    int(entry.privileged),
                 ),
             )
             conn.commit()
@@ -233,6 +238,7 @@ class Database:
         engine_id: Optional[str] = None,
         severity: Optional[str] = None,
         include_removed: bool = False,
+        privileged: Optional[bool] = None,
     ) -> list[SecretMetadataCache]:
         """
         List all cached secrets with optional filtering.
@@ -242,6 +248,7 @@ class Database:
             engine_id: Filter by engine mount path.
             severity: Filter by severity profile.
             include_removed: Also return secrets that sync no longer finds in their backend.
+            privileged: Filter by the privileged flag.
 
         Returns:
             List of cached metadata entries matching the filters.
@@ -264,6 +271,9 @@ class Database:
             params.append(severity)
         if not include_removed:
             query += " AND removed_at IS NULL"
+        if privileged is not None:
+            query += " AND privileged = ?"
+            params.append(int(privileged))
 
         with self._conn_lock:
             conn = self._require_connection()
@@ -854,3 +864,67 @@ class Database:
                 (revoked_at, confirmation_id),
             )
             conn.commit()
+
+    def add_snapshot(
+        self,
+        created_at: str,
+        content: str,
+        sha256: str,
+        row_count: int,
+        label: Optional[str],
+        cadence: Optional[str],
+        period: Optional[str],
+        supersedes: Optional[int],
+    ) -> Optional[int]:
+        """Store a frozen compliance snapshot; snapshots are never updated or deleted (#94)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            cursor = conn.execute(
+                "INSERT INTO compliance_snapshots "
+                "(created_at, label, cadence, period, supersedes, row_count, content, sha256) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (created_at, label, cadence, period, supersedes, row_count, content, sha256),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def list_snapshots(self) -> list[dict]:
+        """List snapshots, newest first, without their content."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            rows = conn.execute(
+                "SELECT id, created_at, label, cadence, period, supersedes, row_count, sha256 "
+                "FROM compliance_snapshots ORDER BY id DESC"
+            )
+            return [dict(row) for row in rows]
+
+    def get_snapshot(self, snapshot_id: int) -> Optional[dict]:
+        """Return one snapshot with its content."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute("SELECT * FROM compliance_snapshots WHERE id = ?", (snapshot_id,)).fetchone()
+            return dict(row) if row else None
+
+    def audit_head(self) -> dict:
+        """The newest audit event's id and hash, which snapshots record to anchor the chain."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return {"events": 0, "head_hash": GENESIS_HASH}
+            row = conn.execute("SELECT id, hash FROM audit_events ORDER BY id DESC LIMIT 1").fetchone()
+            return {"events": row["id"], "head_hash": row["hash"]} if row else {"events": 0, "head_hash": GENESIS_HASH}
+
+    def first_audit_timestamp(self) -> Optional[str]:
+        """When the audit log started (reporting periods before it can't be closed)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute("SELECT timestamp FROM audit_events ORDER BY id LIMIT 1").fetchone()
+            return row["timestamp"] if row else None

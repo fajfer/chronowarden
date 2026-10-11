@@ -57,7 +57,24 @@ def _revert_confirmation(db: Any, config: AppConfig, event: dict, source: str) -
     )
 
 
-def revert_event(db: Any, event: dict, source: str, config: AppConfig) -> dict:
+def _revert_privileged(db: Any, manager: Any, event: dict, source: str) -> dict:
+    """Write the previous privileged flag back to the backend (a chronowarden_* key, so ADR-004 allows it)."""
+    from chronowarden.api.secrets import write_privileged
+
+    identity = (event["vault_name"], event["engine_id"], event["secret_path"])
+    before, after = json.loads(event["before"]), json.loads(event["after"])
+    entry = db.get_secret_metadata(*identity)
+    if entry is None:
+        raise RevertError(409, f"Secret {'/'.join(identity)} is no longer cached")
+    if entry.privileged != after["privileged"]:
+        raise RevertError(
+            409, f"Event {event['id']} can't be reverted: the value changed since; revert the newer event"
+        )
+    write_privileged(db, manager, entry, before["privileged"], source, reverts=event["id"])
+    return db.list_audit_events(limit=1, event_type="secret.privileged")[0]
+
+
+def revert_event(db: Any, event: dict, source: str, config: AppConfig, manager: Any = None) -> dict:
     """
     Restore the value an event replaced, and record that as a new event of the same type.
 
@@ -66,6 +83,7 @@ def revert_event(db: Any, event: dict, source: str, config: AppConfig) -> dict:
         event: The stored event to revert.
         source: Audit source of the request (`ui` or `api`).
         config: Application configuration (TTL recalculation when a confirmation is revoked).
+        manager: Vault manager, for events whose revert writes to the backend (the privileged flag).
 
     Returns:
         The new event.
@@ -77,9 +95,13 @@ def revert_event(db: Any, event: dict, source: str, config: AppConfig) -> dict:
     event_type = event["event_type"]
     if event_type == "secret.confirmed" and "revoked" not in json.loads(event["after"]):
         return _revert_confirmation(db, config, event, source)
+    if event_type == "secret.privileged" and "reverts" not in json.loads(event["after"]):
+        return _revert_privileged(db, manager, event, source)
     if event_type not in ("secret.system", "secret.owners"):
         reason = _NOT_REVERTIBLE.get(
-            event_type, "only system and owner assignments and rotation confirmations of secrets can be reverted"
+            event_type,
+            "only system and owner assignments, the privileged flag and rotation confirmations of secrets "
+            "can be reverted",
         )
         raise RevertError(422, f"Event {event['id']} ({event_type}) can't be reverted: {reason}")
 

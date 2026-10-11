@@ -15,6 +15,7 @@ const LABELS: Record<string, string> = {
   'secret.system': 'System changed',
   'secret.owners': 'Owners changed',
   'secret.confirmed': 'Rotation confirmed',
+  'secret.privileged': 'Privileged flag changed',
   'secret.removed': 'Removed from the backend',
   'secret.reappeared': 'Back in the backend',
   'secret.purged': 'Purged',
@@ -36,6 +37,7 @@ export function isRevertible(event: AuditEvent): boolean {
   return (
     event.event_type === 'secret.system' ||
     event.event_type === 'secret.owners' ||
+    event.event_type === 'secret.privileged' ||
     (event.event_type === 'secret.confirmed' && !(after && 'revoked' in after))
   );
 }

@@ -19,6 +19,8 @@ export interface Secret {
   secret_path: string;
   full_path: string;
   ttl: string | null;
+  /** Backend's last update (rotation) of the secret. */
+  updated_time: string | null;
   ttl_date: string | null;
   days_remaining: number | null;
   severity: string;
@@ -26,6 +28,8 @@ export interface Secret {
   alert_threshold_days: number;
   last_synced: string | null;
   status: SecretStatus;
+  /** chronowarden_privileged is "true" in the backend (#93). */
+  privileged: boolean;
   /** Rotations must be confirmed as applied (ADR-021). */
   confirmation_required: boolean;
   /** The newest version isn't confirmed yet. */

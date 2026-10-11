@@ -103,6 +103,28 @@ def format_date(dt: datetime, date_format: str = "YYYY-MM-DD") -> str:
     return f"{dt.year:04d}-{dt.month:02d}-{dt.day:02d}"
 
 
+PRIVILEGED_KEY = "chronowarden_privileged"
+
+
+def parse_privileged(value: Optional[str], where: str) -> bool:
+    """
+    Read the chronowarden_privileged metadata value: only "true" (any case) counts (#93).
+
+    Args:
+        value: The custom metadata value, or None when the key is absent.
+        where: The secret, for the warning about an invalid value.
+
+    Returns:
+        Whether the secret is privileged.
+    """
+    if value is None:
+        return False
+    normalized = str(value).strip().lower()
+    if normalized not in ("true", "false"):
+        logger.warning("Ignoring invalid %s value %r on %s; use true or false", PRIVILEGED_KEY, value, where)
+    return normalized == "true"
+
+
 def calculate_ttl(updated_time: str, severity: str, config: AppConfig) -> Optional[str]:
     """
     Calculate the expiry date (TTL) for a secret.
@@ -183,6 +205,7 @@ def sync_secret_metadata(
 
     # Read what the internal database currently has
     cached = db.get_secret_metadata(vault_name, engine_id, secret_path)
+    privileged = parse_privileged(custom_metadata.get(PRIVILEGED_KEY), f"{vault_name}/{engine_id}/{secret_path}")
 
     # Calculate the desired TTL from config, counting from a confirmed applied date when it is later (ADR-021)
     from chronowarden.confirmations import rotation_base  # here: confirmations imports parse_date from this module
@@ -215,7 +238,12 @@ def sync_secret_metadata(
     db_needs_update = False
     if cached is None:
         db_needs_update = True
-    elif cached.severity != severity or cached.ttl != desired_ttl or cached.updated_time != updated_time:
+    elif (
+        cached.severity != severity
+        or cached.ttl != desired_ttl
+        or cached.updated_time != updated_time
+        or cached.privileged != privileged
+    ):
         db_needs_update = True
         if cached.updated_time != updated_time:
             logger.info(
@@ -254,6 +282,7 @@ def sync_secret_metadata(
         ttl=desired_ttl,
         severity=severity,
         last_synced=datetime.now(tz=timezone.utc).isoformat(),
+        privileged=privileged,
     )
 
     # Update internal database if it diverges from desired state

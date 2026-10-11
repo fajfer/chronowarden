@@ -5,6 +5,10 @@
 export type { Secret, SecretStatus, PurgeResult, Confirmation } from './Secret';
 export type { AuditEvent, AuditChainStatus, AuditFilters } from './Audit';
 export type {
+  ComplianceScope, SnapshotInfo, GapEntry, GapReport, PeriodStatus, SummaryGroup, ComplianceSummary,
+  SnapshotRequest,
+} from './Compliance';
+export type {
   Owner, OwnerCreate, OwnerUpdate,
   NotificationRoute, NotificationRouteCreate,
 } from './Owner';

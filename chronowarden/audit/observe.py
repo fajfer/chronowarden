@@ -86,3 +86,21 @@ def record_config_applied(db: Any, identity: SecretIdentity, state: dict[str, An
     db.set_observed_state(identity, state)
     if changed is not None:
         db.append_audit_event("secret.config_applied", "sync", identity=identity, before=changed[0], after=changed[1])
+
+
+def remember_written(db: Any, identity: SecretIdentity, written: dict[str, str]) -> None:
+    """
+    Remember keys Chronowarden wrote on a user's request (e.g. the privileged flag), without recording an event.
+
+    The caller records the meaningful event itself; this only keeps the next sync from reporting the write.
+
+    Args:
+        db: The Chronowarden database.
+        identity: The secret.
+        written: The keys and values written.
+    """
+    state = db.get_observed_state(identity)
+    if state is None:
+        return
+    state["custom_metadata"].update(written)
+    db.set_observed_state(identity, state)

@@ -8,7 +8,7 @@ import logging
 import os
 import pathlib
 import re
-from typing import Optional
+from typing import Literal, Optional
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -312,6 +312,51 @@ class VaultConfig(BaseModel):
         return self.secret_id
 
 
+class ComplianceScope(BaseModel):
+    """Which secrets a snapshot covers; empty lists mean all."""
+
+    model_config = _STRICT
+
+    vaults: list[str] = Field(default_factory=list, description="Vault names")
+    engines: list[str] = Field(default_factory=list, description="Engine mount paths")
+    systems: list[str] = Field(default_factory=list, description="System names")
+    privileged_only: bool = Field(default=False, description="Only secrets marked chronowarden_privileged")
+
+
+class ReportingCadence(BaseModel):
+    """A reporting period whose snapshot is closed by hand after the period ends."""
+
+    model_config = _STRICT
+
+    period: Literal["monthly", "quarterly", "half-yearly", "yearly"]
+    scope: ComplianceScope = Field(default_factory=ComplianceScope)
+
+
+class ReportingConfig(BaseModel):
+    """Periodic reporting; no cadences means not opted in."""
+
+    model_config = _STRICT
+
+    cadences: list[ReportingCadence] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_unique_periods(self) -> "ReportingConfig":
+        """One cadence per period, so a period's snapshot is unambiguous."""
+        periods = [cadence.period for cadence in self.cadences]
+        duplicates = sorted({period for period in periods if periods.count(period) > 1})
+        if duplicates:
+            raise ValueError(f"duplicate reporting cadence(s): {', '.join(duplicates)}")
+        return self
+
+
+class ComplianceConfig(BaseModel):
+    """Compliance evidence settings (#94)."""
+
+    model_config = _STRICT
+
+    reporting: ReportingConfig = Field(default_factory=ReportingConfig)
+
+
 class MetricsConfig(BaseModel):
     """Prometheus metrics settings (ADR-022)."""
 
@@ -375,6 +420,7 @@ class AppConfig(BaseModel):
     )
     ui: UiConfig = Field(default_factory=UiConfig, description="Instance-wide UI settings")
     metrics: MetricsConfig = Field(default_factory=MetricsConfig, description="Prometheus metrics (off by default)")
+    compliance: ComplianceConfig = Field(default_factory=ComplianceConfig, description="Compliance evidence settings")
 
     @field_validator("confirmation_grace")
     @classmethod
@@ -398,6 +444,17 @@ class AppConfig(BaseModel):
         merged = {name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()}
         merged.update(self.expiry_profiles)
         self.expiry_profiles = merged
+        return self
+
+    @model_validator(mode="after")
+    def validate_compliance_vaults(self) -> "AppConfig":
+        """Reporting scopes may only name configured vaults."""
+        known = {vault.name for vault in self.vaults}
+        unknown = sorted(
+            {name for cadence in self.compliance.reporting.cadences for name in cadence.scope.vaults} - known
+        )
+        if unknown:
+            raise ValueError(f"compliance reporting scope names unknown vault(s): {', '.join(unknown)}")
         return self
 
     @model_validator(mode="after")

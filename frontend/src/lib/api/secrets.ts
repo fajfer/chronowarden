@@ -59,3 +59,8 @@ export function fetchSecretHistory(id: number): Promise<AuditEvent[]> {
 export function confirmRotation(id: number, appliedAt: string): Promise<Secret> {
   return apiPost<Secret>(`/secrets/${id}/confirmations`, { applied_at: appliedAt });
 }
+
+/** PUT /api/v1/secrets/:id/privileged — write chronowarden_privileged to the backend. */
+export function setSecretPrivileged(id: number, privileged: boolean): Promise<Secret> {
+  return apiPut<Secret>(`/secrets/${id}/privileged`, { privileged });
+}
