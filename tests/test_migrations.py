@@ -66,6 +66,7 @@ class TestMigrate:
             assert schema_version(db._conn) == LATEST
             tables = {r[0] for r in db._conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
             assert {"secret_metadata_cache", "owners", "notification_routes"} <= tables
+            assert {"systems", "system_owners", "secret_systems", "secret_owners"} <= tables
         finally:
             db.close()
 

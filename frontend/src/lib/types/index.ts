@@ -11,5 +11,6 @@ export type {
   VaultInstanceHealth, SyncResult, SyncedSecretEntry,
   ApiInfo, HealthStatus,
 } from './Vault';
+export type { System, SystemCreate, SystemUpdate, SystemRef, OwnerRef } from './System';
 export type { FilterState } from './Filter';
 export { DEFAULT_FILTERS } from './Filter';

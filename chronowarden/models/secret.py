@@ -10,6 +10,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from chronowarden.models.system import OwnerRef, SystemRef
+
 
 class SecretStatus(str, Enum):
     """Computed status of a secret based on TTL and days remaining."""
@@ -36,3 +38,8 @@ class SecretMetadataResponse(BaseModel):
     alert_threshold_days: int = 30
     last_synced: Optional[datetime] = None
     status: SecretStatus = SecretStatus.NO_TTL
+    system: Optional[SystemRef] = Field(default=None, description="Assigned system, or null when unassigned")
+    owners: list[OwnerRef] = Field(default_factory=list, description="Owners assigned to the secret itself")
+    effective_owners: list[OwnerRef] = Field(
+        default_factory=list, description="The secret's own owners, or else its system's owners (ADR-010)"
+    )
