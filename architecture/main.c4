@@ -9,13 +9,13 @@ model {
   chronowarden = system 'Chronowarden' {
     component frontend {
       technology 'SvelteKit, TypeScript, Tailwind CSS'
-      description 'Dark mode dashboard UI for secret monitoring, owner management, and sync control'
+      description 'Dark mode dashboard UI for secret monitoring, owner and system management, assignments, and sync control'
 
     }
 
     component database {
       technology 'sqlite'
-      description 'SQLite database storing secret metadata cache, engine configuration, and owner profiles'
+      description 'SQLite database storing the rebuildable secret metadata cache, plus owners, systems and their assignments to secrets (not rebuildable: back it up). Schema migrated at startup'
 
       style {
         shape cylinder
@@ -33,11 +33,11 @@ model {
     }
 
     // User uses the UI
-    user -> chronowarden.frontend 'Views secret metadata, manages owners, triggers sync'
+    user -> chronowarden.frontend 'Views secret metadata, manages owners and systems, assigns secrets, triggers sync'
     // Frontend interacts with the database
     chronowarden.frontend -[api]-> chronowarden.backend 'Triggers API through frontend'
     // Backend interacts with the database
-    chronowarden.backend -[api]-> chronowarden.database 'Stores and retrieves secret metadata cache and owner profiles'
+    chronowarden.backend -[api]-> chronowarden.database 'Stores the metadata cache, owners, systems and assignments keyed by secret identity'
     // Backend uses metadata module
     chronowarden.backend -[api]-> chronowarden.metadata 'TTL calculation and sync'
 
