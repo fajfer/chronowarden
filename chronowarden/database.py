@@ -4,6 +4,7 @@
 
 """SQLite database for Chronowarden internal state management."""
 
+import json
 import logging
 import sqlite3
 from datetime import datetime, timezone
@@ -364,7 +365,7 @@ class Database:
                 return []
             identities = [(r["vault_name"], r["engine_id"], r["secret_path"]) for r in conn.execute(query, params)]
             where = "WHERE vault_name = ? AND engine_id = ? AND secret_path = ?"
-            for table in ("secret_metadata_cache", "secret_systems", "secret_owners"):
+            for table in ("secret_metadata_cache", "secret_systems", "secret_owners", "observed_state"):
                 conn.executemany(f"DELETE FROM {table} {where}", identities)
             conn.commit()
             return identities
@@ -762,5 +763,29 @@ class Database:
                 "INSERT INTO audit_state (key, value) VALUES (?, ?) "
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                 (key, value),
+            )
+            conn.commit()
+
+    def get_observed_state(self, identity: SecretIdentity) -> Optional[dict]:
+        """Return a secret's backend state from the last sync, or None if it was never seen."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute(
+                "SELECT state FROM observed_state WHERE vault_name = ? AND engine_id = ? AND secret_path = ?", identity
+            ).fetchone()
+            return json.loads(row["state"]) if row else None
+
+    def set_observed_state(self, identity: SecretIdentity, state: dict) -> None:
+        """Remember a secret's backend state for the next sync."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "INSERT INTO observed_state (vault_name, engine_id, secret_path, state) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(vault_name, engine_id, secret_path) DO UPDATE SET state = excluded.state",
+                (*identity, canonical_json(state)),
             )
             conn.commit()

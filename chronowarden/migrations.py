@@ -150,12 +150,26 @@ def _audit_log(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE TABLE audit_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
 
 
+def _observed_state(conn: sqlite3.Connection) -> None:
+    """Remember each secret's backend state between syncs, so changes made in the backend can be recorded."""
+    conn.execute("""
+        CREATE TABLE observed_state (
+            vault_name TEXT NOT NULL,
+            engine_id TEXT NOT NULL,
+            secret_path TEXT NOT NULL,
+            state TEXT NOT NULL,
+            PRIMARY KEY (vault_name, engine_id, secret_path)
+        )
+    """)
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "baseline 0.6 schema", _baseline),
     Migration(2, "webhook notification routes only", _webhook_routes_only),
     Migration(3, "systems and secret assignments", _systems_and_owners),
     Migration(4, "removed_at on cached secrets", _removed_at),
     Migration(5, "audit log", _audit_log),
+    Migration(6, "observed backend state", _observed_state),
 ]
 
 
