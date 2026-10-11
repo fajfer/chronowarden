@@ -33,6 +33,7 @@ dev = [
     "black>=24.10.0",
     "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=1.0.6",
+    "testcontainers>=4.10",
 ]
 
 [build-system]
@@ -41,6 +42,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["chronowarden"]
+
+[tool.pytest.ini_options]
+# Integration tests start real OpenBao/Vault containers (testcontainers); run them with: pytest -m integration
+addopts = "-m 'not integration'"
+markers = ["integration: needs a container runtime; starts OpenBao and HashiCorp Vault"]
 
 [tool.ruff]
 line-length = 120
