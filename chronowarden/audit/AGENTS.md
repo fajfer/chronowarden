@@ -36,7 +36,8 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
   `owner.created|updated|deleted` (subject `owner:<id>`), `config.baseline|changed` (subject `config`). From sync:
   `secret.baseline` (first sight), `secret.metadata` (custom keys, values included), `secret.settings`,
   `secret.version` (rotation; values never read), `secret.config_applied` (Chronowarden's own severity/TTL write).
-  `secret.confirmed` (rotation confirmed as applied, ADR-021).
+  `secret.confirmed` (rotation confirmed as applied, ADR-021), `secret.privileged` (revertible; written to the
+  backend), `compliance.snapshot` (subject `snapshot:<id>`).
 - Secret events are keyed by identity (`vault_name`, `engine_id`, `secret_path`), so history survives a rebuilt
   cache (ADR-017). Unchanged values record nothing.
 - Config events store only expiry profiles and the severity cascade, never addresses or credentials.
