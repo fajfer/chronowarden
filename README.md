@@ -25,6 +25,8 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 
 - **Vendor neutrality** - Connect to multiple backends instances simultaneously
 - **Credential Health Dashboard** - Visual status of secrets (OK, Warning, Expired, No TTL)
+- **Systems and Owners** - Assign secrets to business systems (CMDB link, asset number) and owners, and see who is
+  responsible for each secret
 - **Severity Levels** - Classify secrets by (user-defined) compliance requirements (PCI-DSS, Critical, Default)
 - **Secure** - Never reads actual secret values, only metadata
 - **Real-Time Sync** - Live and on-demand synchronization with backends
@@ -55,7 +57,9 @@ docker run --network=host --rm -p 8000:8000 \
   ghcr.io/fajfer/chronowarden:v0.6.3
 ```
 
-Add `-v $(pwd)/chronowarden.db:/app/chronowarden.db` if you already have a DB
+Add `-v $(pwd)/chronowarden.db:/app/chronowarden.db` to keep the database. From 0.7 it holds system and owner
+assignments that can't be rebuilt from Vault, so **back up `chronowarden.db`**; it is upgraded automatically on
+startup.
 
 #### Building image
 Production (default) — distroless, no shell, 86MB \
@@ -179,10 +183,20 @@ path "sys/mounts" {
 
 ### Secrets
 - `GET /api/v1/secrets` - List all tracked secrets with metadata
-  - Query params: `vault_name`, `engine_id`, `severity`
-- `GET /api/v1/secrets/{id}` - Get secret metadata by ID
+  - Query params: `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id` (effective owner), `unassigned`
+- `GET /api/v1/secrets/{id}` - Get secret metadata by ID, including its system, owners and effective owners
+- `PUT /api/v1/secrets/{id}/system` - Assign the secret to a system (`{"system_id": "..."}`, or `null` to unassign)
+- `PUT /api/v1/secrets/{id}/owners` - Replace the secret's owners (`{"owner_ids": [...]}`)
 
-Severity is set in `config.yaml` only (per vault, engine or secret); the API is read-only for secrets.
+Severity is set in `config.yaml` only (per vault, engine or secret). A secret's effective owners are its own owners,
+or else its system's owners.
+
+### Systems and owners
+- `GET/POST /api/v1/systems/`, `GET/PUT/DELETE /api/v1/systems/{id}` - Systems (name, description, CMDB URI, asset
+  number); deleting a system that still has secrets returns `409` with their list
+- `PUT /api/v1/systems/{id}/owners` - Replace a system's owners
+- `GET/POST /api/v1/owners/`, `GET/PUT/DELETE /api/v1/owners/{id}` - Owners; deleting one removes it from every
+  secret and system
 
 ### Sync
 - `POST /api/v1/sync/vault/{vault_name}` - Trigger synchronization for a specific Vault instance

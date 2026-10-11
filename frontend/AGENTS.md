@@ -17,10 +17,13 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
   fallback `index.html`). There is no `svelte.config.js` since SvelteKit 3 (#79). `tsconfig.json` extends
   `$app/tsconfig`.
 - `src/lib/api/`: `client.ts` (`apiGet/apiPost/apiPatch/...`, `ApiError`), plus one file per backend router
-  (`secrets.ts`, `sync.ts`, `vaults.ts`, `owners.ts`).
-- `src/lib/stores/`: `secrets` (list, loading, error, `secretStats`), `filters`, `sync` (+ toasts), `theme`, `auth`.
+  (`secrets.ts`, `sync.ts`, `vaults.ts`, `owners.ts`, `systems.ts`). `ApiError.message` is the backend's `detail`
+  (string, `{ message }` or the 422 list), ready for a toast.
+- `src/lib/stores/`: `secrets` (list, loading, error, `secretStats`, `updateSecret`), `filters` (incl. `systemId`,
+  `UNASSIGNED_SYSTEM`), `sync` (+ toasts), `theme`, `auth`.
 - `src/lib/types/`: TypeScript mirrors of backend models, re-exported from `types/index.ts`.
-- `src/lib/components/`: `Filters`, `SecretModal`, `OwnerModal`, `StatusBadge`, `ExpiryHorizon`, `Navbar`,
+- `src/lib/components/`: `Filters`, `SecretModal` (details + system/owner assignment), `OwnerModal`, `SystemModal`,
+  `StatusBadge`, `ExpiryHorizon`, `Navbar`,
   `Sidebar`, …
 - `src/lib/utils/`: `dateFormat.ts`, `statusColor.ts` (status → label and colour).
 - `src/routes/`: `/` dashboard, `/secrets`, `/vaults`, `/sync`, `/settings`, `/login`; `+layout.ts` sets

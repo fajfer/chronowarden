@@ -9,13 +9,19 @@ export interface FilterState {
   vaultName: string | null;
   engineId: string | null;
   severity: string | null;
+  /** System ID, `UNASSIGNED_SYSTEM` for secrets without a system, or null for all. */
+  systemId: string | null;
   statuses: SecretStatus[];
 }
+
+/** Filter value for secrets without a system. */
+export const UNASSIGNED_SYSTEM = '__unassigned__';
 
 export const DEFAULT_FILTERS: FilterState = {
   search: '',
   vaultName: null,
   engineId: null,
   severity: null,
+  systemId: null,
   statuses: [],
 };

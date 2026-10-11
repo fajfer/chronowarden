@@ -47,3 +47,8 @@ export async function loadSecrets(): Promise<void> {
     secretsLoading.set(false);
   }
 }
+
+/** Replace one secret in the store, e.g. after changing its assignment. */
+export function updateSecret(updated: Secret): void {
+  secrets.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
+}

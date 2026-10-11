@@ -23,7 +23,6 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
-| [2026-10-09-systems-and-owners](2026-10-09-systems-and-owners.md) | Systems (CMDB URI, asset number, owners) and owners assigned to secrets (#61) |
 | [2026-10-09-wire-prometheus-metrics](2026-10-09-wire-prometheus-metrics.md) | Defined-but-unset metrics get producers |
 | [2026-10-10-release-0-7](2026-10-10-release-0-7.md) | Release 0.7 Compliance evidence, extended scope: order of work |
 | [2026-10-10-supply-chain-security](2026-10-10-supply-chain-security.md) | Scorecard 6.8 → ~8.7, SLSA Build L3, cosign, CycloneDX + SPDX SBOMs, fuzzing, signed Releases |
@@ -37,6 +36,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-09-systems-and-owners](implemented/2026-10-09-systems-and-owners.md) | Systems (CMDB URI, asset number, owners) and owners assigned to secrets (#61) |
 | [2026-10-11-release-0-6-3](implemented/2026-10-11-release-0-6-3.md) | Sync merges custom metadata instead of replacing it (released as v0.6.3) |
 | [2026-10-10-sveltekit-3](implemented/2026-10-10-sveltekit-3.md) | Frontend on SvelteKit 3 and TypeScript 6 (#79, PR #80) |
 | [2026-10-10-release-0-6-2](implemented/2026-10-10-release-0-6-2.md) | Remove Vault passthrough endpoints, urllib3 bump, Sentry/Node/k8s hardening (released as v0.6.2) |

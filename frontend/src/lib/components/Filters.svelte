@@ -5,20 +5,26 @@
 <script lang="ts">
   import {
     filters, setSearch, toggleStatus,
-    setVaultName, setSeverity, setEngineId, clearFilters,
+    setVaultName, setSeverity, setEngineId, setSystemId, clearFilters,
   } from '#lib/stores/filters.js';
   import { secrets } from '#lib/stores/secrets.js';
   import { getStatusLabel } from '#lib/utils/statusColor.js';
-  import type { SecretStatus } from '#lib/types/index.js';
+  import { UNASSIGNED_SYSTEM } from '#lib/types/index.js';
+  import type { SecretStatus, SystemRef } from '#lib/types/index.js';
 
   const statuses: SecretStatus[] = ['ok', 'warning', 'expired', 'no_ttl'];
 
   const vaultOptions = $derived(Array.from(new Set($secrets.map((s) => s.vault_name))).sort());
   const severityOptions = $derived(Array.from(new Set($secrets.map((s) => s.severity))).sort());
   const engineOptions = $derived(Array.from(new Set($secrets.map((s) => s.engine_id))).sort());
+  const systemOptions = $derived(
+    Array.from(new Map($secrets.filter((s) => s.system).map((s) => [s.system!.id, s.system!])).values())
+      .sort((a: SystemRef, b: SystemRef) => a.name.localeCompare(b.name)),
+  );
 
   const hasActive = $derived(
-    !!($filters.search || $filters.vaultName || $filters.severity || $filters.engineId || $filters.statuses.length),
+    !!($filters.search || $filters.vaultName || $filters.severity || $filters.engineId || $filters.systemId ||
+      $filters.statuses.length),
   );
 
   const selectClass =
@@ -51,6 +57,12 @@
   <select class={selectClass} value={$filters.engineId ?? ''} onchange={(e: Event) => setEngineId((e.target as HTMLSelectElement).value || null)}>
     <option value="">All engines</option>
     {#each engineOptions as eng}<option value={eng}>{eng}</option>{/each}
+  </select>
+
+  <select class={selectClass} value={$filters.systemId ?? ''} onchange={(e: Event) => setSystemId((e.target as HTMLSelectElement).value || null)}>
+    <option value="">All systems</option>
+    <option value={UNASSIGNED_SYSTEM}>Unassigned</option>
+    {#each systemOptions as sys (sys.id)}<option value={sys.id}>{sys.name}</option>{/each}
   </select>
 
   <div class="flex flex-wrap gap-1">

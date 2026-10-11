@@ -51,3 +51,14 @@ export interface SystemUpdate {
   cmdb_uri?: string | null;
   asset_number?: string | null;
 }
+
+/**
+ * What the system form returns: the fields plus the complete owner list.
+ */
+export interface SystemFormData {
+  name: string;
+  description: string;
+  cmdb_uri: string | null;
+  asset_number: string | null;
+  owner_ids: string[];
+}

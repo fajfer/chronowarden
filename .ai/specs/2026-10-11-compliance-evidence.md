@@ -82,7 +82,7 @@ filter; the secret detail view a privileged toggle.
   [api](../../chronowarden/api/AGENTS.md), [frontend](../../frontend/AGENTS.md)
 - [ADR-004](../adr/ADR-004-metadata-only-access.md), [ADR-010](../adr/ADR-010-owners-systems-and-permissions.md),
   [ADR-017](../adr/ADR-017-sqlite-holds-assignments.md), [ADR-014](../adr/ADR-014-rotation-confirmation-and-audit-log.md)
-- [systems and owners spec](2026-10-09-systems-and-owners.md)
+- [systems and owners spec](implemented/2026-10-09-systems-and-owners.md)
 
 ## ADRs affected
 
