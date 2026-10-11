@@ -5,7 +5,7 @@
 <script lang="ts">
   import {
     filters, setSearch, toggleStatus,
-    setVaultName, setSeverity, setEngineId, setSystemId, clearFilters,
+    setVaultName, setSeverity, setEngineId, setSystemId, togglePrivilegedOnly, clearFilters,
   } from '#lib/stores/filters.js';
   import { secrets } from '#lib/stores/secrets.js';
   import { getStatusLabel } from '#lib/utils/statusColor.js';
@@ -24,7 +24,7 @@
 
   const hasActive = $derived(
     !!($filters.search || $filters.vaultName || $filters.severity || $filters.engineId || $filters.systemId ||
-      $filters.statuses.length),
+      $filters.privilegedOnly || $filters.statuses.length),
   );
 
   const selectClass =
@@ -64,6 +64,15 @@
     <option value={UNASSIGNED_SYSTEM}>Unassigned</option>
     {#each systemOptions as sys (sys.id)}<option value={sys.id}>{sys.name}</option>{/each}
   </select>
+
+  <button
+    onclick={togglePrivilegedOnly}
+    aria-pressed={$filters.privilegedOnly}
+    class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors
+           {$filters.privilegedOnly ? 'bg-rose-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}"
+  >
+    Privileged only
+  </button>
 
   <div class="flex flex-wrap gap-1">
     {#each statuses as status}

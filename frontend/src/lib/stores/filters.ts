@@ -47,3 +47,8 @@ export function setEngineId(engineId: string | null): void {
 export function setSystemId(systemId: string | null): void {
   filters.update((f) => ({ ...f, systemId }));
 }
+
+/** Toggle showing only privileged secrets. */
+export function togglePrivilegedOnly(): void {
+  filters.update((f) => ({ ...f, privilegedOnly: !f.privilegedOnly }));
+}

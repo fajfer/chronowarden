@@ -8,7 +8,9 @@
   import { formatDate } from '#lib/utils/dateFormat.js';
   import { fetchOwners } from '#lib/api/owners.js';
   import { fetchSystems } from '#lib/api/systems.js';
-  import { confirmRotation, fetchSecret, fetchSecretHistory, setSecretOwners, setSecretSystem } from '#lib/api/secrets.js';
+  import {
+    confirmRotation, fetchSecret, fetchSecretHistory, setSecretOwners, setSecretPrivileged, setSecretSystem,
+  } from '#lib/api/secrets.js';
   import { revertAuditEvent } from '#lib/api/audit.js';
   import { updateSecret, loadSecrets } from '#lib/stores/secrets.js';
   import AuditEventList from './AuditEventList.svelte';
@@ -40,6 +42,19 @@
       history = await fetchSecretHistory(id);
     } catch {
       history = [];
+    }
+  }
+
+  async function togglePrivileged() {
+    if (!secret) return;
+    try {
+      const updated = await setSecretPrivileged(secret.id, !secret.privileged);
+      updateSecret(updated);
+      secret = updated;
+      addToast(`${updated.full_path} is ${updated.privileged ? 'now' : 'no longer'} privileged`, 'success');
+      await loadHistory(updated.id);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Changing the privileged flag failed', 'error');
     }
   }
 
@@ -175,6 +190,13 @@
           <div>
             <p class="text-gray-500 text-xs">Last Synced</p>
             <p class="text-gray-200">{formatDate(secret.last_synced)}</p>
+          </div>
+          <div class="col-span-2">
+            <label class="flex items-center gap-2 text-gray-200">
+              <input type="checkbox" checked={secret.privileged} onchange={togglePrivileged} class="accent-rose-500" />
+              Privileged
+              <span class="text-xs text-gray-500">(written to the backend as chronowarden_privileged)</span>
+            </label>
           </div>
         </div>
 
