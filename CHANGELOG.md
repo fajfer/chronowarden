@@ -32,6 +32,10 @@ git history.
 
 ### Added
 
+- **Audit log (#24, ADR-014).** Every change Chronowarden makes is recorded in an append-only, hash-chained log:
+  system and owner assignments, systems, owners, secrets removed, reappearing or purged, and config changes that
+  affect secrets (recorded at startup). `GET /api/v1/audit/events`, `/audit/events.jsonl` (export) and
+  `/audit/verify` (recompute the chain); `GET /api/v1/secrets/{id}/history` per secret. The log is kept forever.
 - **Systems and owners for secrets (#61).** Create systems (name, description, CMDB link, asset number, owners) under
   `/api/v1/systems`, assign a secret to one system and to owners with `PUT /api/v1/secrets/{id}/system` and
   `/owners`, and filter secrets by `system_id`, `owner_id` (effective owner) or `unassigned`. A secret's effective
