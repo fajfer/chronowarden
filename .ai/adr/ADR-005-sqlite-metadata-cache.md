@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-005: SQLite as the local metadata cache
 
-- **Status:** Accepted (retroactive)
+- **Status:** Superseded by ADR-017
 - **Date:** 2026-02-07
 - **Evidence:** `b9baae7` (database.py added), `4add654` (API moved to the DB cache), `2725865` (connection lock); PRs #8, #54.
 

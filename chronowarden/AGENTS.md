@@ -71,7 +71,7 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 
 ## Related ADRs
 
-[ADR-005](../.ai/adr/ADR-005-sqlite-metadata-cache.md), [ADR-006](../.ai/adr/ADR-006-config-source-of-truth.md),
+[ADR-017](../.ai/adr/ADR-017-sqlite-holds-assignments.md), [ADR-006](../.ai/adr/ADR-006-config-source-of-truth.md),
 [ADR-007](../.ai/adr/ADR-007-sveltekit-spa-served-by-fastapi.md)
 
 ## Validate

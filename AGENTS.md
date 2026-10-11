@@ -62,7 +62,7 @@ Shorthand: `<area>` means `<area>/AGENTS.md`. Read root + the listed files, noth
 | Add or change a REST endpoint | [api](chronowarden/api/AGENTS.md), [models](chronowarden/models/AGENTS.md) |
 | Secret status, TTL, severity cascade, sync | [core](chronowarden/AGENTS.md), [ADR-006](.ai/adr/ADR-006-config-source-of-truth.md) |
 | Add or change a config option | [core](chronowarden/AGENTS.md), [deploy](deploy/AGENTS.md) |
-| DB schema or query change | [models](chronowarden/models/AGENTS.md), [ADR-005](.ai/adr/ADR-005-sqlite-metadata-cache.md) |
+| DB schema or query change | [models](chronowarden/models/AGENTS.md), [ADR-017](.ai/adr/ADR-017-sqlite-holds-assignments.md) |
 | Add or wire a Prometheus metric | [metrics](chronowarden/metrics/AGENTS.md) |
 | UI page, component, store, theme | [frontend](frontend/AGENTS.md) |
 | Filter bug in the secrets table | [frontend](frontend/AGENTS.md) (+ [api](chronowarden/api/AGENTS.md) if the bug is in a query param) |

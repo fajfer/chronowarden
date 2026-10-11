@@ -23,7 +23,7 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-002](ADR-002-architecture-as-code-likec4.md) | Architecture as code in LikeC4 | Accepted (retroactive) | 2025-02-20 |
 | [ADR-003](ADR-003-pluggable-integrations-vault-first.md) | Pluggable secret-backend integrations, Vault first | Accepted (retroactive) | 2026-02-07 |
 | [ADR-004](ADR-004-metadata-only-access.md) | Metadata-only access to secret backends | Accepted (retroactive) | 2026-02-07 |
-| [ADR-005](ADR-005-sqlite-metadata-cache.md) | SQLite as the local metadata cache | Accepted (retroactive) | 2026-02-07 |
+| [ADR-005](ADR-005-sqlite-metadata-cache.md) | SQLite as the local metadata cache | Superseded by ADR-017 | 2026-02-07 |
 | [ADR-006](ADR-006-config-source-of-truth.md) | Config is the source of truth for severity | Accepted (retroactive) | 2026-02-08 |
 | [ADR-007](ADR-007-sveltekit-spa-served-by-fastapi.md) | SvelteKit SPA served by FastAPI, API under /api/v1 | Accepted (retroactive) | 2026-02-07 |
 | [ADR-008](ADR-008-container-and-deployment-targets.md) | Distroless image; Compose and bare Kubernetes manifests | Accepted (retroactive) | 2026-02-09 |
@@ -35,3 +35,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-014](ADR-014-rotation-confirmation-and-audit-log.md) | Rotation confirmation and audit log | Proposed | 2026-10-09 |
 | [ADR-015](ADR-015-authentication.md) | Authentication for UI and API | Proposed | 2026-10-09 |
 | [ADR-016](ADR-016-stability-policy-for-1-0.md) | What 1.0 guarantees | Proposed | 2026-10-09 |
+| [ADR-017](ADR-017-sqlite-holds-assignments.md) | SQLite holds assignments that can't be rebuilt from the backends | Accepted | 2026-10-11 |

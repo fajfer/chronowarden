@@ -34,6 +34,8 @@ to anything. There is no authentication or RBAC (`frontend/src/lib/stores/auth.t
 
 - First schema change on existing tables (`secret_metadata_cache.system_id`). There are no migrations (ADR-005), so a
   guarded `ALTER TABLE` or a migration tool is needed.
+  *Update 2026-10-11:* [ADR-017](ADR-017-sqlite-holds-assignments.md) stores assignments in separate tables keyed
+  by secret identity, so no existing table changes.
 - Owner and system assignment need their own endpoints, because `PATCH /secrets/{id}` is being removed (#73,
   ADR-006).
 - The audit log (ADR-014) records assignment changes, with free-text identity until ADR-015.
