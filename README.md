@@ -242,6 +242,33 @@ docker run -p 127.0.0.1:8201:8201 --cap-add=IPC_LOCK \
 
 Chronowarden maintains compatibility with both platforms as [OpenBao intends to remain API compatible](https://openbao.org/api-docs/libraries/).
 
+## Verifying releases
+
+From 0.7.0 on, every release is built by GitHub Actions from a tag and comes with
+[SLSA Build L3](https://slsa.dev/spec/v1.1/levels) provenance and a [cosign](https://docs.sigstore.dev/) keyless
+signature. Verify an image by its digest:
+
+```bash
+DIGEST=$(docker buildx imagetools inspect ghcr.io/fajfer/chronowarden:v0.7.0 --format '{{json .Manifest.Digest}}' | tr -d '"')
+
+# Built by this repository's workflow from the tag (SLSA provenance)
+slsa-verifier verify-image "ghcr.io/fajfer/chronowarden@${DIGEST}" \
+  --source-uri github.com/fajfer/chronowarden --source-tag v0.7.0
+
+# Signed by the release workflow
+cosign verify "ghcr.io/fajfer/chronowarden@${DIGEST}" \
+  --certificate-identity-regexp '^https://github.com/fajfer/chronowarden/\.github/workflows/docker\.yaml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+The wheel and sdist on the [GitHub release](https://github.com/fajfer/chronowarden/releases) are covered by
+`chronowarden.intoto.jsonl`:
+
+```bash
+slsa-verifier verify-artifact chronowarden-0.7.0-py3-none-any.whl \
+  --provenance-path chronowarden.intoto.jsonl --source-uri github.com/fajfer/chronowarden --source-tag v0.7.0
+```
+
 ## Deployment
 
 See [deploy/](deploy/) for:
