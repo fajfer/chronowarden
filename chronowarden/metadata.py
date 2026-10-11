@@ -47,9 +47,10 @@ def parse_date(date_str: str, format_hint: str = "YYYY-MM-DD") -> Optional[datet
         try:
             cleaned = date_str.rstrip("Z")
             if "." in cleaned:
-                parts = cleaned.split(".")
-                fractional = parts[1][:6]
-                cleaned = f"{parts[0]}.{fractional}"
+                # Python keeps at most 6 fractional digits; keep any UTC offset that follows them
+                head, fraction = cleaned.split(".", 1)
+                digits = re.match(r"\d*", fraction).group(0)  # type: ignore[union-attr]
+                cleaned = f"{head}.{digits[:6]}{fraction[len(digits):]}"
             dt = datetime.fromisoformat(cleaned)
             if date_str.endswith("Z"):
                 dt = dt.replace(tzinfo=timezone.utc)
