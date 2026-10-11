@@ -216,6 +216,8 @@ or else its system's owners.
   `event_type`, `subject`, `since`, `until`; paging with `before_id`)
 - `GET /api/v1/audit/events.jsonl` - Export of the whole log as stored, for archiving or independent checks
 - `GET /api/v1/audit/verify` - Recompute the hash chain; returns the head hash to note down
+- `POST /api/v1/audit/events/{id}/revert` - Undo a system or owner assignment change (recorded as a new event);
+  backend data, severity and TTL can't be reverted from Chronowarden
 - `GET /api/v1/secrets/{id}/history` - Changes to one secret
 
 ### Vaults

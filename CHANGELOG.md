@@ -37,7 +37,8 @@ git history.
   affect secrets (recorded at startup). Sync also records changes made in the backend: custom metadata keys
   added, changed or removed (with values), version-cleanup settings, and new versions (rotations; values are never
   read). `GET /api/v1/audit/events`, `/audit/events.jsonl` (export) and
-  `/audit/verify` (recompute the chain); `GET /api/v1/secrets/{id}/history` per secret. The log is kept forever.
+  `/audit/verify` (recompute the chain); `GET /api/v1/secrets/{id}/history` per secret; assignment changes can be
+  reverted with `POST /api/v1/audit/events/{id}/revert`. The log is kept forever.
 - **Systems and owners for secrets (#61).** Create systems (name, description, CMDB link, asset number, owners) under
   `/api/v1/systems`, assign a secret to one system and to owners with `PUT /api/v1/secrets/{id}/system` and
   `/owners`, and filter secrets by `system_id`, `owner_id` (effective owner) or `unassigned`. A secret's effective
