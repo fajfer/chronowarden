@@ -22,7 +22,8 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 - `../config.example.yaml`: the full config reference ([core](../chronowarden/AGENTS.md)).
 - `../.github/workflows/`: `docker.yaml` (builds both targets for amd64 and arm64; pushes to `ghcr.io` except on PRs),
   `ci.yaml` (black, ruff, pytest, `npm run check`), `scorecard.yml`, `zizmor.yaml`,
-  `agents-docs.yaml`.
+  `agents-docs.yaml`, `cflite_pr.yml` / `cflite_batch.yml` (ClusterFuzzLite: 5 min on PRs touching the code,
+  30 min weekly).
 
 ## Contracts
 
@@ -55,6 +56,10 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   change together.
 - `docker.yaml` smoke-tests the production image (health + path traversal check) before pushing; the job has
   `timeout-minutes: 30`.
+- Fuzzing: atheris harnesses in `fuzz/` (`fuzz_*.py`, each asserts its function's contract), built by
+  `.clusterfuzzlite/` on the OSS-Fuzz builder, which runs **Python 3.11** (the project declares 3.12+):
+  `build.sh` installs the `uv.lock` versions with uv (hash-pinned in `.clusterfuzzlite/requirements.txt`) and the
+  package with `--ignore-requires-python`. Code the fuzzers import must keep running on 3.11.
 - `frontend-builder` runs on `$BUILDPLATFORM`: its output is arch-independent, and `npm ci` under QEMU arm64
   emulation hung intermittently (v0.6.2 tag build). Keep it native.
 - Planned: headless image without the frontend, e.g. for a CronJob (#48); `dev-setup.py` rework with podman and
