@@ -72,7 +72,7 @@ New **ADR-018 Release integrity** (task 9). Extends ADR-008.
 | 7 | zizmor and Scorecard: the SLSA generator is called by tag (`@v2.x.y`), with a justified zizmor ignore for that `uses:` only; Scorecard gets `repo_token: ${{ secrets.SCORECARD_TOKEN }}` | deploy | zizmor clean; Scorecard green | todo | |
 | 8 | Maintainer, manual (agent drafts instructions and questionnaire answers in a scratch file): ruleset on `main` (PR required for everyone, CI and zizmor required, 0 approvals, no force push or deletion), tag ruleset for `v*`, `SCORECARD_TOKEN`, OpenSSF Best Practices "passing" | none | Branch-Protection and CII scored | doing | |
 | 9 | ADR-018; README "Verifying releases" (`slsa-verifier`, `cosign verify`, `cosign verify-attestation`); `deploy/AGENTS.md`; CHANGELOG | [.ai/adr](../adr/README.md), deploy | ADR indexed; commands run against the release | todo | |
-| 10 | **Required:** ClusterFuzzLite (`.clusterfuzzlite/`, PR + weekly batch) with atheris fuzzers for `parse_date`, `calculate_ttl` and `load_config` (YAML bytes) | [core](../../chronowarden/AGENTS.md) | Fuzzing 10; crashes found are fixed with regression tests | todo | |
+| 10 | **Required:** ClusterFuzzLite (`.clusterfuzzlite/`, PR + weekly batch) with atheris fuzzers for `parse_date`, `calculate_ttl` and `load_config` (YAML bytes) | [core](../../chronowarden/AGENTS.md) | Fuzzing 10; crashes found are fixed with regression tests | done | 76c2bc4 |
 
 ## Validation
 
