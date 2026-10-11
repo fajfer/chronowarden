@@ -83,7 +83,7 @@ ADR-014 accepted; ADR-021 new.
 | 1 | `audit_events` with hash chain, append-only writer, chain verifier, JSONL export, `GET /api/v1/audit/events` | models, api | Tests: chain verifies; tampering a row is detected; no update/delete path | done | 1b35320 |
 | 2 | Observed state table and sync diffing into events (custom metadata, settings, versions, baseline) | core, integrations | Tests against fixtures; live check on both dev vaults: change a key in Vault → event with before/after | done | 845abcb |
 | 3 | Move #61 assignment logging and privileged changes (privileged: recorded by the compliance spec, which adds the flag) into events; config-change events at startup | core, api | Tests | done | 1b35320 |
-| 4 | Revert endpoint with the allowed/refused rules | api | Tests for each allowed and refused type | todo | |
+| 4 | Revert endpoint with the allowed/refused rules | api | Tests for each allowed and refused type | done | ac9c643 |
 | 5 | Confirmation cascade + grace config, `rotation_confirmations`, awaiting-confirmation status, TTL from max(updated_time, applied_at), confirm endpoint | core, models, api | Tests: required/not required via cascade, historic date, TTL recalculation, revert of a confirmation | todo | |
 | 6 | UI: Audit log page, secret History with Revert, Confirm rotation dialog, awaiting-confirmation badge | frontend | `npm run check` clean; walk-through against the dev vaults | todo | |
 | 7 | ADR-014 accepted text, ADR-021; `main.c4`; README; CHANGELOG; `chronowarden/audit/AGENTS.md` | [.ai/adr](../adr/README.md) | Docs match the code | todo | |
