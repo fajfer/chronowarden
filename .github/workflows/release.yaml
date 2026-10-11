@@ -79,7 +79,9 @@ jobs:
     permissions:
       actions: read # to read the workflow run
       id-token: write # to sign the provenance
-      contents: read
+      # The generator's upload job declares contents: write even with upload-assets off; GitHub refuses to start
+      # a reusable workflow whose jobs ask for more than the caller grants (startup_failure on v0.7.0-rc.1)
+      contents: write
     # Reusable workflows must be referenced by tag for the SLSA verifier to trust them (ADR-018)
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0 # zizmor: ignore[unpinned-uses]
     with:
