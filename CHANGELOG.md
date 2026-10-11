@@ -39,6 +39,12 @@ git history.
   read). `GET /api/v1/audit/events`, `/audit/events.jsonl` (export) and
   `/audit/verify` (recompute the chain); `GET /api/v1/secrets/{id}/history` per secret; assignment changes can be
   reverted with `POST /api/v1/audit/events/{id}/revert`. The log is kept forever.
+- **Compliance evidence (#93, #94, #95).** Secrets marked `chronowarden_privileged: true` in the backend are flagged
+  (toggle in the UI, written with the metadata merge, audited, revertible; filter and column). A Compliance tab
+  shows totals and privileged counts, a read-only tree and settings, and frozen inventory snapshots: ad hoc with a
+  label and scope, or closing a reporting period configured under `compliance.reporting.cadences` (monthly to
+  yearly). Snapshots are canonical JSON with a SHA-256 and the audit log head, can't be changed or deleted, and are
+  exported as JSON (the hashed bytes) or CSV. Gaps are shown before freezing.
 - **Rotation confirmation (#24, ADR-021).** `confirmation_required` (per vault, engine or secret, default off) marks
   a secret's new versions as awaiting confirmation until someone confirms they were applied where the secret is
   used: in the API (`POST /api/v1/secrets/{id}/confirmations`, with an optional `confirmed_by` for pipelines) with an

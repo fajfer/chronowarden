@@ -26,6 +26,8 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 
 - **Vendor neutrality** - Connect to multiple backends instances simultaneously
 - **Credential Health Dashboard** - Visual status of secrets (OK, Warning, Expired, No TTL)
+- **Compliance Evidence** - Privileged flag (`chronowarden_privileged`), gap warnings, opt-in reporting periods and
+  frozen, SHA-256 hashed inventory snapshots with CSV/JSON export; a Compliance tab with summaries and a tree
 - **Audit Log** - Append-only, hash-chained record of every change (assignments, systems, owners, removed
   secrets, config), exportable as JSON Lines
 - **Systems and Owners** - Assign secrets to business systems (CMDB link, asset number) and owners, and see who is
@@ -212,6 +214,19 @@ or else its system's owners.
   - A disconnected vault is reconnected first. If that fails, the response is `503` with the `reason`
     (`offline`, `auth`, ...) and whether a background retry is scheduled; the vault is then synced
     automatically as soon as the retry reconnects it
+
+### Compliance
+- `PUT /api/v1/secrets/{id}/privileged` - Set `chronowarden_privileged` in the backend (`{"privileged": true}`)
+- `GET /api/v1/compliance/summary` - Total and privileged secrets per vault, engine and system
+- `GET /api/v1/compliance/gaps` - Secrets without owner or system, expired or without TTL, privileged without owner,
+  or awaiting confirmation (scope: `vaults`, `engines`, `systems`, `privileged_only`, or `cadence`)
+- `GET /api/v1/compliance/periods` - Ended reporting periods and the snapshot closing each
+- `GET/POST /api/v1/compliance/snapshots` - Frozen snapshots: ad hoc (`label`, `scope`) or closing a period
+  (`cadence`, `period`; `supersedes` to correct one); `GET .../snapshots/{id}.json` returns the hashed bytes,
+  `.csv` the rows
+- `GET /api/v1/compliance/settings` - Reporting and confirmation settings from `config.yaml`
+
+Snapshot exports list secret paths and owners; keep them as confidential as the instance itself.
 
 ### Audit log
 - `GET /api/v1/audit/events` - Change history, newest first (filters: `vault_name`, `engine_id`, `secret_path`,
