@@ -78,9 +78,49 @@ def _webhook_routes_only(conn: sqlite3.Connection) -> None:
     conn.execute("ALTER TABLE notification_routes_new RENAME TO notification_routes")
 
 
+def _systems_and_owners(conn: sqlite3.Connection) -> None:
+    """Add systems and the secret assignments, keyed by secret identity rather than cache row (ADR-017, #61)."""
+    conn.execute("""
+        CREATE TABLE systems (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL DEFAULT '',
+            cmdb_uri TEXT,
+            asset_number TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE system_owners (
+            system_id TEXT NOT NULL,
+            owner_id TEXT NOT NULL,
+            PRIMARY KEY (system_id, owner_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE secret_systems (
+            vault_name TEXT NOT NULL,
+            engine_id TEXT NOT NULL,
+            secret_path TEXT NOT NULL,
+            system_id TEXT NOT NULL,
+            PRIMARY KEY (vault_name, engine_id, secret_path)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE secret_owners (
+            vault_name TEXT NOT NULL,
+            engine_id TEXT NOT NULL,
+            secret_path TEXT NOT NULL,
+            owner_id TEXT NOT NULL,
+            PRIMARY KEY (vault_name, engine_id, secret_path, owner_id)
+        )
+    """)
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "baseline 0.6 schema", _baseline),
     Migration(2, "webhook notification routes only", _webhook_routes_only),
+    Migration(3, "systems and secret assignments", _systems_and_owners),
 ]
 
 

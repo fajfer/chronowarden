@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
+import type { OwnerRef, SystemRef } from './System';
+
 /**
  * Computed status for a secret based on TTL and days remaining.
  */
@@ -24,10 +26,10 @@ export interface Secret {
   alert_threshold_days: number;
   last_synced: string | null;
   status: SecretStatus;
-  /**
-   * Optional owner assignment. Not yet returned by the backend Secret API
-   * (see the "assign secrets to internal systems" roadmap item) — rendered
-   * as "—" until the backend populates it.
-   */
-  owner?: string | null;
+  /** Assigned system, or null when unassigned (#61). */
+  system: SystemRef | null;
+  /** Owners assigned to the secret itself. */
+  owners: OwnerRef[];
+  /** The secret's own owners, or else its system's owners (ADR-010). */
+  effective_owners: OwnerRef[];
 }

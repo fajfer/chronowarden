@@ -19,6 +19,11 @@ logger = logging.getLogger("uvicorn.error")
 
 DEFAULT_DB_PATH = Path("chronowarden.db")
 
+# A secret's real identity (ADR-017): vault name, engine mount, path inside the engine
+SecretIdentity = tuple[str, str, str]
+
+_SYSTEM_COLUMNS = ("name", "description", "cmdb_uri", "asset_number")
+
 
 class SecretMetadataCache(BaseModel):
     """Internal cache entry for a Vault secret's metadata."""
@@ -359,12 +364,14 @@ class Database:
             conn.commit()
 
     def delete_owner(self, owner_id: str) -> None:
-        """Delete an owner and their notification routes."""
+        """Delete an owner, their notification routes, and their assignments to secrets and systems."""
         with self._conn_lock:
             conn = self._require_connection()
             if conn is None:
                 return
             conn.execute("DELETE FROM notification_routes WHERE owner_id = ?", (owner_id,))
+            conn.execute("DELETE FROM secret_owners WHERE owner_id = ?", (owner_id,))
+            conn.execute("DELETE FROM system_owners WHERE owner_id = ?", (owner_id,))
             conn.execute("DELETE FROM owners WHERE id = ?", (owner_id,))
             conn.commit()
 
@@ -404,3 +411,188 @@ class Database:
                 return
             conn.execute("DELETE FROM notification_routes WHERE id = ?", (route_id,))
             conn.commit()
+
+    def create_system(
+        self, system_id: str, name: str, description: str, cmdb_uri: Optional[str], asset_number: Optional[str]
+    ) -> None:
+        """
+        Create a system.
+
+        Raises:
+            sqlite3.IntegrityError: If a system with the same name exists.
+        """
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "INSERT INTO systems (id, name, description, cmdb_uri, asset_number) VALUES (?, ?, ?, ?, ?)",
+                (system_id, name, description, cmdb_uri, asset_number),
+            )
+            conn.commit()
+
+    def get_system(self, system_id: str) -> Optional[dict]:
+        """Get a system by ID, with its `owner_ids`."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute(
+                "SELECT id, name, description, cmdb_uri, asset_number, created_at FROM systems WHERE id = ?",
+                (system_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            system = dict(row)
+            system["owner_ids"] = self._system_owner_ids(conn, system_id)
+            return system
+
+    def list_systems(self) -> list[dict]:
+        """List all systems by name, each with its `owner_ids`."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            rows = conn.execute(
+                "SELECT id, name, description, cmdb_uri, asset_number, created_at FROM systems ORDER BY name"
+            ).fetchall()
+            return [{**dict(row), "owner_ids": self._system_owner_ids(conn, row["id"])} for row in rows]
+
+    @staticmethod
+    def _system_owner_ids(conn: sqlite3.Connection, system_id: str) -> list[str]:
+        """Return the owner IDs of a system."""
+        rows = conn.execute("SELECT owner_id FROM system_owners WHERE system_id = ? ORDER BY owner_id", (system_id,))
+        return [row["owner_id"] for row in rows]
+
+    def update_system(self, system_id: str, fields: dict[str, Optional[str]]) -> None:
+        """
+        Update a system's fields; only names in `_SYSTEM_COLUMNS` are used.
+
+        Raises:
+            sqlite3.IntegrityError: If the new name belongs to another system.
+        """
+        columns = [column for column in _SYSTEM_COLUMNS if column in fields]
+        if not columns:
+            return
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            query = "UPDATE systems SET " + ", ".join(f"{column} = ?" for column in columns) + " WHERE id = ?"
+            conn.execute(query, [fields[column] for column in columns] + [system_id])
+            conn.commit()
+
+    def set_system_owners(self, system_id: str, owner_ids: list[str]) -> list[str]:
+        """
+        Replace a system's owners.
+
+        Returns:
+            The previous owner IDs.
+        """
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            previous = self._system_owner_ids(conn, system_id)
+            conn.execute("DELETE FROM system_owners WHERE system_id = ?", (system_id,))
+            conn.executemany(
+                "INSERT INTO system_owners (system_id, owner_id) VALUES (?, ?)",
+                [(system_id, owner_id) for owner_id in sorted(set(owner_ids))],
+            )
+            conn.commit()
+            return previous
+
+    def delete_system(self, system_id: str) -> None:
+        """Delete a system and its owner links; callers check that no secret is assigned to it first."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute("DELETE FROM system_owners WHERE system_id = ?", (system_id,))
+            conn.execute("DELETE FROM systems WHERE id = ?", (system_id,))
+            conn.commit()
+
+    def list_secrets_of_system(self, system_id: str) -> list[SecretIdentity]:
+        """Return the identities of the secrets assigned to a system."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            rows = conn.execute(
+                "SELECT vault_name, engine_id, secret_path FROM secret_systems WHERE system_id = ? "
+                "ORDER BY vault_name, engine_id, secret_path",
+                (system_id,),
+            )
+            return [(row["vault_name"], row["engine_id"], row["secret_path"]) for row in rows]
+
+    def set_secret_system(self, identity: SecretIdentity, system_id: Optional[str]) -> Optional[str]:
+        """
+        Assign a secret to a system, or unassign it with None.
+
+        Returns:
+            The previous system ID, or None.
+        """
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute(
+                "SELECT system_id FROM secret_systems WHERE vault_name = ? AND engine_id = ? AND secret_path = ?",
+                identity,
+            ).fetchone()
+            conn.execute(
+                "DELETE FROM secret_systems WHERE vault_name = ? AND engine_id = ? AND secret_path = ?", identity
+            )
+            if system_id is not None:
+                conn.execute(
+                    "INSERT INTO secret_systems (vault_name, engine_id, secret_path, system_id) VALUES (?, ?, ?, ?)",
+                    (*identity, system_id),
+                )
+            conn.commit()
+            return row["system_id"] if row else None
+
+    def set_secret_owners(self, identity: SecretIdentity, owner_ids: list[str]) -> list[str]:
+        """
+        Replace the owners assigned to a secret.
+
+        Returns:
+            The previous owner IDs.
+        """
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            where = "WHERE vault_name = ? AND engine_id = ? AND secret_path = ?"
+            previous = [
+                row["owner_id"]
+                for row in conn.execute(f"SELECT owner_id FROM secret_owners {where} ORDER BY owner_id", identity)
+            ]
+            conn.execute(f"DELETE FROM secret_owners {where}", identity)
+            conn.executemany(
+                "INSERT INTO secret_owners (vault_name, engine_id, secret_path, owner_id) VALUES (?, ?, ?, ?)",
+                [(*identity, owner_id) for owner_id in sorted(set(owner_ids))],
+            )
+            conn.commit()
+            return previous
+
+    def get_assignments(self) -> tuple[dict[SecretIdentity, str], dict[SecretIdentity, list[str]]]:
+        """
+        Return every secret assignment, keyed by secret identity.
+
+        Returns:
+            (system ID per secret, owner IDs per secret).
+        """
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return {}, {}
+            systems = {
+                (row["vault_name"], row["engine_id"], row["secret_path"]): row["system_id"]
+                for row in conn.execute("SELECT vault_name, engine_id, secret_path, system_id FROM secret_systems")
+            }
+            owners: dict[SecretIdentity, list[str]] = {}
+            for row in conn.execute(
+                "SELECT vault_name, engine_id, secret_path, owner_id FROM secret_owners ORDER BY owner_id"
+            ):
+                owners.setdefault((row["vault_name"], row["engine_id"], row["secret_path"]), []).append(row["owner_id"])
+            return systems, owners

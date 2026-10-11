@@ -27,6 +27,11 @@ git history.
 
 ### Added
 
+- **Systems and owners for secrets (#61).** Create systems (name, description, CMDB link, asset number, owners) under
+  `/api/v1/systems`, assign a secret to one system and to owners with `PUT /api/v1/secrets/{id}/system` and
+  `/owners`, and filter secrets by `system_id`, `owner_id` (effective owner) or `unassigned`. A secret's effective
+  owners are its own owners, or else its system's owners. Assignments live only in Chronowarden's database, so back
+  it up. Editing is open to anyone who can reach the API until authentication (0.9).
 - Releases are signed: the production image carries a cosign signature, SLSA Build L3 provenance and CycloneDX/SPDX
   SBOMs, and the GitHub Release has the wheel, sdist, source SBOMs and provenance. See "Verifying releases" in the
   README.

@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
-from chronowarden.api import health_router, owners_router, secrets_router, sync_router, vault_router
+from chronowarden.api import health_router, owners_router, secrets_router, sync_router, systems_router, vault_router
 from chronowarden.api.sync import sync_vault_now
 from chronowarden.config import AppConfig, load_config
 from chronowarden.database import Database
@@ -94,6 +94,7 @@ app = FastAPI(
         {"name": "vault", "description": "HashiCorp Vault integration"},
         {"name": "sync", "description": "Metadata synchronization"},
         {"name": "owners", "description": "Owner profile management"},
+        {"name": "systems", "description": "Systems that secrets are assigned to"},
     ],
 )
 
@@ -103,6 +104,7 @@ app.include_router(secrets_router, prefix="/api/v1")
 app.include_router(vault_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(owners_router, prefix="/api/v1")
+app.include_router(systems_router, prefix="/api/v1")
 
 
 @app.get("/api/v1", tags=["root"], summary="API endpoint")

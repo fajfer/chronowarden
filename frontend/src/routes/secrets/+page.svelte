@@ -169,7 +169,7 @@
                 <td class="px-4 py-3">
                   <span class="font-mono text-xs text-gray-400 bg-gray-700/50 rounded px-1.5 py-0.5">{secret.engine_id}</span>
                 </td>
-                <td class="px-4 py-3 {secret.owner ? 'text-gray-300' : 'text-gray-600'}">{secret.owner ?? '—'}</td>
+                <td class="px-4 py-3 {secret.effective_owners.length ? 'text-gray-300' : 'text-gray-600'}">{secret.effective_owners.length ? secret.effective_owners.map((o) => o.name).join(', ') : 'Unassigned'}</td>
                 <td class="px-4 py-3">
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700/60 text-gray-300">{secret.severity}</span>
                 </td>
