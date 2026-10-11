@@ -29,6 +29,7 @@ Chronowarden version and your Vault/OpenBao version. Questions are also welcome 
    uv run black --check .
    uv run ruff check .
    uv run pytest
+   uv run pytest -m integration   # real OpenBao/Vault containers; needs podman or docker
    cd frontend && npm run check
    ```
 
