@@ -41,4 +41,4 @@ Two properties of the existing cache made it unsuitable to hold them:
 ## Related files
 
 - [`chronowarden/database.py`](../../chronowarden/database.py)
-- [`.ai/specs/2026-10-09-systems-and-owners.md`](../specs/2026-10-09-systems-and-owners.md)
+- [`.ai/specs/implemented/2026-10-09-systems-and-owners.md`](../specs/implemented/2026-10-09-systems-and-owners.md)
