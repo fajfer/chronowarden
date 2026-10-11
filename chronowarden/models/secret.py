@@ -40,6 +40,16 @@ class SecretMetadataResponse(BaseModel):
     status: SecretStatus = SecretStatus.NO_TTL
     system: Optional[SystemRef] = Field(default=None, description="Assigned system, or null when unassigned")
     owners: list[OwnerRef] = Field(default_factory=list, description="Owners assigned to the secret itself")
+    removed_at: Optional[datetime] = Field(
+        default=None, description="When sync stopped finding the secret in its backend; null while it exists"
+    )
     effective_owners: list[OwnerRef] = Field(
         default_factory=list, description="The secret's own owners, or else its system's owners (ADR-010)"
     )
+
+
+class PurgeResult(BaseModel):
+    """Result of purging removed secrets."""
+
+    purged: int = Field(description="Number of removed secrets deleted with their assignments")
+    secrets: list[str] = Field(description="Full paths of the purged secrets")

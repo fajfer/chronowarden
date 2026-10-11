@@ -83,6 +83,8 @@ class TestMigrate:
             assert [(r["id"], r["type"], r["message_template"]) for r in routes] == [("r2", "webhook", "tpl")]
             with pytest.raises(sqlite3.IntegrityError):
                 db.create_notification_route("r3", "o1", "email", "a@b.c", "x")
+            columns = {r[1] for r in db._conn.execute("PRAGMA table_info(secret_metadata_cache)")}
+            assert "removed_at" in columns and secret.removed_at is None
         finally:
             db.close()
 

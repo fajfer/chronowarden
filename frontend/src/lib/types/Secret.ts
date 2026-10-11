@@ -26,10 +26,20 @@ export interface Secret {
   alert_threshold_days: number;
   last_synced: string | null;
   status: SecretStatus;
+  /** When sync stopped finding the secret in its backend (#86); null while it exists. */
+  removed_at: string | null;
   /** Assigned system, or null when unassigned (#61). */
   system: SystemRef | null;
   /** Owners assigned to the secret itself. */
   owners: OwnerRef[];
   /** The secret's own owners, or else its system's owners (ADR-010). */
   effective_owners: OwnerRef[];
+}
+
+/**
+ * Result of purging removed secrets.
+ */
+export interface PurgeResult {
+  purged: number;
+  secrets: string[];
 }

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-export type { Secret, SecretStatus } from './Secret';
+export type { Secret, SecretStatus, PurgeResult } from './Secret';
 export type {
   Owner, OwnerCreate, OwnerUpdate,
   NotificationRoute, NotificationRouteCreate,

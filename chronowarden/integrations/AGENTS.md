@@ -55,7 +55,9 @@ OpenBao (KV v2) via `hvac`.
 - `VaultIntegration.get_secret` exists but no API exposes it (the value-reading endpoint was removed in `ac38af9`).
   Don't wire it up.
 - `get_secret_metadata` returns `None` for `InvalidPath`; `list_secrets` keys ending in `/` are folders (sync
-  recurses).
+  recurses). By default `list_secrets` returns `[]` on any error; sync calls it with `strict=True`, which raises
+  instead (only `InvalidPath` stays `[]`: an engine whose last secret was deleted), so a failed listing never looks
+  like deleted secrets (#86).
 - Auth failures stop retries for that vault; offline vaults are retried every `vault_reconnect_interval` s for at
   most `vault_reconnect_max_attempts` cycles. `connect()` closes a previous client before re-authenticating.
 - `connect()`, `is_connected()` and the reconnect loop's passes block on network I/O: call them through

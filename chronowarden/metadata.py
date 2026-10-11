@@ -47,9 +47,10 @@ def parse_date(date_str: str, format_hint: str = "YYYY-MM-DD") -> Optional[datet
         try:
             cleaned = date_str.rstrip("Z")
             if "." in cleaned:
-                parts = cleaned.split(".")
-                fractional = parts[1][:6]
-                cleaned = f"{parts[0]}.{fractional}"
+                # Python keeps at most 6 fractional digits; keep any UTC offset that follows them
+                head, fraction = cleaned.split(".", 1)
+                digits = re.match(r"\d*", fraction).group(0)  # type: ignore[union-attr]
+                cleaned = f"{head}.{digits[:6]}{fraction[len(digits):]}"
             dt = datetime.fromisoformat(cleaned)
             if date_str.endswith("Z"):
                 dt = dt.replace(tzinfo=timezone.utc)
@@ -255,34 +256,68 @@ def sync_secret_metadata(
     return entry
 
 
-def _list_secret_paths(vault: VaultIntegration, engine_id: str, prefix: str = "") -> list[str]:
+def _list_secret_paths(
+    vault: VaultIntegration, engine_id: str, prefix: str = "", failures: Optional[list[str]] = None
+) -> list[str]:
     """
     Recursively list all secret paths under a given engine and prefix.
 
     Walks the KV v2 hierarchy depth-first, descending into subdirectories (keys that
     end with '/') and collecting all secret paths, not just those stored at the engine
-    root.
+    root. A folder that can't be listed is skipped and recorded in `failures`.
 
     Args:
         vault: The VaultIntegration instance.
         engine_id: Engine mount path.
         prefix: Optional (empty for root) prefix to filter secrets.
+        failures: Collects the folders whose listing failed, so callers know the result is incomplete.
     """
     paths: list[str] = []
 
     try:
-        keys = vault.list_secrets(prefix, mount_point=engine_id)
+        keys = vault.list_secrets(prefix, mount_point=engine_id, strict=True)
     except (VaultError, RequestException):
         logger.exception("Error listing secrets in %s/%s", engine_id, prefix)
+        if failures is not None:
+            failures.append(f"{engine_id}/{prefix}")
         return paths
 
     for key in keys:
         full_path = f"{prefix}{key}"
         if key.endswith("/"):
-            paths.extend(_list_secret_paths(vault, engine_id, full_path))
+            paths.extend(_list_secret_paths(vault, engine_id, full_path, failures))
         else:
             paths.append(full_path)
     return paths
+
+
+def _reconcile_removed(
+    db: Database, vault_name: str, engine_path: str, secret_paths: list[str], failures: list[str]
+) -> None:
+    """
+    Mark secrets the engine no longer lists as removed (#86), but only after a complete listing.
+
+    Args:
+        db: Database for internal state.
+        vault_name: Name of the vault.
+        engine_path: Engine mount path.
+        secret_paths: Every path the listing returned.
+        failures: Folders whose listing failed; any failure skips the check.
+    """
+    if failures:
+        logger.warning(
+            "Listing of engine '%s' in vault '%s' was incomplete (%s); not checking for removed secrets",
+            engine_path,
+            vault_name,
+            ", ".join(failures),
+        )
+        return
+    now = datetime.now(tz=timezone.utc).isoformat()
+    removed, reappeared = db.reconcile_engine(vault_name, engine_path, set(secret_paths), now)
+    for path in removed:
+        logger.info("Secret %s/%s/%s is no longer in the backend; marked removed", vault_name, engine_path, path)
+    for path in reappeared:
+        logger.info("Secret %s/%s/%s is back in the backend", vault_name, engine_path, path)
 
 
 def detect_changes(
@@ -313,8 +348,10 @@ def detect_changes(
     for engine in engines:
         engine_path = engine["path"]
         logger.info("Scanning engine '%s' in vault '%s'", engine_path, vault_name)
+        failures: list[str] = []
+        secret_paths = _list_secret_paths(vault, engine_path, failures=failures)
 
-        for secret_path in _list_secret_paths(vault, engine_path):
+        for secret_path in secret_paths:
             try:
                 result = sync_secret_metadata(vault, vault_name, engine_path, secret_path, config, db)
                 if result is not None:
@@ -323,6 +360,8 @@ def detect_changes(
                 logger.exception("Vault error syncing secret %s/%s", engine_path, secret_path)
             except sqlite3.Error:
                 logger.exception("Database error syncing secret %s/%s", engine_path, secret_path)
+
+        _reconcile_removed(db, vault_name, engine_path, secret_paths, failures)
 
     logger.info("Sync complete for vault '%s': %d secrets processed", vault_name, len(updated))
     return updated

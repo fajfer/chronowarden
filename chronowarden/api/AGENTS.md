@@ -14,7 +14,7 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 | File | Prefix | Endpoints |
 |---|---|---|
 | `health.py` | none | `GET /health`, `/info`, `/ready`, `/metrics` (Prometheus) |
-| `secrets.py` | `/secrets` | `GET /` (filters `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id`, `unassigned`), `GET /{id}`, `PUT /{id}/system`, `PUT /{id}/owners` |
+| `secrets.py` | `/secrets` | `GET /` (filters `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id`, `unassigned`, `include_removed`), `GET /{id}`, `PUT /{id}/system`, `PUT /{id}/owners`, `DELETE /{id}` and `DELETE /removed` (purge removed secrets only; 409 for one that still exists) |
 | `sync.py` | `/sync` | `POST /vault/{vault_name}` |
 | `vault.py` | `/vault` | `GET /instances`, `/health`, `/{name}/health` |
 | `owners.py` | `/owners` | CRUD for owners, `POST/DELETE` notification routes, `POST /{id}/test-route/{route_id}` |

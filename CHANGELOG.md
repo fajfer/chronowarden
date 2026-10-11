@@ -33,6 +33,10 @@ git history.
   owners are its own owners, or else its system's owners. In the UI: Settings → Systems, the assignment section of
   a secret's details, a System column and filter in the secrets table, and a "By system" card on the dashboard.
   Assignments live only in Chronowarden's database, so back it up. Editing is open to anyone who can reach the API until authentication (0.9).
+- **Secrets deleted in the backend are noticed (#86).** Sync marks them with `removed_at` instead of showing them
+  forever as aging secrets, and unmarks them if they come back. They are hidden from the table and the dashboard
+  unless you turn on "Show removed", and can be purged one by one or all at once (`DELETE /api/v1/secrets/{id}`,
+  `DELETE /api/v1/secrets/removed`). Nothing is marked when a listing fails or is incomplete.
 - Releases are signed: the production image carries a cosign signature, SLSA Build L3 provenance and CycloneDX/SPDX
   SBOMs, and the GitHub Release has the wheel, sdist, source SBOMs and provenance. See "Verifying releases" in the
   README.
@@ -41,6 +45,8 @@ git history.
 
 ### Fixed
 
+- Timestamps with fractional seconds and a UTC offset (`last_synced`) lost the offset, so the UI could show them in
+  the wrong time zone.
 - A config file that isn't valid UTF-8 stopped startup with a raw `UnicodeDecodeError`; it is now a configuration
   error naming the file.
 - TTL calculation crashed for update times near the year 9999, and years before 1000 were written in a form

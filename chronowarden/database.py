@@ -24,6 +24,9 @@ SecretIdentity = tuple[str, str, str]
 
 _SYSTEM_COLUMNS = ("name", "description", "cmdb_uri", "asset_number")
 
+# Columns of secret_metadata_cache in the order SecretMetadataCache expects them
+_CACHE_COLUMNS = "id, vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced, removed_at"
+
 
 class SecretMetadataCache(BaseModel):
     """Internal cache entry for a Vault secret's metadata."""
@@ -36,6 +39,12 @@ class SecretMetadataCache(BaseModel):
     ttl: Optional[str] = None
     severity: Optional[str] = None
     last_synced: Optional[str] = None
+    removed_at: Optional[str] = None
+
+
+def _row_to_cache(row: sqlite3.Row) -> SecretMetadataCache:
+    """Build a cache entry from a row selected with `_CACHE_COLUMNS`."""
+    return SecretMetadataCache(**dict(row))
 
 
 class Database:
@@ -137,9 +146,8 @@ class Database:
             if conn is None:
                 return None
             cursor = conn.execute(
-                """
-                SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
-                       severity, last_synced
+                f"""
+                SELECT {_CACHE_COLUMNS}
                 FROM secret_metadata_cache
                 WHERE vault_name = ? AND engine_id = ? AND secret_path = ?
                 """,
@@ -148,16 +156,7 @@ class Database:
             row = cursor.fetchone()
             if row is None:
                 return None
-            return SecretMetadataCache(
-                id=row["id"],
-                vault_name=row["vault_name"],
-                engine_id=row["engine_id"],
-                secret_path=row["secret_path"],
-                updated_time=row["updated_time"],
-                ttl=row["ttl"],
-                severity=row["severity"],
-                last_synced=row["last_synced"],
-            )
+            return _row_to_cache(row)
 
     def list_secrets_for_vault(self, vault_name: str) -> list[SecretMetadataCache]:
         """
@@ -174,27 +173,14 @@ class Database:
             if conn is None:
                 return []
             cursor = conn.execute(
-                """
-                SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
-                       severity, last_synced
+                f"""
+                SELECT {_CACHE_COLUMNS}
                 FROM secret_metadata_cache
                 WHERE vault_name = ?
                 """,
                 (vault_name,),
             )
-            return [
-                SecretMetadataCache(
-                    id=row["id"],
-                    vault_name=row["vault_name"],
-                    engine_id=row["engine_id"],
-                    secret_path=row["secret_path"],
-                    updated_time=row["updated_time"],
-                    ttl=row["ttl"],
-                    severity=row["severity"],
-                    last_synced=row["last_synced"],
-                )
-                for row in cursor.fetchall()
-            ]
+            return [_row_to_cache(row) for row in cursor.fetchall()]
 
     def get_secret_by_id(self, secret_id: int) -> Optional[SecretMetadataCache]:
         """
@@ -211,9 +197,8 @@ class Database:
             if conn is None:
                 return None
             cursor = conn.execute(
-                """
-                SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
-                       severity, last_synced
+                f"""
+                SELECT {_CACHE_COLUMNS}
                 FROM secret_metadata_cache
                 WHERE id = ?
                 """,
@@ -222,22 +207,14 @@ class Database:
             row = cursor.fetchone()
             if row is None:
                 return None
-            return SecretMetadataCache(
-                id=row["id"],
-                vault_name=row["vault_name"],
-                engine_id=row["engine_id"],
-                secret_path=row["secret_path"],
-                updated_time=row["updated_time"],
-                ttl=row["ttl"],
-                severity=row["severity"],
-                last_synced=row["last_synced"],
-            )
+            return _row_to_cache(row)
 
     def list_all_secrets(
         self,
         vault_name: Optional[str] = None,
         engine_id: Optional[str] = None,
         severity: Optional[str] = None,
+        include_removed: bool = False,
     ) -> list[SecretMetadataCache]:
         """
         List all cached secrets with optional filtering.
@@ -246,13 +223,13 @@ class Database:
             vault_name: Filter by vault instance name.
             engine_id: Filter by engine mount path.
             severity: Filter by severity profile.
+            include_removed: Also return secrets that sync no longer finds in their backend.
 
         Returns:
             List of cached metadata entries matching the filters.
         """
-        query = """
-            SELECT id, vault_name, engine_id, secret_path, updated_time, ttl,
-                   severity, last_synced
+        query = f"""
+            SELECT {_CACHE_COLUMNS}
             FROM secret_metadata_cache
             WHERE 1=1
         """
@@ -267,25 +244,15 @@ class Database:
         if severity is not None:
             query += " AND severity = ?"
             params.append(severity)
+        if not include_removed:
+            query += " AND removed_at IS NULL"
 
         with self._conn_lock:
             conn = self._require_connection()
             if conn is None:
                 return []
             cursor = conn.execute(query, params)
-            return [
-                SecretMetadataCache(
-                    id=row["id"],
-                    vault_name=row["vault_name"],
-                    engine_id=row["engine_id"],
-                    secret_path=row["secret_path"],
-                    updated_time=row["updated_time"],
-                    ttl=row["ttl"],
-                    severity=row["severity"],
-                    last_synced=row["last_synced"],
-                )
-                for row in cursor.fetchall()
-            ]
+            return [_row_to_cache(row) for row in cursor.fetchall()]
 
     def delete_secret_metadata(self, vault_name: str, engine_id: str, secret_path: str) -> None:
         """
@@ -308,6 +275,82 @@ class Database:
                 (vault_name, engine_id, secret_path),
             )
             conn.commit()
+
+    def reconcile_engine(
+        self, vault_name: str, engine_id: str, listed_paths: set[str], now: str
+    ) -> tuple[list[str], list[str]]:
+        """
+        Mark cached secrets of an engine that the backend no longer lists, and unmark those listed again.
+
+        Call it only after a complete listing of the engine; a partial one would mark existing secrets removed.
+
+        Args:
+            vault_name: The vault instance name.
+            engine_id: The engine mount path.
+            listed_paths: Every secret path the backend listed for the engine.
+            now: Timestamp stored as `removed_at` (ISO 8601).
+
+        Returns:
+            (paths newly marked removed, paths that reappeared).
+        """
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return [], []
+            rows = conn.execute(
+                "SELECT secret_path, removed_at FROM secret_metadata_cache WHERE vault_name = ? AND engine_id = ?",
+                (vault_name, engine_id),
+            ).fetchall()
+            removed = sorted(
+                r["secret_path"] for r in rows if r["removed_at"] is None and r["secret_path"] not in listed_paths
+            )
+            reappeared = sorted(
+                r["secret_path"] for r in rows if r["removed_at"] is not None and r["secret_path"] in listed_paths
+            )
+            where = "WHERE vault_name = ? AND engine_id = ? AND secret_path = ?"
+            conn.executemany(
+                f"UPDATE secret_metadata_cache SET removed_at = ? {where}",
+                [(now, vault_name, engine_id, path) for path in removed],
+            )
+            conn.executemany(
+                f"UPDATE secret_metadata_cache SET removed_at = NULL {where}",
+                [(vault_name, engine_id, path) for path in reappeared],
+            )
+            conn.commit()
+            return removed, reappeared
+
+    def purge_removed(
+        self, secret_id: Optional[int] = None, vault_name: Optional[str] = None, engine_id: Optional[str] = None
+    ) -> list[SecretIdentity]:
+        """
+        Delete removed secrets from the cache together with their system and owner assignments.
+
+        Only secrets with `removed_at` set are ever purged.
+
+        Args:
+            secret_id: Purge only this cache row.
+            vault_name: Purge only removed secrets of this vault.
+            engine_id: Purge only removed secrets of this engine.
+
+        Returns:
+            The identities purged.
+        """
+        query = "SELECT vault_name, engine_id, secret_path FROM secret_metadata_cache WHERE removed_at IS NOT NULL"
+        params: list = []
+        for column, value in (("id", secret_id), ("vault_name", vault_name), ("engine_id", engine_id)):
+            if value is not None:
+                query += f" AND {column} = ?"
+                params.append(value)
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            identities = [(r["vault_name"], r["engine_id"], r["secret_path"]) for r in conn.execute(query, params)]
+            where = "WHERE vault_name = ? AND engine_id = ? AND secret_path = ?"
+            for table in ("secret_metadata_cache", "secret_systems", "secret_owners"):
+                conn.executemany(f"DELETE FROM {table} {where}", identities)
+            conn.commit()
+            return identities
 
     def create_owner(self, owner_id: str, name: str, email: str) -> None:
         """Create a new owner profile."""
