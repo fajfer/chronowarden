@@ -42,6 +42,23 @@ jobs:
       - name: Build wheel and sdist
         run: uv build --out-dir dist
 
+      - name: Install syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+
+      - name: Generate source SBOMs
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+          # The frontend is a static build: its devDependencies (Svelte, ...) are compiled into what ships
+          SYFT_JAVASCRIPT_INCLUDE_DEV_DEPENDENCIES: "true"
+          SYFT_FILE_METADATA_SELECTION: none
+        run: |
+          "$SYFT" scan dir:. --exclude './dist/**' --exclude './.clusterfuzzlite/**' --quiet \
+            -o cyclonedx-json@1.6=dist/chronowarden-source.cdx.json \
+            -o spdx-json@2.3=dist/chronowarden-source.spdx.json
+          jq -e '.specVersion == "1.6"' dist/chronowarden-source.cdx.json > /dev/null
+          jq -e '.spdxVersion == "SPDX-2.3"' dist/chronowarden-source.spdx.json > /dev/null
+
       - name: Hash release files
         id: hash
         run: |

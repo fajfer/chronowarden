@@ -21,13 +21,14 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   (namespace `chronowarden`; ingress and config Secret are left to the user).
 - `../config.example.yaml`: the full config reference ([core](../chronowarden/AGENTS.md)).
 - `../.github/workflows/`: `docker.yaml` (both targets, amd64 + arm64, pushed except on PRs; on `v*` tags: cosign
-  signature + SLSA provenance), `release.yaml` (`v*` tags: wheel, sdist, provenance, Release notes from
-  `scripts/release_notes.sh`; `-rc.N` = pre-release), `ci.yaml`, `scorecard.yml`, `zizmor.yaml`, `agents-docs.yaml`,
-  `cflite_pr.yml` / `cflite_batch.yml` (ClusterFuzzLite: 5 min on code PRs, 30 min weekly).
+  signature, SLSA provenance, image SBOMs), `release.yaml` (`v*` tags: wheel, sdist, source SBOMs, provenance, notes
+  from `scripts/release_notes.sh`; `-rc.N` = pre-release), `ci.yaml`, `scorecard.yml`, `zizmor.yaml`,
+  `agents-docs.yaml`, `cflite_pr.yml` / `cflite_batch.yml` (ClusterFuzzLite: 5 min on code PRs, 30 min weekly).
 
 ## Contracts
 
-- Image: listens on `0.0.0.0:8000`; `CHRONOWARDEN_CONFIG=/data/config.yaml` by default; Python 3.13; the production image has no shell.
+- Image: listens on `0.0.0.0:8000`; `CHRONOWARDEN_CONFIG=/data/config.yaml` by default; Python 3.13; the production
+  image has no shell.
 - Build inputs are pinned: every `FROM` by digest (tag kept beside it), Python dependencies from the committed
   `uv.lock` (`uv sync --locked --no-dev --no-editable`, uv from a pinned image). Dependabot updates the digests,
   `uv.lock` and `frontend/package-lock.json` weekly; Python minor/major and Node major updates are ignored.
@@ -54,8 +55,7 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 - Production crashed when the distroless Python differed from the builder's (`pydantic_core` import error, PR #17).
   The `python:3.13.*-slim` tags, the distroless image and the hard-coded `python3.13/site-packages` path must
   change together.
-- `docker.yaml` smoke-tests the production image (health + path traversal check) before pushing; the job has
-  `timeout-minutes: 30`.
+- `docker.yaml` smoke-tests the production image (health + path traversal) before pushing; 30-minute timeout.
 - Fuzzing: atheris harnesses in `fuzz/` (`fuzz_*.py`, each asserts its function's contract), built by
   `.clusterfuzzlite/` on the OSS-Fuzz builder, which runs **Python 3.11** (the project declares 3.12+):
   `build.sh` installs the `uv.lock` versions with uv (hash-pinned in `.clusterfuzzlite/requirements.txt`) and the
