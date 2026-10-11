@@ -26,9 +26,6 @@ wheels/
 .venv/
 venv/
 
-# uv
-uv.lock
-
 # Node
 node_modules/
 dist/

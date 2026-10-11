@@ -26,8 +26,10 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 
 ## Contracts
 
-- Image: listens on `0.0.0.0:8000`; `CHRONOWARDEN_CONFIG=/data/config.yaml` by default; Python 3.13
-  (`PYTHON_VERSION` build arg); the production image has no shell.
+- Image: listens on `0.0.0.0:8000`; `CHRONOWARDEN_CONFIG=/data/config.yaml` by default; Python 3.13; the production image has no shell.
+- Build inputs are pinned: every `FROM` by digest (tag kept beside it), Python dependencies from the committed
+  `uv.lock` (`uv sync --locked --no-dev --no-editable`, uv from a pinned image). Dependabot updates the digests,
+  `uv.lock` and `frontend/package-lock.json` weekly; Python minor/major and Node major updates are ignored.
 - Kubernetes: config comes from Secret `chronowarden-config` mounted at `/etc/chronowarden/config.yaml`;
   `workingDir: /app/data` on the PVC (so `chronowarden.db` persists); runs as UID 1000, non-root, all capabilities
   dropped; liveness/readiness on `/api/v1/health`.
@@ -49,7 +51,8 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 - The DB file is written to the process working directory. In Docker, mount it as `/app/chronowarden.db`
   (README); in Kubernetes, the PVC is the working directory.
 - Production crashed when the distroless Python differed from the builder's (`pydantic_core` import error, PR #17).
-  `PYTHON_VERSION`, the distroless tag and the hard-coded `python3.13/site-packages` path must change together.
+  The `python:3.13.*-slim` tags, the distroless image and the hard-coded `python3.13/site-packages` path must
+  change together.
 - `docker.yaml` smoke-tests the production image (health + path traversal check) before pushing; the job has
   `timeout-minutes: 30`.
 - `frontend-builder` runs on `$BUILDPLATFORM`: its output is arch-independent, and `npm ci` under QEMU arm64
