@@ -65,6 +65,7 @@ Shorthand: `<area>` means `<area>/AGENTS.md`. Read root + the listed files, noth
 | Add or change a config option | [core](chronowarden/AGENTS.md), [deploy](deploy/AGENTS.md) |
 | DB schema or query change | [models](chronowarden/models/AGENTS.md), [ADR-017](.ai/adr/ADR-017-sqlite-holds-assignments.md) |
 | Add or wire a Prometheus metric | [metrics](chronowarden/metrics/AGENTS.md) |
+| Audit log, change history, recording an event | [audit](chronowarden/audit/AGENTS.md), [ADR-014](.ai/adr/ADR-014-rotation-confirmation-and-audit-log.md) |
 | UI page, component, store, theme | [frontend](frontend/AGENTS.md) |
 | Filter bug in the secrets table | [frontend](frontend/AGENTS.md) (+ [api](chronowarden/api/AGENTS.md) if the bug is in a query param) |
 | App startup, Sentry, SPA serving | [core](chronowarden/AGENTS.md), [ADR-007](.ai/adr/ADR-007-sveltekit-spa-served-by-fastapi.md) |

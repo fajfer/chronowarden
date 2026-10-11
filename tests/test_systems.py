@@ -4,7 +4,6 @@
 
 """Tests for systems and the system/owner assignments of secrets (#61)."""
 
-import logging
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -168,11 +167,21 @@ class TestSecretAssignments:
         assert paths("unassigned=true") == ["app/api"]
         assert paths("unassigned=false") == ["app/db"]
 
-    def test_change_is_logged(self, client: TestClient, db: Database, caplog: pytest.LogCaptureFixture) -> None:
+    def test_change_is_recorded_in_the_audit_log(self, client: TestClient, db: Database) -> None:
         system = _create_system(client)
-        with caplog.at_level(logging.INFO, logger="uvicorn.error"):
-            client.put(f"/api/v1/secrets/{_secret_id(db)}/system", json={"system_id": system["id"]})
-        assert f"Secret prod/secret/app/db system changed from None to {system['id']}" in caplog.text
+        client.put(
+            f"/api/v1/secrets/{_secret_id(db)}/system",
+            json={"system_id": system["id"]},
+            headers={"X-Chronowarden-Client": "ui"},
+        )
+        event = db.list_audit_events(event_type="secret.system")[0]
+        assert (event["vault_name"], event["engine_id"], event["secret_path"]) == ("prod", "secret", "app/db")
+        assert event["source"] == "ui"
+        assert '"system":null' in event["before"] and f'"id":"{system["id"]}"' in event["after"]
+
+    def test_unchanged_assignment_records_nothing(self, client: TestClient, db: Database) -> None:
+        client.put(f"/api/v1/secrets/{_secret_id(db)}/owners", json={"owner_ids": []})
+        assert db.list_audit_events(event_type="secret.owners") == []
 
     def test_assignments_survive_a_rebuilt_cache(self, client: TestClient, db: Database) -> None:
         """ADR-017: assignments are keyed by identity, so deleting and re-syncing the cache row keeps them."""

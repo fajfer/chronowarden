@@ -122,11 +122,40 @@ def _removed_at(conn: sqlite3.Connection) -> None:
     conn.execute("ALTER TABLE secret_metadata_cache ADD COLUMN removed_at TEXT")
 
 
+def _audit_log(conn: sqlite3.Connection) -> None:
+    """Add the append-only, hash-chained audit log (ADR-014); triggers refuse any UPDATE or DELETE."""
+    conn.execute("""
+        CREATE TABLE audit_events (
+            id INTEGER PRIMARY KEY,
+            timestamp TEXT NOT NULL,
+            source TEXT NOT NULL,
+            actor TEXT,
+            event_type TEXT NOT NULL,
+            subject TEXT,
+            vault_name TEXT,
+            engine_id TEXT,
+            secret_path TEXT,
+            before TEXT,
+            after TEXT,
+            prev_hash TEXT NOT NULL,
+            hash TEXT NOT NULL UNIQUE
+        )
+    """)
+    conn.execute("CREATE INDEX audit_events_secret ON audit_events (vault_name, engine_id, secret_path)")
+    for action in ("UPDATE", "DELETE"):
+        conn.execute(f"""
+            CREATE TRIGGER audit_events_no_{action.lower()} BEFORE {action} ON audit_events
+            BEGIN SELECT RAISE(ABORT, 'audit_events is append-only'); END
+        """)
+    conn.execute("CREATE TABLE audit_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "baseline 0.6 schema", _baseline),
     Migration(2, "webhook notification routes only", _webhook_routes_only),
     Migration(3, "systems and secret assignments", _systems_and_owners),
     Migration(4, "removed_at on cached secrets", _removed_at),
+    Migration(5, "audit log", _audit_log),
 ]
 
 

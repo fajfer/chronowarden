@@ -1,0 +1,58 @@
+<!--
+SPDX-FileCopyrightText: 2026 Damian Fajfer <damian@fajfer.org>
+
+SPDX-License-Identifier: EUPL-1.2
+-->
+# audit: hash-chained audit log
+
+## Purpose
+
+Tamper-evident record of every change Chronowarden makes or sees (ADR-014): assignments, systems, owners,
+removed/reappeared/purged secrets, and config changes that affect secrets. Kept forever.
+
+## Files
+
+- `chain.py`: `canonical_json`, `event_hash`, `verify_chain`, `GENESIS_HASH`. Pure functions, no I/O.
+- `config_events.py`: `record_config_change(db, config)`, called in `app.py` `lifespan` after the DB opens.
+- `../database.py`: `append_audit_event`, `list_audit_events`, `iter_audit_events`, `get/set_audit_state`.
+- `../api/audit.py`: `GET /audit/events`, `/audit/events.jsonl`, `/audit/verify`; `request_source(request)`.
+- `../models/audit.py`: `AuditEvent` (before/after parsed), `AuditChainStatus`.
+
+## Contracts
+
+- Table `audit_events` (migration 5): `id` is 1, 2, 3, …; triggers abort any `UPDATE` or `DELETE`. Never add code
+  that changes or removes events; corrections are new events.
+- **Hash recipe** (also how anyone checks the JSONL export): `hash = sha256(json.dumps({id, timestamp, source,
+  actor, event_type, subject, vault_name, engine_id, secret_path, before, after, prev_hash}, sort_keys=True,
+  separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()`. `before`/`after` are the **stored JSON
+  text**, not parsed objects. The first event's `prev_hash` is 64 zeros.
+- `source`: `sync`, `config`, `ui` (requests with header `X-Chronowarden-Client: ui`, set by the frontend client) or
+  `api`. `actor` stays null until authentication (0.9).
+- Event types: `secret.system`, `secret.owners` (`{"owners": [{id, name}]}`), `secret.removed`, `secret.reappeared`,
+  `secret.purged` (with the assignments that went), `system.created|updated|owners|deleted` (subject `system:<id>`),
+  `owner.created|updated|deleted` (subject `owner:<id>`), `config.baseline|changed` (subject `config`).
+- Secret events are keyed by identity (`vault_name`, `engine_id`, `secret_path`), so history survives a rebuilt
+  cache (ADR-017). Unchanged values record nothing.
+- Config events store only expiry profiles and the severity cascade, never addresses or credentials.
+
+## How to
+
+- **Record a new kind of change**: call `db.append_audit_event(type, source, identity=… or subject=…, before=…,
+  after=…)` right after the change, with a `<thing>.<what>` type; add it to the list above and test it in
+  `tests/test_audit.py`.
+
+## Gotchas
+
+- `verify_chain` can't see the newest events being cut off; snapshots record the head hash for that (#94).
+- The change and its event are separate commits; a crash between them loses the event, not the change.
+- Other teams' metadata values will be stored here once sync observes them (task 2 of the audit spec); accepted
+  and documented next to the README "unauthenticated" warning.
+
+## Related ADRs
+
+[ADR-014](../../.ai/adr/ADR-014-rotation-confirmation-and-audit-log.md),
+[ADR-017](../../.ai/adr/ADR-017-sqlite-holds-assignments.md), [ADR-004](../../.ai/adr/ADR-004-metadata-only-access.md)
+
+## Validate
+
+`uv run pytest tests/test_audit.py tests/test_migrations.py`

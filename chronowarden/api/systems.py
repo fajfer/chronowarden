@@ -9,8 +9,9 @@ import sqlite3
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Path, status
+from fastapi import APIRouter, HTTPException, Path, Request, status
 
+from chronowarden.api.audit import request_source
 from chronowarden.assignments import AssignmentIndex
 from chronowarden.models.system import OwnerIds, System, SystemCreate, SystemUpdate
 
@@ -65,6 +66,11 @@ def require_known_owners(db: Any, owner_ids: list[str]) -> None:
         raise HTTPException(status_code=422, detail=f"Unknown owner ID(s): {', '.join(unknown)}")
 
 
+def _audit_view(system: dict) -> dict:
+    """A system's fields as recorded in audit events."""
+    return {key: system[key] for key in ("name", "description", "cmdb_uri", "asset_number", "owner_ids")}
+
+
 def _name_taken(name: str) -> HTTPException:
     """Build the 409 response for a duplicate system name."""
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"A system named '{name}' already exists")
@@ -79,7 +85,7 @@ async def list_systems() -> list[System]:
 
 
 @router.post("/", response_model=System, status_code=status.HTTP_201_CREATED, summary="Create a system")
-async def create_system(data: SystemCreate) -> System:
+async def create_system(data: SystemCreate, request: Request) -> System:
     """
     Create a system, optionally with owners.
 
@@ -94,8 +100,11 @@ async def create_system(data: SystemCreate) -> System:
     except sqlite3.IntegrityError:
         raise _name_taken(data.name) from None
     db.set_system_owners(system_id, data.owner_ids)
-    logger.info("Created system '%s' (%s) with owners %s", data.name, system_id, sorted(set(data.owner_ids)))
-    return _build_system(_require_system(db, system_id), AssignmentIndex(db))
+    system = _require_system(db, system_id)
+    db.append_audit_event(
+        "system.created", request_source(request), subject=f"system:{system_id}", after=_audit_view(system)
+    )
+    return _build_system(system, AssignmentIndex(db))
 
 
 @router.get("/{system_id}", response_model=System, summary="Get a system")
@@ -111,7 +120,7 @@ async def get_system(system_id: str = Path(description="System ID")) -> System:
 
 
 @router.put("/{system_id}", response_model=System, summary="Update a system")
-async def update_system(data: SystemUpdate, system_id: str = Path(description="System ID")) -> System:
+async def update_system(data: SystemUpdate, request: Request, system_id: str = Path(description="System ID")) -> System:
     """
     Update a system's fields; omitted fields stay unchanged.
 
@@ -119,17 +128,27 @@ async def update_system(data: SystemUpdate, system_id: str = Path(description="S
         HTTPException: 404 if the system doesn't exist, 409 if the new name is taken.
     """
     db = _get_db()
-    _require_system(db, system_id)
+    before = _require_system(db, system_id)
     fields = data.model_dump(exclude_unset=True)
     try:
         db.update_system(system_id, fields)
     except sqlite3.IntegrityError:
         raise _name_taken(str(fields.get("name"))) from None
-    return _build_system(_require_system(db, system_id), AssignmentIndex(db))
+    after = _require_system(db, system_id)
+    changed = [key for key in fields if before[key] != after[key]]
+    if changed:
+        db.append_audit_event(
+            "system.updated",
+            request_source(request),
+            subject=f"system:{system_id}",
+            before={key: before[key] for key in changed},
+            after={key: after[key] for key in changed},
+        )
+    return _build_system(after, AssignmentIndex(db))
 
 
 @router.put("/{system_id}/owners", response_model=System, summary="Replace a system's owners")
-async def set_system_owners(data: OwnerIds, system_id: str = Path(description="System ID")) -> System:
+async def set_system_owners(data: OwnerIds, request: Request, system_id: str = Path(description="System ID")) -> System:
     """
     Replace the owners of a system.
 
@@ -140,12 +159,20 @@ async def set_system_owners(data: OwnerIds, system_id: str = Path(description="S
     _require_system(db, system_id)
     require_known_owners(db, data.owner_ids)
     previous = db.set_system_owners(system_id, data.owner_ids)
-    logger.info("System %s owners changed from %s to %s", system_id, previous, sorted(set(data.owner_ids)))
-    return _build_system(_require_system(db, system_id), AssignmentIndex(db))
+    system = _require_system(db, system_id)
+    if previous != system["owner_ids"]:
+        db.append_audit_event(
+            "system.owners",
+            request_source(request),
+            subject=f"system:{system_id}",
+            before={"owner_ids": previous},
+            after={"owner_ids": system["owner_ids"]},
+        )
+    return _build_system(system, AssignmentIndex(db))
 
 
 @router.delete("/{system_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a system")
-async def delete_system(system_id: str = Path(description="System ID")) -> None:
+async def delete_system(request: Request, system_id: str = Path(description="System ID")) -> None:
     """
     Delete a system that no secret is assigned to.
 
@@ -164,4 +191,6 @@ async def delete_system(system_id: str = Path(description="System ID")) -> None:
             },
         )
     db.delete_system(system_id)
-    logger.info("Deleted system '%s' (%s)", system["name"], system_id)
+    db.append_audit_event(
+        "system.deleted", request_source(request), subject=f"system:{system_id}", before=_audit_view(system)
+    )

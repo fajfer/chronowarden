@@ -32,12 +32,20 @@ model {
       description 'Metadata management module for TTL calculation, date parsing, and sync with severity cascade resolution'
     }
 
+    component audit {
+      technology 'Python'
+      description 'Append-only, hash-chained audit log of every change Chronowarden makes or sees; verifiable and exportable as JSON Lines'
+    }
+
     // User uses the UI
     user -> chronowarden.frontend 'Views secret metadata, manages owners and systems, assigns secrets, triggers sync'
     // Frontend interacts with the database
     chronowarden.frontend -[api]-> chronowarden.backend 'Triggers API through frontend'
     // Backend interacts with the database
     chronowarden.backend -[api]-> chronowarden.database 'Stores the metadata cache, owners, systems and assignments keyed by secret identity'
+    // Every change is recorded in the audit log, stored in the database
+    chronowarden.backend -[api]-> chronowarden.audit 'Records changes and verifies the hash chain'
+    chronowarden.audit -[api]-> chronowarden.database 'Appends events to audit_events (never updates or deletes)'
     // Backend uses metadata module
     chronowarden.backend -[api]-> chronowarden.metadata 'TTL calculation and sync'
 

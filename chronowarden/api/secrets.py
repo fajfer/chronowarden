@@ -8,11 +8,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
+from chronowarden.api.audit import request_source
 from chronowarden.assignments import AssignmentIndex
 from chronowarden.config import AppConfig
 from chronowarden.database import SecretIdentity, SecretMetadataCache
+from chronowarden.models.audit import AuditEvent
 from chronowarden.models.secret import PurgeResult, SecretMetadataResponse, SecretStatus
 from chronowarden.models.system import OwnerIds, SystemAssignment
 
@@ -138,6 +140,23 @@ def _identity(entry: SecretMetadataCache) -> SecretIdentity:
     return (entry.vault_name, entry.engine_id, entry.secret_path)
 
 
+def _assignment_state(index: AssignmentIndex, identity: SecretIdentity) -> dict[str, Any]:
+    """A secret's system and own owners, as recorded in audit events."""
+    system = index.system_of(identity)
+    return {
+        "system": system.model_dump() if system else None,
+        "owners": [owner.model_dump() for owner in index.owners_of(identity)],
+    }
+
+
+def _record_purges(database: Any, index: AssignmentIndex, identities: list[SecretIdentity], source: str) -> None:
+    """Record a `secret.purged` event, with the assignments that went with it, for each purged secret."""
+    for identity in identities:
+        database.append_audit_event(
+            "secret.purged", source, identity=identity, before=_assignment_state(index, identity)
+        )
+
+
 def _require_secret(database: Any, secret_id: int) -> SecretMetadataCache:
     """
     Return a cached secret or raise 404.
@@ -197,6 +216,7 @@ async def list_secrets(
 
 @router.delete("/removed", response_model=PurgeResult, summary="Purge removed secrets")
 async def purge_removed_secrets(
+    request: Request,
     vault_name: Optional[str] = Query(None, description="Only purge removed secrets of this vault"),
     engine_id: Optional[str] = Query(None, description="Only purge removed secrets of this engine"),
 ) -> PurgeResult:
@@ -211,13 +231,15 @@ async def purge_removed_secrets(
         How many secrets were purged, and which.
     """
     database, _, _ = _get_app_dependencies()
-    purged = ["/".join(identity) for identity in database.purge_removed(vault_name=vault_name, engine_id=engine_id)]
-    logger.info("Purged %d removed secret(s): %s", len(purged), purged)
+    index = AssignmentIndex(database)
+    identities = database.purge_removed(vault_name=vault_name, engine_id=engine_id)
+    _record_purges(database, index, identities, request_source(request))
+    purged = ["/".join(identity) for identity in identities]
     return PurgeResult(purged=len(purged), secrets=purged)
 
 
 @router.delete("/{secret_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Purge a removed secret")
-async def purge_secret(secret_id: int) -> None:
+async def purge_secret(secret_id: int, request: Request) -> None:
     """
     Delete a secret that is no longer in its backend, with its system and owner assignments.
 
@@ -237,8 +259,8 @@ async def purge_secret(secret_id: int) -> None:
                 "only removed secrets can be purged"
             ),
         )
-    database.purge_removed(secret_id=secret_id)
-    logger.info("Purged removed secret %s", "/".join(_identity(entry)))
+    index = AssignmentIndex(database)
+    _record_purges(database, index, database.purge_removed(secret_id=secret_id), request_source(request))
 
 
 @router.get("/{secret_id}", response_model=SecretMetadataResponse, summary="Get cached secret metadata by ID")
@@ -261,7 +283,7 @@ async def get_secret(secret_id: int) -> SecretMetadataResponse:
 
 
 @router.put("/{secret_id}/system", response_model=SecretMetadataResponse, summary="Assign a secret to a system")
-async def set_secret_system(data: SystemAssignment, secret_id: int) -> SecretMetadataResponse:
+async def set_secret_system(data: SystemAssignment, secret_id: int, request: Request) -> SecretMetadataResponse:
     """
     Assign a secret to a system, or unassign it with `null`; replaces the previous assignment.
 
@@ -279,13 +301,23 @@ async def set_secret_system(data: SystemAssignment, secret_id: int) -> SecretMet
     entry = _require_secret(database, secret_id)
     if data.system_id is not None and database.get_system(data.system_id) is None:
         raise HTTPException(status_code=422, detail=f"Unknown system ID: {data.system_id}")
-    previous = database.set_secret_system(_identity(entry), data.system_id)
-    logger.info("Secret %s system changed from %s to %s", "/".join(_identity(entry)), previous, data.system_id)
-    return _enrich_secret(entry, config, AssignmentIndex(database))
+    before = AssignmentIndex(database).system_of(_identity(entry))
+    database.set_secret_system(_identity(entry), data.system_id)
+    index = AssignmentIndex(database)
+    after = index.system_of(_identity(entry))
+    if before != after:
+        database.append_audit_event(
+            "secret.system",
+            request_source(request),
+            identity=_identity(entry),
+            before={"system": before.model_dump() if before else None},
+            after={"system": after.model_dump() if after else None},
+        )
+    return _enrich_secret(entry, config, index)
 
 
 @router.put("/{secret_id}/owners", response_model=SecretMetadataResponse, summary="Replace a secret's owners")
-async def set_secret_owners(data: OwnerIds, secret_id: int) -> SecretMetadataResponse:
+async def set_secret_owners(data: OwnerIds, secret_id: int, request: Request) -> SecretMetadataResponse:
     """
     Replace the owners assigned to a secret; `[]` removes them, so the system's owners apply.
 
@@ -304,8 +336,36 @@ async def set_secret_owners(data: OwnerIds, secret_id: int) -> SecretMetadataRes
     database, config, _ = _get_app_dependencies()
     entry = _require_secret(database, secret_id)
     require_known_owners(database, data.owner_ids)
-    previous = database.set_secret_owners(_identity(entry), data.owner_ids)
-    logger.info(
-        "Secret %s owners changed from %s to %s", "/".join(_identity(entry)), previous, sorted(set(data.owner_ids))
-    )
-    return _enrich_secret(entry, config, AssignmentIndex(database))
+    before = [owner.model_dump() for owner in AssignmentIndex(database).owners_of(_identity(entry))]
+    database.set_secret_owners(_identity(entry), data.owner_ids)
+    index = AssignmentIndex(database)
+    after = [owner.model_dump() for owner in index.owners_of(_identity(entry))]
+    if before != after:
+        database.append_audit_event(
+            "secret.owners",
+            request_source(request),
+            identity=_identity(entry),
+            before={"owners": before},
+            after={"owners": after},
+        )
+    return _enrich_secret(entry, config, index)
+
+
+@router.get("/{secret_id}/history", response_model=list[AuditEvent], summary="Change history of a secret")
+async def secret_history(secret_id: int) -> list[AuditEvent]:
+    """
+    List the audit events of one secret, newest first.
+
+    Args:
+        secret_id: The secret metadata cache row ID.
+
+    Returns:
+        Every recorded change to the secret, by its identity (so history survives a rebuilt cache).
+
+    Raises:
+        HTTPException: 404 if the secret isn't cached.
+    """
+    database, _, _ = _get_app_dependencies()
+    vault_name, engine_id, secret_path = _identity(_require_secret(database, secret_id))
+    rows = database.list_audit_events(limit=1000, vault_name=vault_name, engine_id=engine_id, secret_path=secret_path)
+    return [AuditEvent.from_stored(row) for row in rows]

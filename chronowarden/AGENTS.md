@@ -16,7 +16,7 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 - Sentry (`_configure_sentry`): disabled without `sentry_dsn`. PII off; tracing/profiling off unless
   `sentry_traces_sample_rate`/`sentry_profiles_sample_rate` are set.
 - `app.py`: module-level singletons `vault_manager`, `db`, `app_config`; `lifespan` (load config → Sentry →
-  `connect_all` → open DB → `start_reconnect_loop`); routers mounted under `/api/v1`; SPA serving.
+  `connect_all` → open DB → `record_config_change` → `start_reconnect_loop`); routers mounted under `/api/v1`; SPA serving.
 - `config.py`: `AppConfig`, `VaultConfig`, `EngineConfigNested`, `SecretConfig`, `ExpiryProfile`, `load_config`.
 - `metadata.py`: `parse_date`, `calculate_ttl`, `sync_secret_metadata`, `detect_changes`.
 - `logging_config.py`: `configure_logging()` (called when `app.py` is imported) adds timestamps to uvicorn's handlers

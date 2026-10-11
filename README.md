@@ -25,6 +25,8 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 
 - **Vendor neutrality** - Connect to multiple backends instances simultaneously
 - **Credential Health Dashboard** - Visual status of secrets (OK, Warning, Expired, No TTL)
+- **Audit Log** - Append-only, hash-chained record of every change (assignments, systems, owners, removed
+  secrets, config), exportable as JSON Lines
 - **Systems and Owners** - Assign secrets to business systems (CMDB link, asset number) and owners, and see who is
   responsible for each secret
 - **Severity Levels** - Classify secrets by (user-defined) compliance requirements (PCI-DSS, Critical, Default)
@@ -207,6 +209,13 @@ or else its system's owners.
   - A disconnected vault is reconnected first. If that fails, the response is `503` with the `reason`
     (`offline`, `auth`, ...) and whether a background retry is scheduled; the vault is then synced
     automatically as soon as the retry reconnects it
+
+### Audit log
+- `GET /api/v1/audit/events` - Change history, newest first (filters: `vault_name`, `engine_id`, `secret_path`,
+  `event_type`, `subject`, `since`, `until`; paging with `before_id`)
+- `GET /api/v1/audit/events.jsonl` - Export of the whole log as stored, for archiving or independent checks
+- `GET /api/v1/audit/verify` - Recompute the hash chain; returns the head hash to note down
+- `GET /api/v1/secrets/{id}/history` - Changes to one secret
 
 ### Vaults
 - `GET /api/v1/vault/instances` - List configured Vault instances with connection status
