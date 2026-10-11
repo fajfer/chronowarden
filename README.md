@@ -16,8 +16,9 @@ This is very early work being built with focus on compliance for financial insti
 
 > [!WARNING]
 > **The API and UI have no authentication yet** (planned for a later release). Anyone who can reach the HTTP port
-> can read all tracked metadata and trigger syncs. Run Chronowarden only on a trusted network or behind an
-> authenticating reverse proxy, and never expose it directly to the internet.
+> can read all tracked metadata (including other teams' custom metadata values kept in the audit log) and trigger
+> syncs. Run Chronowarden only on a trusted network or behind an authenticating reverse proxy, and never expose it
+> directly to the internet.
 
 Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and troubleshoot!
 
