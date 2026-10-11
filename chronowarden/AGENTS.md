@@ -41,7 +41,8 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 - Credential resolution order: `*_file` > `*_env` > literal (tokens and AppRole IDs).
 - Config is the source of truth: sync writes the resolved `chronowarden_severity`/`chronowarden_ttl` back to the
   backend when they differ ([ADR-006](../.ai/adr/ADR-006-config-source-of-truth.md)).
-- `detect_changes(vault, vault_name, config, db)` is what `POST /api/v1/sync/vault/{name}` calls.
+- `detect_changes` (called by `POST /sync/vault/{name}`) runs `reconcile_engine` only after a **complete** engine
+  listing: unlisted secrets get `removed_at`, listed ones lose it (#86). Never weaken that guard.
 - API routers read `app_config`, `db`, `vault_manager` from `chronowarden.app` lazily (inside a function); keep
   that pattern and don't rename these globals.
 

@@ -19,7 +19,8 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
 - `src/lib/api/`: `client.ts` (`apiGet/apiPost/apiPatch/...`, `ApiError`), plus one file per backend router
   (`secrets.ts`, `sync.ts`, `vaults.ts`, `owners.ts`, `systems.ts`). `ApiError.message` is the backend's `detail`
   (string, `{ message }` or the 422 list), ready for a toast.
-- `src/lib/stores/`: `secrets` (list, loading, error, `secretStats`, `updateSecret`), `filters` (incl. `systemId`,
+- `src/lib/stores/`: `secrets` (secrets that exist; stats and dashboard use it), `removedSecrets` (gone from the
+  backend, shown with "Show removed"), loading, error, `secretStats`, `updateSecret`; `filters` (incl. `systemId`,
   `UNASSIGNED_SYSTEM`), `sync` (+ toasts), `theme`, `auth`.
 - `src/lib/types/`: TypeScript mirrors of backend models, re-exported from `types/index.ts`.
 - `src/lib/components/`: `Filters`, `SecretModal` (details + system/owner assignment), `OwnerModal`, `SystemModal`,
