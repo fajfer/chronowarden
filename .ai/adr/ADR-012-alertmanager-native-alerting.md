@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-012: Alertmanager-native alerting
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-022
 - **Date:** 2026-10-09
 - **Evidence:** Maintainer decision 2026-10-09; maintainer comment on #61 (owners as routing targets, "as Alertmanager understands it"); issue #71.
 
