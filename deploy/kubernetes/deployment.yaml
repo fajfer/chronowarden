@@ -28,7 +28,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: chronowarden
-          image: ghcr.io/fajfer/chronowarden:v0.6.2
+          image: ghcr.io/fajfer/chronowarden:v0.6.3
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
