@@ -15,6 +15,8 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 - `secret.py`: `SecretStatus` (`expired`/`warning`/`ok`/`no_ttl`), `SecretMetadataResponse`,
   `SecretMetadataUpdate` (trims severity, rejects blank).
 - `owner.py`: `Owner*`, `NotificationRoute*` (route `type` is `webhook` only since 0.7, ADR-022).
+- `system.py`: `System*`, `OwnerRef`/`SystemRef` (used in `SecretMetadataResponse.system`, `owners`,
+  `effective_owners`), `OwnerIds`, `SystemAssignment`.
 - `engine.py`, `entity.py`, `router.py`: **reserved for the roadmap, not wired.** Engine kinds (Azure Key Vault,
   X.509, manual), users/groups with permission levels (RBAC), notification routers (email/webhook/Slack). Nothing
   imports them. Wiring or deleting them is in root **Ask First**.
@@ -25,7 +27,9 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 ## Contracts
 
 - Tables: `secret_metadata_cache` (unique `vault_name, engine_id, secret_path`), `owners`,
-  `notification_routes` (`type = 'webhook'`). `PRAGMA user_version` is the number of the last migration applied.
+  `notification_routes` (`type = 'webhook'`), `systems` (unique `name`), `system_owners`, and the assignments
+  `secret_systems` / `secret_owners` keyed by `vault_name, engine_id, secret_path`, never the cache `id` (ADR-017).
+  `PRAGMA user_version` is the number of the last migration applied.
 - `SecretMetadataResponse` fields are mirrored in `frontend/src/lib/types/Secret.ts`, `Owner` in `Owner.ts`:
   changing a field means changing both.
 - `full_path` is computed as `vault_name/engine_id/secret_path`.
@@ -50,8 +54,8 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 ## Gotchas
 
 - A database newer than the code is refused at startup (`MigrationError`); downgrading needs a backup.
-- `PRAGMA foreign_keys` is not enabled, so `ON DELETE CASCADE` does nothing. `delete_owner` deletes routes
-  explicitly.
+- `PRAGMA foreign_keys` is not enabled, so `ON DELETE CASCADE` does nothing. `delete_owner` deletes routes and
+  assignments explicitly; `delete_system` expects no secrets assigned (the API checks).
 - Owner and route IDs are `TEXT` (generated in the API); secret IDs are `INTEGER AUTOINCREMENT`.
 - `chronowarden.db` files created before 0.6 still contain an unused `engine_config` table (removed from code in
   #30). It is harmless; nothing reads it.
@@ -64,4 +68,4 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 
 ## Validate
 
-`uv run pytest tests/test_database.py tests/test_migrations.py tests/test_secrets.py tests/test_owners.py`
+`uv run pytest tests/test_database.py tests/test_migrations.py tests/test_secrets.py tests/test_owners.py tests/test_systems.py`

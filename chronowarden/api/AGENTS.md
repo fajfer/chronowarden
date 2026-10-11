@@ -14,10 +14,11 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 | File | Prefix | Endpoints |
 |---|---|---|
 | `health.py` | none | `GET /health`, `/info`, `/ready`, `/metrics` (Prometheus) |
-| `secrets.py` | `/secrets` | `GET /` (filters `vault_name`, `engine_id`, `severity`), `GET /{id}`; read-only |
+| `secrets.py` | `/secrets` | `GET /` (filters `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id`, `unassigned`), `GET /{id}`, `PUT /{id}/system`, `PUT /{id}/owners` |
 | `sync.py` | `/sync` | `POST /vault/{vault_name}` |
 | `vault.py` | `/vault` | `GET /instances`, `/health`, `/{name}/health` |
 | `owners.py` | `/owners` | CRUD for owners, `POST/DELETE` notification routes, `POST /{id}/test-route/{route_id}` |
+| `systems.py` | `/systems` | CRUD for systems, `PUT /{id}/owners`; `DELETE` is 409 (with the secret list) while secrets are assigned |
 | `__init__.py` | n/a | exports `*_router`; add new routers here and include them in `app.py` |
 
 ## Contracts
@@ -28,8 +29,10 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 - Status mapping used across routers: unknown vault/secret/owner → 404; vault not connected or backend write failed
   → 503; invalid severity → 422, with `detail` listing the allowed values.
 - `severity` input (query or body) must be a configured expiry profile or `"none"` (`_validate_severity_input`).
-- Secrets are read-only via the API: severity comes from config (ADR-006). `PATCH /secrets/{id}` was removed
-  (#73); assignments in #61 get dedicated endpoints.
+- Severity is read-only via the API: it comes from config (ADR-006). Assignments (#61) use `PUT /secrets/{id}/system`
+  and `/owners`, which replace the whole value and resolve `{id}` to the secret identity before storing (ADR-017).
+  Each change is a `logger.info` line until the audit log (#24). Effective owners and the filters come from
+  `chronowarden/assignments.py` (`AssignmentIndex`, loaded once per request).
 - `POST /sync/vault/{name}` also (re)starts the manager's reconnect loop.
 
 ## How to
@@ -67,4 +70,4 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 
 ## Validate
 
-`uv run pytest tests/test_secrets.py tests/test_sync_api.py tests/test_vault_api.py tests/test_owners.py tests/test_app.py`
+`uv run pytest tests/test_secrets.py tests/test_systems.py tests/test_sync_api.py tests/test_vault_api.py tests/test_owners.py tests/test_app.py`
