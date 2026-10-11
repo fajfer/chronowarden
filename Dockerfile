@@ -2,14 +2,13 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-ARG PYTHON_VERSION=3.13.5
-
 # ============================================================================
 # Stage 1: Frontend builder
 #   Runs on the build machine's native platform: the output is static HTML/JS,
 #   identical for every target, and npm under QEMU emulation can hang.
 # ============================================================================
-FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
+# Base images are pinned by digest (tag kept for readers); Dependabot updates both.
+FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -22,22 +21,30 @@ RUN npm run build
 # ============================================================================
 # Stage 2: Backend builder
 # ============================================================================
-FROM python:${PYTHON_VERSION}-slim AS backend-builder
+FROM ghcr.io/astral-sh/uv:0.12.3@sha256:2d890623d310b57771ce840f0da5eed5fc6d657da05ffaa45d82797b53fa3abc AS uv
+
+FROM python:3.13.5-slim@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7b0ceaccb55e9dd7e30987419 AS backend-builder
+
+COPY --from=uv /uv /usr/local/bin/uv
+
+# Use the image's Python, copy files instead of hard-linking from the cache
+ENV UV_PYTHON_DOWNLOADS=never \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
 
 WORKDIR /app
 
-COPY pyproject.toml README.md /app/
+COPY pyproject.toml uv.lock README.md /app/
 COPY chronowarden/ /app/chronowarden/
 
-RUN python -m venv /app/.venv \
-  && /app/.venv/bin/pip install --no-cache-dir --upgrade pip \
-  && /app/.venv/bin/pip install --no-cache-dir .
+# Exactly the versions in uv.lock, runtime dependencies only
+RUN uv sync --locked --no-dev --no-editable --no-cache
 
 # ============================================================================
 # Stage 3a: Development image  (--target dev)
 #   Includes shell, dev tools, editable source mounts expected
 # ============================================================================
-FROM python:${PYTHON_VERSION}-slim AS dev
+FROM python:3.13.5-slim@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7b0ceaccb55e9dd7e30987419 AS dev
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git \
@@ -66,7 +73,7 @@ CMD ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--re
 # ============================================================================
 # Stage 3b: Production image  (default target)
 # ============================================================================
-FROM gcr.io/distroless/python3-debian13:nonroot AS production
+FROM gcr.io/distroless/python3-debian13:nonroot@sha256:83aa8d4f74a4d7f7cf2d472054139bef71a927b76c680c0f2e1021d6b1d6d732 AS production
 
 WORKDIR /app
 
