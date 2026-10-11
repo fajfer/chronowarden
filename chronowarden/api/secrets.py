@@ -20,6 +20,7 @@ from chronowarden.models.audit import AuditEvent
 from chronowarden.models.secret import (
     Confirmation,
     ConfirmationCreate,
+    PrivilegedUpdate,
     PurgeResult,
     SecretMetadataResponse,
     SecretStatus,
@@ -135,6 +136,7 @@ def _enrich_secret(entry: SecretMetadataCache, config: AppConfig, index: Assignm
         last_synced=last_synced,
         status=_compute_status(days_remaining, alert_days),
         removed_at=parse_date(entry.removed_at) if entry.removed_at else None,
+        privileged=entry.privileged,
         **_confirmation_fields(index.db, config, _identity(entry), severity),
         system=index.system_of(_identity(entry)),
         owners=index.owners_of(_identity(entry)),
@@ -201,6 +203,7 @@ async def list_secrets(
     owner_id: Optional[str] = Query(None, description="Filter by effective owner"),
     unassigned: Optional[bool] = Query(None, description="true: neither system nor own owners; false: the rest"),
     include_removed: bool = Query(False, description="Also list secrets that are no longer in their backend"),
+    privileged: Optional[bool] = Query(None, description="Filter by the privileged flag"),
 ) -> list[SecretMetadataResponse]:
     """
     List all cached secret metadata with optional filtering.
@@ -213,6 +216,7 @@ async def list_secrets(
         owner_id: Filter by effective owner (own owners, or else the system's owners).
         unassigned: Filter by whether the secret has neither a system nor own owners.
         include_removed: Also list secrets that sync no longer finds in their backend (#86).
+        privileged: Filter by the privileged flag (#93).
 
     Returns:
         List of enriched secret metadata entries.
@@ -224,6 +228,7 @@ async def list_secrets(
         engine_id=engine_id,
         severity=severity,
         include_removed=include_removed,
+        privileged=privileged,
     )
     index = AssignmentIndex(database)
     return [
@@ -440,3 +445,59 @@ async def confirm_rotation(data: ConfirmationCreate, secret_id: int, request: Re
     )
     refresh_cached_ttl(database, config, identity)
     return _enrich_secret(database.get_secret_by_id(secret_id), config, AssignmentIndex(database))
+
+
+@router.put("/{secret_id}/privileged", response_model=SecretMetadataResponse, summary="Set the privileged flag")
+async def set_privileged(data: PrivilegedUpdate, secret_id: int, request: Request) -> SecretMetadataResponse:
+    """
+    Write `chronowarden_privileged` to the backend (merged with the other metadata, ADR-004) and cache it.
+
+    Args:
+        data: The new value.
+        secret_id: The secret metadata cache row ID.
+
+    Returns:
+        The secret with its new flag.
+
+    Raises:
+        HTTPException: 404 if the secret isn't cached, 503 if its vault isn't connected or the write failed.
+    """
+    database, config, manager = _get_app_dependencies()
+    entry = _require_secret(database, secret_id)
+    write_privileged(database, manager, entry, data.privileged, request_source(request))
+    return _enrich_secret(database.get_secret_by_id(secret_id), config, AssignmentIndex(database))
+
+
+def write_privileged(
+    database: Any, manager: Any, entry: SecretMetadataCache, value: bool, source: str, reverts: Optional[int] = None
+) -> None:
+    """
+    Write the privileged flag to the backend, cache it and record the change (also used by revert, with `reverts`).
+
+    Raises:
+        HTTPException: 503 if the vault isn't connected or the write failed.
+    """
+    from chronowarden.audit.observe import remember_written
+    from chronowarden.metadata import PRIVILEGED_KEY
+
+    vault = manager.get(entry.vault_name)
+    if vault is None or not vault.is_connected():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Vault '{entry.vault_name}' is not connected"
+        )
+    written = {PRIVILEGED_KEY: "true" if value else "false"}
+    if not vault.write_secret_metadata(entry.secret_path, written, mount_point=entry.engine_id):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Writing {PRIVILEGED_KEY} to vault '{entry.vault_name}' failed; see the server log",
+        )
+    remember_written(database, _identity(entry), written)
+    if entry.privileged != value:
+        database.upsert_secret_metadata(entry.model_copy(update={"privileged": value}))
+        database.append_audit_event(
+            "secret.privileged",
+            source,
+            identity=_identity(entry),
+            before={"privileged": entry.privileged},
+            after={"privileged": value, **({"reverts": reverts} if reverts is not None else {})},
+        )

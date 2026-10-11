@@ -43,7 +43,9 @@ _AUDIT_FILTERS = {
 }
 
 # Columns of secret_metadata_cache in the order SecretMetadataCache expects them
-_CACHE_COLUMNS = "id, vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced, removed_at"
+_CACHE_COLUMNS = (
+    "id, vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced, removed_at, privileged"
+)
 
 
 class SecretMetadataCache(BaseModel):
@@ -58,6 +60,7 @@ class SecretMetadataCache(BaseModel):
     severity: Optional[str] = None
     last_synced: Optional[str] = None
     removed_at: Optional[str] = None
+    privileged: bool = False
 
 
 def _row_to_cache(row: sqlite3.Row) -> SecretMetadataCache:
@@ -122,13 +125,14 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO secret_metadata_cache
-                    (vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (vault_name, engine_id, secret_path, updated_time, ttl, severity, last_synced, privileged)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(vault_name, engine_id, secret_path) DO UPDATE SET
                     updated_time = excluded.updated_time,
                     ttl = excluded.ttl,
                     severity = excluded.severity,
-                    last_synced = excluded.last_synced
+                    last_synced = excluded.last_synced,
+                    privileged = excluded.privileged
                 """,
                 (
                     entry.vault_name,
@@ -138,6 +142,7 @@ class Database:
                     entry.ttl,
                     entry.severity,
                     entry.last_synced or datetime.now(tz=timezone.utc).isoformat(),
+                    int(entry.privileged),
                 ),
             )
             conn.commit()
@@ -233,6 +238,7 @@ class Database:
         engine_id: Optional[str] = None,
         severity: Optional[str] = None,
         include_removed: bool = False,
+        privileged: Optional[bool] = None,
     ) -> list[SecretMetadataCache]:
         """
         List all cached secrets with optional filtering.
@@ -242,6 +248,7 @@ class Database:
             engine_id: Filter by engine mount path.
             severity: Filter by severity profile.
             include_removed: Also return secrets that sync no longer finds in their backend.
+            privileged: Filter by the privileged flag.
 
         Returns:
             List of cached metadata entries matching the filters.
@@ -264,6 +271,9 @@ class Database:
             params.append(severity)
         if not include_removed:
             query += " AND removed_at IS NULL"
+        if privileged is not None:
+            query += " AND privileged = ?"
+            params.append(int(privileged))
 
         with self._conn_lock:
             conn = self._require_connection()

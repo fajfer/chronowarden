@@ -183,6 +183,11 @@ def _rotation_confirmations(conn: sqlite3.Connection) -> None:
     )
 
 
+def _privileged(conn: sqlite3.Connection) -> None:
+    """Cache the chronowarden_privileged flag read from the backend (#93)."""
+    conn.execute("ALTER TABLE secret_metadata_cache ADD COLUMN privileged INTEGER NOT NULL DEFAULT 0")
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "baseline 0.6 schema", _baseline),
     Migration(2, "webhook notification routes only", _webhook_routes_only),
@@ -191,6 +196,7 @@ MIGRATIONS: list[Migration] = [
     Migration(5, "audit log", _audit_log),
     Migration(6, "observed backend state", _observed_state),
     Migration(7, "rotation confirmations", _rotation_confirmations),
+    Migration(8, "privileged flag on cached secrets", _privileged),
 ]
 
 
