@@ -12,7 +12,7 @@ Before 1.0, minor versions may contain breaking changes; they are marked **Break
 Releases before 0.6.0 are described in the [GitHub releases](https://github.com/fajfer/chronowarden/releases) and the
 git history.
 
-## [0.7.0] - unreleased
+## [0.7.0] - 2026-10-12
 
 Milestone [0.7 Compliance evidence](https://github.com/fajfer/chronowarden/milestone/4): Chronowarden now produces
 evidence an auditor accepts, about your secrets and about itself. **Read the upgrade notes first: back up
