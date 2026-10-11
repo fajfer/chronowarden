@@ -47,5 +47,13 @@ nav:
   - Getting Started:
       - Quickstart: getting-started/quickstart.md
       - Configuration: getting-started/configuration.md
+  - Guides:
+      - Upgrading to 0.7: guides/upgrading-to-0.7.md
+      - Systems and owners: guides/systems-and-owners.md
+      - Secrets deleted in Vault: guides/removed-secrets.md
+      - Audit log: guides/audit-log.md
+      - Rotation confirmation: guides/rotation-confirmation.md
+      - Compliance evidence: guides/compliance-evidence.md
+      - Prometheus metrics: guides/metrics.md
   - Reference:
       - Vault Permissions: reference/vault-permissions.md
