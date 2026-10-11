@@ -253,3 +253,11 @@ class TestSnapshots:
     def test_unknown_snapshot_is_404(self, client: TestClient) -> None:
         assert client.get("/api/v1/compliance/snapshots/9").status_code == 404
         assert client.get("/api/v1/compliance/snapshots/9.json").status_code == 404
+
+
+def test_settings_view_has_no_addresses_or_credentials(client: TestClient) -> None:
+    data = client.get("/api/v1/compliance/settings").json()
+    assert data["reporting"]["cadences"][0]["period"] == "monthly"
+    assert data["confirmation_grace"] == "7d"
+    assert data["confirmation_required"] == [{"vault": "prod", "required": None, "engines": []}]
+    assert "http://v:8200" not in json.dumps(data) and "token" not in json.dumps(data)

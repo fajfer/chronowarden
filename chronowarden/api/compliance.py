@@ -68,6 +68,46 @@ def _iso(moment: datetime) -> str:
     return moment.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
+@router.get("/settings", summary="Compliance settings from config.yaml (read-only)")
+async def get_settings() -> dict[str, Any]:
+    """
+    Show the settings that shape compliance evidence; they are edited in config.yaml only (until 0.9).
+
+    Returns:
+        Reporting cadences, the confirmation grace periods and the confirmation_required cascade; never addresses
+        or credentials.
+    """
+    _, config = _get_app_dependencies()
+    return {
+        "reporting": config.compliance.reporting.model_dump(),
+        "confirmation_grace": config.confirmation_grace,
+        "confirmation_grace_by_profile": {
+            name: profile.confirmation_grace
+            for name, profile in sorted(config.expiry_profiles.items())
+            if profile.confirmation_grace
+        },
+        "confirmation_required": [
+            {
+                "vault": vault.name,
+                "required": vault.confirmation_required,
+                "engines": [
+                    {
+                        "engine": engine.name,
+                        "required": engine.confirmation_required,
+                        "secrets": [
+                            {"path": secret.path, "required": secret.confirmation_required}
+                            for secret in engine.secrets
+                            if secret.confirmation_required is not None
+                        ],
+                    }
+                    for engine in vault.engines
+                ],
+            }
+            for vault in config.vaults
+        ],
+    }
+
+
 @router.get("/summary", summary="Total and privileged secrets per vault, engine and system")
 async def get_summary() -> dict[str, list[dict[str, Any]]]:
     """
