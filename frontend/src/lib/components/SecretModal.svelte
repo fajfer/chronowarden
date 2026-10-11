@@ -72,6 +72,12 @@
       </div>
 
       <div class="px-6 py-4 space-y-4 text-sm">
+        {#if secret.removed_at}
+          <div class="px-3 py-2 bg-red-900/30 border border-red-800 rounded-lg text-red-300">
+            No longer in the backend since {formatDate(secret.removed_at)}. Purge it from the secrets table once it's no
+            longer needed for reporting.
+          </div>
+        {/if}
         <div class="flex gap-2">
           <StatusBadge status={secret.status} />
           <span class="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium text-blue-400 border-blue-500">

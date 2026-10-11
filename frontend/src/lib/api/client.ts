@@ -67,8 +67,8 @@ export function apiPut<T>(path: string, body?: unknown): Promise<T> {
 }
 
 /** Perform a DELETE request. */
-export function apiDelete(path: string): Promise<void> {
-  return request<void>('DELETE', path);
+export function apiDelete<T = void>(path: string): Promise<T> {
+  return request<T>('DELETE', path);
 }
 
 /** Perform a PATCH request. */

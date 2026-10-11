@@ -3,7 +3,10 @@
   //
   // SPDX-License-Identifier: EUPL-1.2
 
-  import { secrets, secretsLoading, secretsError } from '#lib/stores/secrets.js';
+  import { secrets, removedSecrets, secretsLoading, secretsError, loadSecrets } from '#lib/stores/secrets.js';
+  import { purgeSecret, purgeRemovedSecrets } from '#lib/api/secrets.js';
+  import { addToast } from '#lib/stores/sync.js';
+  import { formatDate } from '#lib/utils/dateFormat.js';
   import { filters } from '#lib/stores/filters.js';
   import Filters from '#lib/components/Filters.svelte';
   import StatusBadge from '#lib/components/StatusBadge.svelte';
@@ -16,9 +19,10 @@
   let sortField = $state<string>('full_path');
   let sortDir = $state<'asc' | 'desc'>('asc');
   let selectedIds = $state<number[]>([]);
+  let showRemoved = $state(false);
 
   const filteredSecrets = $derived.by(() => {
-    let result = [...$secrets];
+    let result = showRemoved ? [...$secrets, ...$removedSecrets] : [...$secrets];
     const f = $filters;
 
     if (f.search) {
@@ -49,6 +53,33 @@
 
     return result;
   });
+
+  const visibleRemoved = $derived(filteredSecrets.filter((s) => s.removed_at !== null));
+
+  async function handlePurge(secret: Secret) {
+    try {
+      await purgeSecret(secret.id);
+      addToast(`Purged ${secret.full_path}`, 'success');
+      await loadSecrets();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Purge failed', 'error');
+    }
+  }
+
+  async function handlePurgeAll() {
+    const scope = [$filters.vaultName, $filters.engineId].filter(Boolean).join('/') || 'all vaults';
+    const message =
+      `Purge every removed secret in ${scope}? Their system and owner assignments are deleted too. ` +
+      'The secrets are already gone from the backend; this only cleans up Chronowarden.';
+    if (!window.confirm(message)) return;
+    try {
+      const result = await purgeRemovedSecrets($filters.vaultName ?? undefined, $filters.engineId ?? undefined);
+      addToast(`Purged ${result.purged} removed secret(s)`, 'success');
+      await loadSecrets();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Purge failed', 'error');
+    }
+  }
 
   const allVisibleSelected = $derived(
     filteredSecrets.length > 0 && filteredSecrets.every((s) => selectedIds.includes(s.id)),
@@ -131,9 +162,24 @@
   <div class="flex items-end justify-between gap-4">
     <div>
       <h1 class="text-2xl font-bold text-white">Secrets</h1>
-      <p class="mt-1 text-sm text-gray-400">{$secrets.length} tracked · metadata only, values never read</p>
+      <p class="mt-1 text-sm text-gray-400">
+        {$secrets.length} tracked{$removedSecrets.length ? ` · ${$removedSecrets.length} removed from their backend` : ''} · metadata only, values never read
+      </p>
     </div>
     <div class="flex gap-2">
+      {#if $removedSecrets.length || showRemoved}
+        <button onclick={() => (showRemoved = !showRemoved)} aria-pressed={showRemoved}
+                class="px-3 py-1.5 text-sm rounded-lg border transition-colors
+                  {showRemoved ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'}">
+          Show removed ({$removedSecrets.length})
+        </button>
+      {/if}
+      {#if showRemoved && visibleRemoved.length}
+        <button onclick={handlePurgeAll}
+                class="px-3 py-1.5 text-sm rounded-lg bg-red-900/50 border border-red-800 text-red-300 hover:bg-red-800/50 transition-colors">
+          Purge removed ({visibleRemoved.length})
+        </button>
+      {/if}
       <button class="px-3 py-1.5 text-sm rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors">Columns</button>
       <button onclick={exportCsv} class="px-3 py-1.5 text-sm rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors">Export CSV</button>
     </div>
@@ -176,7 +222,7 @@
           </thead>
           <tbody>
             {#each filteredSecrets as secret (secret.id)}
-              <tr class="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
+              <tr class="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors {secret.removed_at ? 'opacity-60' : ''}">
                 <td class="px-4 py-3">
                   <input type="checkbox" checked={selectedIds.includes(secret.id)} onchange={() => toggleRow(secret.id)} class="accent-indigo-500 align-middle" />
                 </td>
@@ -184,6 +230,9 @@
                   <button onclick={() => (selectedSecret = secret)} class="text-left block">
                     <span class="font-mono text-gray-200">{secret.secret_path}</span>
                     <span class="block text-xs text-gray-500 mt-0.5">{secret.vault_name}</span>
+                    {#if secret.removed_at}
+                      <span class="block text-xs text-red-400 mt-0.5">Removed from the backend {formatDate(secret.removed_at)}</span>
+                    {/if}
                   </button>
                 </td>
                 <td class="px-4 py-3">
@@ -210,7 +259,10 @@
                   {secret.days_remaining != null ? secret.days_remaining + 'd' : '—'}
                 </td>
                 <td class="px-4 py-3"><StatusBadge status={secret.status} /></td>
-                <td class="px-4 py-3">
+                <td class="px-4 py-3 whitespace-nowrap">
+                  {#if secret.removed_at}
+                    <button onclick={() => handlePurge(secret)} class="text-xs px-2 py-1 mr-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-300">Purge</button>
+                  {/if}
                   <button onclick={() => (selectedSecret = secret)} class="text-gray-500 hover:text-white" title="View details">⋯</button>
                 </td>
               </tr>

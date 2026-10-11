@@ -6,7 +6,10 @@ import { writable, derived } from 'svelte/store';
 import * as secretsApi from '#lib/api/secrets.js';
 import type { Secret } from '#lib/types/index.js';
 
+/** Secrets that exist in their backend: what tables, stats and the dashboard show. */
 export const secrets = writable<Secret[]>([]);
+/** Secrets sync no longer finds in their backend (#86), shown only on request. */
+export const removedSecrets = writable<Secret[]>([]);
 export const secretsLoading = writable<boolean>(false);
 export const secretsError = writable<string | null>(null);
 
@@ -38,8 +41,9 @@ export async function loadSecrets(): Promise<void> {
   secretsLoading.set(true);
   secretsError.set(null);
   try {
-    const data = await secretsApi.fetchSecrets();
-    secrets.set(data);
+    const data = await secretsApi.fetchSecrets(undefined, undefined, undefined, true);
+    secrets.set(data.filter((s) => s.removed_at === null));
+    removedSecrets.set(data.filter((s) => s.removed_at !== null));
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load secrets';
     secretsError.set(message);
@@ -50,5 +54,7 @@ export async function loadSecrets(): Promise<void> {
 
 /** Replace one secret in the store, e.g. after changing its assignment. */
 export function updateSecret(updated: Secret): void {
-  secrets.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
+  const replace = (list: Secret[]) => list.map((s) => (s.id === updated.id ? updated : s));
+  secrets.update(replace);
+  removedSecrets.update(replace);
 }
