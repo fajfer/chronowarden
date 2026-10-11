@@ -13,6 +13,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from chronowarden.migrations import migrate
+
 logger = logging.getLogger("uvicorn.error")
 
 DEFAULT_DB_PATH = Path("chronowarden.db")
@@ -53,12 +55,17 @@ class Database:
         return self._conn
 
     def connect(self) -> None:
-        """Open the database connection and create tables if needed."""
+        """
+        Open the database connection and migrate it to the current schema.
+
+        Raises:
+            MigrationError: If a migration fails or the database is newer than this release.
+        """
         with self._conn_lock:
             self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA journal_mode=WAL")
-            self._create_tables()
+            migrate(self._conn)
             logger.info("Database connected at %s", self._db_path)
 
     def close(self) -> None:
@@ -68,43 +75,6 @@ class Database:
                 self._conn.close()
                 self._conn = None
                 logger.info("Database connection closed")
-
-    def _create_tables(self) -> None:
-        """Create required tables if they don't exist."""
-        conn = self._require_connection()
-        if conn is None:
-            return
-
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS secret_metadata_cache (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                vault_name TEXT NOT NULL,
-                engine_id TEXT NOT NULL,
-                secret_path TEXT NOT NULL,
-                updated_time TEXT,
-                ttl TEXT,
-                severity TEXT,
-                last_synced TEXT,
-                UNIQUE(vault_name, engine_id, secret_path)
-            );
-
-            CREATE TABLE IF NOT EXISTS owners (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT NOT NULL,
-                created_at TEXT DEFAULT (datetime('now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS notification_routes (
-                id TEXT PRIMARY KEY,
-                owner_id TEXT NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
-                type TEXT NOT NULL CHECK(type IN ('email', 'webhook')),
-                address TEXT NOT NULL,
-                message_template TEXT,
-                created_at TEXT DEFAULT (datetime('now'))
-            );
-        """)
-        conn.commit()
 
     def upsert_secret_metadata(self, entry: SecretMetadataCache) -> None:
         """

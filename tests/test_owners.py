@@ -61,16 +61,18 @@ class TestOwnerDatabase:
     def test_create_notification_route(self) -> None:
         """Test creating a notification route."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        self.db.create_notification_route("route-1", "owner-1", "email", "alice@example.com", "Test: {secret_name}")
+        self.db.create_notification_route(
+            "route-1", "owner-1", "webhook", "https://hooks.example.com/alice", "Test: {secret_name}"
+        )
         routes = self.db.list_notification_routes("owner-1")
         assert len(routes) == 1
-        assert routes[0]["type"] == "email"
-        assert routes[0]["address"] == "alice@example.com"
+        assert routes[0]["type"] == "webhook"
+        assert routes[0]["address"] == "https://hooks.example.com/alice"
 
     def test_delete_notification_route(self) -> None:
         """Test deleting a notification route."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        self.db.create_notification_route("route-1", "owner-1", "email", "alice@example.com", "Test")
+        self.db.create_notification_route("route-1", "owner-1", "webhook", "https://hooks.example.com/alice", "Test")
         self.db.delete_notification_route("route-1")
         routes = self.db.list_notification_routes("owner-1")
         assert len(routes) == 0
@@ -78,7 +80,7 @@ class TestOwnerDatabase:
     def test_delete_owner_cascades_routes(self) -> None:
         """Test that deleting an owner also deletes routes."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        self.db.create_notification_route("route-1", "owner-1", "email", "alice@example.com", "Test")
+        self.db.create_notification_route("route-1", "owner-1", "webhook", "https://hooks.example.com/alice", "Test")
         self.db.delete_owner("owner-1")
         routes = self.db.list_notification_routes("owner-1")
         assert len(routes) == 0
@@ -127,12 +129,22 @@ class TestOwnerDatabase:
     def test_multiple_notification_routes(self) -> None:
         """Test creating multiple notification routes for the same owner."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        self.db.create_notification_route("route-1", "owner-1", "email", "alice@example.com", "Template 1")
+        self.db.create_notification_route(
+            "route-1", "owner-1", "webhook", "https://hooks.example.com/alice", "Template 1"
+        )
         self.db.create_notification_route("route-2", "owner-1", "webhook", "https://hooks.example.com", "Template 2")
         routes = self.db.list_notification_routes("owner-1")
         assert len(routes) == 2
-        types = {r["type"] for r in routes}
-        assert types == {"email", "webhook"}
+        assert {r["address"] for r in routes} == {"https://hooks.example.com/alice", "https://hooks.example.com"}
+
+    def test_email_route_rejected_by_schema(self) -> None:
+        """Email routes were removed in 0.7 (ADR-022): the table only accepts webhooks."""
+        self.db.create_owner("owner-1", "Alice", "alice@example.com")
+        try:
+            self.db.create_notification_route("route-1", "owner-1", "email", "alice@example.com", "Test")
+            assert False, "Expected IntegrityError for an email route"
+        except sqlite3.IntegrityError:
+            pass
 
     def test_list_notification_routes_empty(self) -> None:
         """Test listing routes for an owner with no routes returns empty list."""
@@ -149,7 +161,7 @@ class TestOwnerDatabase:
         """Test that notification route preserves the message template."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
         template = "Secret {secret_name} in {vault} expires in {days_until_expiry} days"
-        self.db.create_notification_route("route-1", "owner-1", "email", "alice@example.com", template)
+        self.db.create_notification_route("route-1", "owner-1", "webhook", "https://hooks.example.com/alice", template)
         routes = self.db.list_notification_routes("owner-1")
         assert len(routes) == 1
         assert routes[0]["message_template"] == template
@@ -272,12 +284,12 @@ class TestOwnersAPI:
         with patch("chronowarden.api.owners._get_db", return_value=self.db):
             response = client.post(
                 "/api/v1/owners/owner-1/routes",
-                json={"type": "email", "address": "alice@example.com", "message_template": "Test: {secret_name}"},
+                json={"type": "webhook", "address": "https://hooks.example.com/alice", "message_template": "Test"},
             )
             assert response.status_code == 201
             data = response.json()
-            assert data["type"] == "email"
-            assert data["address"] == "alice@example.com"
+            assert data["type"] == "webhook"
+            assert data["address"] == "https://hooks.example.com/alice"
             assert data["owner_id"] == "owner-1"
 
     def test_add_route_owner_not_found(self) -> None:
@@ -286,14 +298,25 @@ class TestOwnersAPI:
         with patch("chronowarden.api.owners._get_db", return_value=self.db):
             response = client.post(
                 "/api/v1/owners/nonexistent/routes",
-                json={"type": "email", "address": "test@example.com"},
+                json={"type": "webhook", "address": "https://hooks.example.com"},
             )
             assert response.status_code == 404
+
+    def test_add_email_route_rejected(self) -> None:
+        """The API refuses email routes with 422 (removed in 0.7, ADR-022)."""
+        self.db.create_owner("owner-1", "Alice", "alice@example.com")
+        client = self._build_client()
+        with patch("chronowarden.api.owners._get_db", return_value=self.db):
+            response = client.post(
+                "/api/v1/owners/owner-1/routes", json={"type": "email", "address": "alice@example.com"}
+            )
+            assert response.status_code == 422
+            assert self.db.list_notification_routes("owner-1") == []
 
     def test_delete_notification_route(self) -> None:
         """Test deleting a notification route via API."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        self.db.create_notification_route("route-1", "owner-1", "email", "alice@example.com", "Test")
+        self.db.create_notification_route("route-1", "owner-1", "webhook", "https://hooks.example.com/alice", "Test")
         client = self._build_client()
         with patch("chronowarden.api.owners._get_db", return_value=self.db):
             response = client.delete("/api/v1/owners/owner-1/routes/route-1")
@@ -311,7 +334,9 @@ class TestOwnersAPI:
     def test_get_owner_with_routes(self) -> None:
         """Test that getting an owner includes their notification routes."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        self.db.create_notification_route("route-1", "owner-1", "email", "alice@example.com", "Template")
+        self.db.create_notification_route(
+            "route-1", "owner-1", "webhook", "https://hooks.example.com/alice", "Template"
+        )
         self.db.create_notification_route("route-2", "owner-1", "webhook", "https://hooks.example.com", "Template")
         client = self._build_client()
         with patch("chronowarden.api.owners._get_db", return_value=self.db):
@@ -334,7 +359,7 @@ class TestOwnersAPI:
     def test_test_route_success(self) -> None:
         """Test the test-route endpoint returns success."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        self.db.create_notification_route("route-1", "owner-1", "email", "alice@example.com", "Test")
+        self.db.create_notification_route("route-1", "owner-1", "webhook", "https://hooks.example.com/alice", "Test")
         client = self._build_client()
         with patch("chronowarden.api.owners._get_db", return_value=self.db):
             response = client.post("/api/v1/owners/owner-1/test-route/route-1")

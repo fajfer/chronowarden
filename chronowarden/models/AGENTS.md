@@ -14,16 +14,18 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 
 - `secret.py`: `SecretStatus` (`expired`/`warning`/`ok`/`no_ttl`), `SecretMetadataResponse`,
   `SecretMetadataUpdate` (trims severity, rejects blank).
-- `owner.py`: `Owner*`, `NotificationRoute*` (route `type` is `email` or `webhook`).
+- `owner.py`: `Owner*`, `NotificationRoute*` (route `type` is `webhook` only since 0.7, ADR-022).
 - `engine.py`, `entity.py`, `router.py`: **reserved for the roadmap, not wired.** Engine kinds (Azure Key Vault,
   X.509, manual), users/groups with permission levels (RBAC), notification routers (email/webhook/Slack). Nothing
   imports them. Wiring or deleting them is in root **Ask First**.
 - `../database.py`: `Database`, `SecretMetadataCache`, `DEFAULT_DB_PATH`.
+- `../migrations.py`: ordered schema steps (`MIGRATIONS`), run by `Database.connect()`
+  ([ADR-023](../../.ai/adr/ADR-023-schema-migrations-with-user-version.md)).
 
 ## Contracts
 
 - Tables: `secret_metadata_cache` (unique `vault_name, engine_id, secret_path`), `owners`,
-  `notification_routes` (`type IN ('email','webhook')`).
+  `notification_routes` (`type = 'webhook'`). `PRAGMA user_version` is the number of the last migration applied.
 - `SecretMetadataResponse` fields are mirrored in `frontend/src/lib/types/Secret.ts`, `Owner` in `Owner.ts`:
   changing a field means changing both.
 - `full_path` is computed as `vault_name/engine_id/secret_path`.
@@ -35,7 +37,9 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 
 ## How to
 
-- **Add a column**: update `_create_tables`, the `SecretMetadataCache` model, every `SELECT` column list and row
+- **Change the schema**: append a `Migration` to `MIGRATIONS` (never edit a shipped one; constraint changes rebuild
+  the table), with a test that upgrades a database from the previous release (`tests/test_migrations.py`). For a
+  column also update the `SecretMetadataCache` model, every `SELECT` column list and row
   mapping in `database.py`, then the response model and the frontend type. Add tests in `tests/test_database.py`.
 - **Dynamic `UPDATE`**: build the `SET` clause only from fixed column names chosen in code (see `update_owner`,
   `update_secret_metadata_fields`) and pass values as `?` params. Never interpolate caller-supplied names
@@ -45,8 +49,7 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 
 ## Gotchas
 
-- No migrations: tables are created with `CREATE TABLE IF NOT EXISTS`, so a schema change won't alter an existing
-  `chronowarden.db`. Plan a migration in the spec for any column change.
+- A database newer than the code is refused at startup (`MigrationError`); downgrading needs a backup.
 - `PRAGMA foreign_keys` is not enabled, so `ON DELETE CASCADE` does nothing. `delete_owner` deletes routes
   explicitly.
 - Owner and route IDs are `TEXT` (generated in the API); secret IDs are `INTEGER AUTOINCREMENT`.
@@ -56,8 +59,9 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 ## Related ADRs
 
 [ADR-017](../../.ai/adr/ADR-017-sqlite-holds-assignments.md),
+[ADR-023](../../.ai/adr/ADR-023-schema-migrations-with-user-version.md),
 [ADR-010](../../.ai/adr/ADR-010-owners-systems-and-permissions.md) (owners, systems, #61)
 
 ## Validate
 
-`uv run pytest tests/test_database.py tests/test_secrets.py tests/test_owners.py`
+`uv run pytest tests/test_database.py tests/test_migrations.py tests/test_secrets.py tests/test_owners.py`

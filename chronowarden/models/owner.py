@@ -4,7 +4,7 @@
 
 """Owner model definitions for Chronowarden."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field
 class NotificationRouteBase(BaseModel):
     """Base notification route model."""
 
-    type: str = Field(description="Route type: 'email' or 'webhook'")
-    address: str = Field(description="Email address or webhook URL")
+    type: Literal["webhook"] = Field(description="Route type; only 'webhook' (email was removed in 0.7, ADR-022)")
+    address: str = Field(description="Webhook URL")
     message_template: str = Field(
         default="Secret {secret_name} in {vault} expires in {days_until_expiry} days",
         description="Notification message template",

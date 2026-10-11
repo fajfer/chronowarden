@@ -8,7 +8,7 @@
 export interface NotificationRoute {
   id: string;
   owner_id: string;
-  type: 'email' | 'webhook';
+  type: 'webhook';
   address: string;
   message_template: string;
   created_at: string | null;
@@ -18,7 +18,7 @@ export interface NotificationRoute {
  * Payload for creating a notification route.
  */
 export interface NotificationRouteCreate {
-  type: 'email' | 'webhook';
+  type: 'webhook';
   address: string;
   message_template?: string;
 }
