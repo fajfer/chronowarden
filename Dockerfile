@@ -23,7 +23,7 @@ RUN npm run build
 # ============================================================================
 FROM ghcr.io/astral-sh/uv:0.12.3@sha256:2d890623d310b57771ce840f0da5eed5fc6d657da05ffaa45d82797b53fa3abc AS uv
 
-FROM python:3.13.5-slim@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7b0ceaccb55e9dd7e30987419 AS backend-builder
+FROM python:3.13.15-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b AS backend-builder
 
 COPY --from=uv /uv /usr/local/bin/uv
 
@@ -44,7 +44,7 @@ RUN uv sync --locked --no-dev --no-editable --no-cache
 # Stage 3a: Development image  (--target dev)
 #   Includes shell, dev tools, editable source mounts expected
 # ============================================================================
-FROM python:3.13.5-slim@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7b0ceaccb55e9dd7e30987419 AS dev
+FROM python:3.13.15-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b AS dev
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git \
