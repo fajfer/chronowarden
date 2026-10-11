@@ -40,6 +40,18 @@ polling_interval: "6h"     # Global polling interval for all vaults (e.g. '6h', 
 vault_reconnect_interval: 120  # Seconds between reconnection attempts for offline vaults (minimum 10, default: 120)
 vault_reconnect_max_attempts: 5  # Number of reconnect cycles before loop stops (minimum 1, default: 5)
 
+# Compliance evidence (optional). Without cadences you can still take ad-hoc snapshots with a free label in the
+# Compliance tab. With cadences, the tab reminds you when a period ended; closing it freezes a snapshot of the
+# cadence's scope (empty lists = everything). Periods: monthly, quarterly, half-yearly, yearly.
+compliance:
+  reporting:
+    cadences: []
+    # cadences:
+    #   - period: quarterly
+    #     scope: { systems: [Billing], privileged_only: true }
+    #   - period: yearly
+    #     scope: {}
+
 # Prometheus metrics at /api/v1/metrics. Off by default since 0.7: turn them on if Prometheus scrapes Chronowarden.
 metrics:
   enabled: false

@@ -864,3 +864,67 @@ class Database:
                 (revoked_at, confirmation_id),
             )
             conn.commit()
+
+    def add_snapshot(
+        self,
+        created_at: str,
+        content: str,
+        sha256: str,
+        row_count: int,
+        label: Optional[str],
+        cadence: Optional[str],
+        period: Optional[str],
+        supersedes: Optional[int],
+    ) -> Optional[int]:
+        """Store a frozen compliance snapshot; snapshots are never updated or deleted (#94)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            cursor = conn.execute(
+                "INSERT INTO compliance_snapshots "
+                "(created_at, label, cadence, period, supersedes, row_count, content, sha256) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (created_at, label, cadence, period, supersedes, row_count, content, sha256),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def list_snapshots(self) -> list[dict]:
+        """List snapshots, newest first, without their content."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            rows = conn.execute(
+                "SELECT id, created_at, label, cadence, period, supersedes, row_count, sha256 "
+                "FROM compliance_snapshots ORDER BY id DESC"
+            )
+            return [dict(row) for row in rows]
+
+    def get_snapshot(self, snapshot_id: int) -> Optional[dict]:
+        """Return one snapshot with its content."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute("SELECT * FROM compliance_snapshots WHERE id = ?", (snapshot_id,)).fetchone()
+            return dict(row) if row else None
+
+    def audit_head(self) -> dict:
+        """The newest audit event's id and hash, which snapshots record to anchor the chain."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return {"events": 0, "head_hash": GENESIS_HASH}
+            row = conn.execute("SELECT id, hash FROM audit_events ORDER BY id DESC LIMIT 1").fetchone()
+            return {"events": row["id"], "head_hash": row["hash"]} if row else {"events": 0, "head_hash": GENESIS_HASH}
+
+    def first_audit_timestamp(self) -> Optional[str]:
+        """When the audit log started (reporting periods before it can't be closed)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute("SELECT timestamp FROM audit_events ORDER BY id LIMIT 1").fetchone()
+            return row["timestamp"] if row else None

@@ -31,6 +31,7 @@ class SecretMetadataResponse(BaseModel):
     secret_path: str
     full_path: str = Field(description="Computed: vault_name/engine_id/secret_path")
     ttl: Optional[str] = None
+    updated_time: Optional[str] = Field(default=None, description="Backend's last update (rotation) of the secret")
     ttl_date: Optional[datetime] = None
     days_remaining: Optional[int] = None
     severity: str = "default"

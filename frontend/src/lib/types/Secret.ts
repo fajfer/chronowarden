@@ -19,6 +19,8 @@ export interface Secret {
   secret_path: string;
   full_path: string;
   ttl: string | null;
+  /** Backend's last update (rotation) of the secret. */
+  updated_time: string | null;
   ttl_date: string | null;
   days_remaining: number | null;
   severity: string;

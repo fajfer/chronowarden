@@ -1,0 +1,262 @@
+# SPDX-FileCopyrightText: 2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+"""API routes for compliance evidence: summary, gaps, reporting periods and snapshots (#94)."""
+
+import json
+from datetime import datetime, timezone
+from typing import Any, Optional
+
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+
+from chronowarden.api.audit import request_source
+from chronowarden.compliance.evidence import (
+    GAP_TYPES,
+    build_document,
+    gaps_of,
+    in_scope,
+    rows_to_csv,
+    snapshot_row,
+    summary,
+)
+from chronowarden.compliance.periods import ended_periods, period_by_id
+from chronowarden.config import AppConfig, ComplianceScope
+from chronowarden.metadata import parse_date
+from chronowarden.models.compliance import GapEntry, GapReport, PeriodStatus, Snapshot, SnapshotCreate, SnapshotInfo
+
+router = APIRouter(prefix="/compliance", tags=["compliance"])
+
+
+def _get_app_dependencies() -> tuple[Any, AppConfig]:
+    """Get the database and config from the app module."""
+    from chronowarden.app import app_config, db
+
+    return db, app_config
+
+
+def _secrets(database: Any, config: AppConfig, include_removed: bool = False) -> list:
+    from chronowarden.api.secrets import enriched_secrets
+
+    return enriched_secrets(database, config, include_removed=include_removed)
+
+
+def _scope_from_query(
+    vaults: list[str], engines: list[str], systems: list[str], privileged_only: bool
+) -> ComplianceScope:
+    return ComplianceScope(vaults=vaults, engines=engines, systems=systems, privileged_only=privileged_only)
+
+
+def _cadence_scope(config: AppConfig, cadence: str) -> ComplianceScope:
+    """
+    Return the configured scope of a cadence.
+
+    Raises:
+        HTTPException: 422 if the cadence isn't configured.
+    """
+    for configured in config.compliance.reporting.cadences:
+        if configured.period == cadence:
+            return configured.scope
+    raise HTTPException(status_code=422, detail=f"No '{cadence}' reporting cadence is configured")
+
+
+def _now() -> datetime:
+    return datetime.now(tz=timezone.utc)
+
+
+def _iso(moment: datetime) -> str:
+    return moment.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+@router.get("/summary", summary="Total and privileged secrets per vault, engine and system")
+async def get_summary() -> dict[str, list[dict[str, Any]]]:
+    """
+    Count secrets that exist in their backend.
+
+    Returns:
+        Counts by vault, by engine and by system (system null = unassigned).
+    """
+    database, config = _get_app_dependencies()
+    return summary(_secrets(database, config))
+
+
+@router.get("/gaps", response_model=GapReport, summary="Evidence gaps in a scope")
+async def get_gaps(
+    vaults: list[str] = Query(default_factory=list),
+    engines: list[str] = Query(default_factory=list),
+    systems: list[str] = Query(default_factory=list),
+    privileged_only: bool = Query(False),
+    cadence: Optional[str] = Query(None, description="Use a configured cadence's scope instead"),
+) -> GapReport:
+    """
+    List secrets in scope with no effective owner, no system, an expired or missing TTL, privileged without an
+    owner, or a rotation awaiting confirmation.
+
+    Returns:
+        The gaps per secret and per type.
+    """
+    database, config = _get_app_dependencies()
+    scope = _cadence_scope(config, cadence) if cadence else _scope_from_query(vaults, engines, systems, privileged_only)
+    secrets = [s for s in _secrets(database, config) if in_scope(s, scope)]
+    entries = [GapEntry(id=s.id, full_path=s.full_path, gaps=gaps_of(s)) for s in secrets]
+    with_gaps = [entry for entry in entries if entry.gaps]
+    counts = {gap: sum(gap in entry.gaps for entry in with_gaps) for gap in GAP_TYPES}
+    return GapReport(scope=scope, total=len(secrets), counts=counts, secrets=with_gaps)
+
+
+@router.get("/periods", response_model=list[PeriodStatus], summary="Reporting periods and whether they were closed")
+async def get_periods() -> list[PeriodStatus]:
+    """
+    List, per configured cadence, the periods that ended since the audit log started, oldest first.
+
+    Returns:
+        Each period with the latest snapshot closing it, or none (it still needs closing).
+    """
+    database, config = _get_app_dependencies()
+    started = parse_date(database.first_audit_timestamp() or "") or _now()
+    closed: dict[tuple[str, str], int] = {}
+    for snapshot in reversed(database.list_snapshots()):
+        if snapshot["cadence"]:
+            closed[(snapshot["cadence"], snapshot["period"])] = snapshot["id"]
+    result = []
+    for cadence in config.compliance.reporting.cadences:
+        for period in ended_periods(cadence.period, started, _now()):
+            result.append(
+                PeriodStatus(
+                    cadence=period.cadence,
+                    period=period.id,
+                    start=_iso(period.start),
+                    end=_iso(period.end),
+                    snapshot_id=closed.get((period.cadence, period.id)),
+                )
+            )
+    return result
+
+
+@router.get("/snapshots", response_model=list[SnapshotInfo], summary="List snapshots")
+async def list_snapshots() -> list[SnapshotInfo]:
+    """List snapshots, newest first."""
+    database, _ = _get_app_dependencies()
+    return [SnapshotInfo(**row) for row in database.list_snapshots()]
+
+
+@router.post("/snapshots", response_model=SnapshotInfo, status_code=status.HTTP_201_CREATED, summary="Take a snapshot")
+async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInfo:
+    """
+    Freeze the inventory of a scope: ad hoc (label + scope) or for an ended reporting period (scope from config).
+
+    Periodic snapshots also include secrets removed during the period. Closing a period again needs `supersedes`
+    pointing at its latest snapshot (a correction). Gaps aren't recorded; check `GET /compliance/gaps` first.
+
+    Returns:
+        The new snapshot.
+
+    Raises:
+        HTTPException: 422 for an unknown cadence, a malformed or unfinished period or an unknown `supersedes`;
+            409 when the period is already closed and `supersedes` doesn't name its latest snapshot.
+    """
+    database, config = _get_app_dependencies()
+    now = _now()
+    if data.supersedes is not None and database.get_snapshot(data.supersedes) is None:
+        raise HTTPException(status_code=422, detail=f"Snapshot {data.supersedes} doesn't exist")
+    if data.cadence is not None and data.period is not None:
+        scope = _cadence_scope(config, data.cadence)
+        try:
+            period = period_by_id(data.cadence, data.period)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        if period.end > now:
+            raise HTTPException(
+                status_code=422, detail=f"Period {period.id} hasn't ended yet (ends {_iso(period.end)})"
+            )
+        latest = next(
+            (s for s in database.list_snapshots() if s["cadence"] == data.cadence and s["period"] == data.period), None
+        )
+        if latest is not None and data.supersedes != latest["id"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Period {period.id} was closed by snapshot {latest['id']}; "
+                    f"send supersedes={latest['id']} to correct it"
+                ),
+            )
+        secrets = [
+            s
+            for s in _secrets(database, config, include_removed=True)
+            if in_scope(s, scope) and (s.removed_at is None or s.removed_at >= period.start)
+        ]
+    else:
+        scope = data.scope or ComplianceScope()
+        secrets = [s for s in _secrets(database, config) if in_scope(s, scope)]
+    systems = {system["id"]: system for system in database.list_systems()}
+    created_at = _iso(now)
+    content, sha256 = build_document(
+        [snapshot_row(s, systems) for s in secrets],
+        created_at,
+        scope,
+        database.audit_head(),
+        label=data.label,
+        cadence=data.cadence,
+        period=data.period,
+        supersedes=data.supersedes,
+    )
+    snapshot_id = database.add_snapshot(
+        created_at, content, sha256, len(secrets), data.label, data.cadence, data.period, data.supersedes
+    )
+    database.append_audit_event(
+        "compliance.snapshot",
+        request_source(request),
+        subject=f"snapshot:{snapshot_id}",
+        after={
+            "label": data.label,
+            "cadence": data.cadence,
+            "period": data.period,
+            "sha256": sha256,
+            "rows": len(secrets),
+            "supersedes": data.supersedes,
+        },
+    )
+    return SnapshotInfo(**{k: v for k, v in database.get_snapshot(snapshot_id).items() if k != "content"})
+
+
+def _require_snapshot(database: Any, snapshot_id: int) -> dict:
+    snapshot = database.get_snapshot(snapshot_id)
+    if snapshot is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Snapshot {snapshot_id} not found")
+    return snapshot
+
+
+@router.get("/snapshots/{snapshot_id}.json", summary="Export a snapshot as its canonical JSON")
+async def export_snapshot_json(snapshot_id: int) -> Response:
+    """Return exactly the hashed bytes, with the hash in `X-Content-SHA256`."""
+    database, _ = _get_app_dependencies()
+    snapshot = _require_snapshot(database, snapshot_id)
+    return Response(
+        content=snapshot["content"].encode("utf-8"),
+        media_type="application/json",
+        headers={
+            "X-Content-SHA256": snapshot["sha256"],
+            "Content-Disposition": f'attachment; filename="chronowarden-snapshot-{snapshot_id}.json"',
+        },
+    )
+
+
+@router.get("/snapshots/{snapshot_id}.csv", summary="Export a snapshot's rows as CSV")
+async def export_snapshot_csv(snapshot_id: int) -> Response:
+    """Return the rows as CSV; the JSON export is the verifiable form."""
+    database, _ = _get_app_dependencies()
+    snapshot = _require_snapshot(database, snapshot_id)
+    return Response(
+        content=rows_to_csv(json.loads(snapshot["content"])["rows"]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="chronowarden-snapshot-{snapshot_id}.csv"'},
+    )
+
+
+@router.get("/snapshots/{snapshot_id}", response_model=Snapshot, summary="Get a snapshot")
+async def get_snapshot(snapshot_id: int) -> Snapshot:
+    """Return a snapshot with its parsed document."""
+    database, _ = _get_app_dependencies()
+    snapshot = _require_snapshot(database, snapshot_id)
+    content = snapshot.pop("content")
+    return Snapshot(**snapshot, document=json.loads(content))

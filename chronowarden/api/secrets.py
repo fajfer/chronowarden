@@ -128,6 +128,7 @@ def _enrich_secret(entry: SecretMetadataCache, config: AppConfig, index: Assignm
         secret_path=entry.secret_path,
         full_path=f"{entry.vault_name}/{entry.engine_id}/{entry.secret_path}",
         ttl=entry.ttl,
+        updated_time=entry.updated_time,
         ttl_date=ttl_date,
         days_remaining=days_remaining,
         severity=severity,
@@ -501,3 +502,9 @@ def write_privileged(
             before={"privileged": entry.privileged},
             after={"privileged": value, **({"reverts": reverts} if reverts is not None else {})},
         )
+
+
+def enriched_secrets(database: Any, config: AppConfig, include_removed: bool = False) -> list[SecretMetadataResponse]:
+    """Every cached secret as the API returns it (status, assignments, confirmation), for compliance views."""
+    index = AssignmentIndex(database)
+    return [_enrich_secret(e, config, index) for e in database.list_all_secrets(include_removed=include_removed)]

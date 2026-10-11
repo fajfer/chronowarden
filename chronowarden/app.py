@@ -16,6 +16,7 @@ from starlette.responses import FileResponse
 
 from chronowarden.api import (
     audit_router,
+    compliance_router,
     health_router,
     owners_router,
     secrets_router,
@@ -106,6 +107,7 @@ app = FastAPI(
         {"name": "owners", "description": "Owner profile management"},
         {"name": "systems", "description": "Systems that secrets are assigned to"},
         {"name": "audit", "description": "Append-only, hash-chained audit log"},
+        {"name": "compliance", "description": "Compliance evidence: summary, gaps, periods, snapshots"},
     ],
 )
 
@@ -117,6 +119,7 @@ app.include_router(sync_router, prefix="/api/v1")
 app.include_router(owners_router, prefix="/api/v1")
 app.include_router(systems_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
+app.include_router(compliance_router, prefix="/api/v1")
 
 
 @app.get("/api/v1", tags=["root"], summary="API endpoint")
