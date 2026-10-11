@@ -663,6 +663,13 @@ class TestLoadConfig:
         with pytest.raises(ConfigError, match="Cannot parse"):
             load_config(self._write(tmp_path, "vaults: [unclosed\n"))
 
+    def test_non_utf8_file_raises_config_error(self, tmp_path: pathlib.Path) -> None:
+        """Regression (found by fuzzing): invalid UTF-8 crashed startup with UnicodeDecodeError."""
+        path = tmp_path / "config.yaml"
+        path.write_bytes(b"vaults: \xf0\x28\x8c\x28\n")
+        with pytest.raises(ConfigError, match="not valid UTF-8"):
+            load_config(str(path))
+
     def test_non_mapping_raises(self, tmp_path: pathlib.Path) -> None:
         """A YAML list at the top level is an error."""
         with pytest.raises(ConfigError, match="must contain a mapping"):

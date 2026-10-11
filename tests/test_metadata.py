@@ -85,6 +85,14 @@ class TestFormatDate:
         result = format_date(dt)
         assert result == "2026-12-25"
 
+    def test_year_before_1000_is_zero_padded(self) -> None:
+        """Regression (found by fuzzing): strftime wrote '2-01-01', which parse_date can't read back."""
+        dt = parse_date("0002-01-01")
+        assert dt is not None
+        assert format_date(dt) == "0002-01-01"
+        assert format_date(dt, "YYYY-DD-MM") == "0002-01-01"
+        assert parse_date(format_date(dt)) == dt
+
 
 class TestCalculateTTL:
     """Tests for calculate_ttl function."""
@@ -143,6 +151,12 @@ class TestCalculateTTL:
         config = AppConfig()
         result = calculate_ttl("", "default", config)
         assert result is None
+
+    def test_expiry_after_year_9999_returns_none(self) -> None:
+        """Regression (found by fuzzing): the date overflow raised OverflowError instead of returning None."""
+        config = AppConfig()
+        assert calculate_ttl("9999-12-31T23:59:59Z", "default", config) is None
+        assert calculate_ttl("9999-12-31", "default", config) is None
 
     def test_none_updated_time(self) -> None:
         """None updated_time returns None."""
