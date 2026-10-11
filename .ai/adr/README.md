@@ -41,3 +41,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-020](ADR-020-pdf-reports-with-typst.md) | PDF reports with Typst | Proposed | 2026-10-11 |
 | [ADR-021](ADR-021-rotation-handover.md) | Rotation hand-over between the rotating and the applying team | Accepted | 2026-10-11 |
 | [ADR-022](ADR-022-webhooks-and-optional-metrics.md) | Built-in webhook alerting, optional Prometheus metrics | Accepted | 2026-10-11 |
+| [ADR-023](ADR-023-schema-migrations-with-user-version.md) | Schema migrations with PRAGMA user_version | Accepted | 2026-10-11 |
