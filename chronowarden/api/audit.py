@@ -8,10 +8,11 @@ import json
 from collections.abc import Iterator
 from typing import Any, Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Path, Query, Request, status
 from fastapi.responses import StreamingResponse
 
 from chronowarden.audit import verify_chain
+from chronowarden.audit.revert import RevertError, revert_event
 from chronowarden.models.audit import AuditChainStatus, AuditEvent
 
 router = APIRouter(prefix="/audit", tags=["audit"])
@@ -94,3 +95,32 @@ async def verify() -> AuditChainStatus:
         Whether the chain is intact, its length and head hash, and the first broken event if any.
     """
     return AuditChainStatus(**verify_chain(_get_db().iter_audit_events())._asdict())
+
+
+@router.post(
+    "/events/{event_id}/revert",
+    response_model=AuditEvent,
+    status_code=status.HTTP_201_CREATED,
+    summary="Revert an event",
+)
+async def revert(request: Request, event_id: int = Path(description="Audit event ID")) -> AuditEvent:
+    """
+    Restore the value an event replaced; the revert is recorded as a new event that names the reverted one.
+
+    Only a secret's system and owner assignments can be reverted (ADR-004: Chronowarden changes only its own data).
+
+    Returns:
+        The new event.
+
+    Raises:
+        HTTPException: 404 for an unknown event, 422 if the event can't be reverted, 409 if the value changed since or
+            what it refers to no longer exists.
+    """
+    db = _get_db()
+    event = db.get_audit_event(event_id)
+    if event is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Audit event {event_id} not found")
+    try:
+        return AuditEvent.from_stored(revert_event(db, event, request_source(request)))
+    except RevertError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from None

@@ -789,3 +789,12 @@ class Database:
                 (*identity, canonical_json(state)),
             )
             conn.commit()
+
+    def get_audit_event(self, event_id: int) -> Optional[dict]:
+        """Return one stored audit event, or None."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute(f"SELECT {_AUDIT_COLUMNS} FROM audit_events WHERE id = ?", (event_id,)).fetchone()
+            return dict(row) if row else None
