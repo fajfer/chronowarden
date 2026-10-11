@@ -577,9 +577,11 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
 
     logger.info("Loading configuration from %s", path)
     try:
-        data = yaml.safe_load(path.read_text())
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except OSError as exc:
         raise ConfigError(f"Cannot read configuration file {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise ConfigError(f"Configuration file {path} is not valid UTF-8: {exc}") from exc
     except yaml.YAMLError as exc:
         raise ConfigError(f"Cannot parse configuration file {path}: {exc}") from exc
 

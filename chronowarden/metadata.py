@@ -95,9 +95,10 @@ def format_date(dt: datetime, date_format: str = "YYYY-MM-DD") -> str:
     Returns:
         Formatted date string.
     """
+    # Not strftime: "%Y" isn't zero-padded for years before 1000 on glibc, and parse_date needs four digits
     if date_format == "YYYY-DD-MM":
-        return dt.strftime("%Y-%d-%m")
-    return dt.strftime("%Y-%m-%d")
+        return f"{dt.year:04d}-{dt.day:02d}-{dt.month:02d}"
+    return f"{dt.year:04d}-{dt.month:02d}-{dt.day:02d}"
 
 
 def calculate_ttl(updated_time: str, severity: str, config: AppConfig) -> Optional[str]:
@@ -121,7 +122,11 @@ def calculate_ttl(updated_time: str, severity: str, config: AppConfig) -> Option
         return None
 
     rotation_days = config.get_rotation_days(severity)
-    expiry_dt = parsed_updated + timedelta(days=rotation_days)
+    try:
+        expiry_dt = parsed_updated + timedelta(days=rotation_days)
+    except OverflowError:
+        logger.warning("Expiry date for updated_time %s is after year 9999", updated_time)
+        return None
 
     return format_date(expiry_dt, config.date_format)
 
