@@ -14,6 +14,7 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
 
 - `chain.py`: `canonical_json`, `event_hash`, `verify_chain`, `GENESIS_HASH`. Pure functions, no I/O.
 - `config_events.py`: `record_config_change(db, config)`, called in `app.py` `lifespan` after the DB opens.
+- `revert.py`: `revert_event(db, event, source)`, `RevertError` (422 not revertible, 409 changed since or gone).
 - `observe.py`: `observed_state(metadata)`, `record_observed_changes`, `record_config_applied`; called from
   `metadata.sync_secret_metadata`. The last state per secret is in `observed_state` (migration 6).
 - `../database.py`: `append_audit_event`, `list_audit_events`, `iter_audit_events`, `get/set_audit_state`.
@@ -38,6 +39,9 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
 - Secret events are keyed by identity (`vault_name`, `engine_id`, `secret_path`), so history survives a rebuilt
   cache (ADR-017). Unchanged values record nothing.
 - Config events store only expiry profiles and the severity cascade, never addresses or credentials.
+- Revert (`POST /audit/events/{id}/revert`) restores `before` for `secret.system` / `secret.owners` only, while the
+  event's `after` is still current; the new event's `after` carries `"reverts": <id>`. Everything else is 422:
+  backend data isn't Chronowarden's to change (ADR-004), severity/TTL come from config (ADR-006).
 
 ## How to
 
