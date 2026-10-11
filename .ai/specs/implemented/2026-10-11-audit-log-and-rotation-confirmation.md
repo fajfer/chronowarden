@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Audit log, change history and rotation confirmation
 
-- **Status:** in progress
+- **Status:** implemented
 - **Date:** 2026-10-11
 - **Issue:** #24 (retitled "Audit log, change history and rotation confirmation"), #18
 
@@ -63,14 +63,14 @@ status). Secret detail → History (events for that secret, Revert where allowed
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [core](../../chronowarden/AGENTS.md), [models](../../chronowarden/models/AGENTS.md),
-  [api](../../chronowarden/api/AGENTS.md), [integrations](../../chronowarden/integrations/AGENTS.md),
-  [frontend](../../frontend/AGENTS.md)
-- [ADR-004](../adr/ADR-004-metadata-only-access.md), [ADR-006](../adr/ADR-006-config-source-of-truth.md),
-  [ADR-014](../adr/ADR-014-rotation-confirmation-and-audit-log.md), [ADR-021](../adr/ADR-021-rotation-handover.md),
-  [ADR-022](../adr/ADR-022-webhooks-and-optional-metrics.md),
-  [ADR-017](../adr/ADR-017-sqlite-holds-assignments.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [core](../../../chronowarden/AGENTS.md), [models](../../../chronowarden/models/AGENTS.md),
+  [api](../../../chronowarden/api/AGENTS.md), [integrations](../../../chronowarden/integrations/AGENTS.md),
+  [frontend](../../../frontend/AGENTS.md)
+- [ADR-004](../../adr/ADR-004-metadata-only-access.md), [ADR-006](../../adr/ADR-006-config-source-of-truth.md),
+  [ADR-014](../../adr/ADR-014-rotation-confirmation-and-audit-log.md), [ADR-021](../../adr/ADR-021-rotation-handover.md),
+  [ADR-022](../../adr/ADR-022-webhooks-and-optional-metrics.md),
+  [ADR-017](../../adr/ADR-017-sqlite-holds-assignments.md)
 
 ## ADRs affected
 
@@ -85,8 +85,8 @@ ADR-014 accepted; ADR-021 new.
 | 3 | Move #61 assignment logging and privileged changes (privileged: recorded by the compliance spec, which adds the flag) into events; config-change events at startup | core, api | Tests | done | 1b35320 |
 | 4 | Revert endpoint with the allowed/refused rules | api | Tests for each allowed and refused type | done | ac9c643 |
 | 5 | Confirmation cascade + grace config, `rotation_confirmations`, awaiting-confirmation status, TTL from max(updated_time, applied_at), confirm endpoint | core, models, api | Tests: required/not required via cascade, historic date, TTL recalculation, revert of a confirmation | done | f2639d3 |
-| 6 | UI: Audit log page, secret History with Revert, Confirm rotation dialog, awaiting-confirmation badge | frontend | `npm run check` clean; walk-through against the dev vaults | todo | |
-| 7 | ADR-014 accepted text, ADR-021; `main.c4`; README; CHANGELOG; `chronowarden/audit/AGENTS.md` | [.ai/adr](../adr/README.md) | Docs match the code | todo | |
+| 6 | UI: Audit log page, secret History with Revert, Confirm rotation dialog, awaiting-confirmation badge | frontend | `npm run check` clean; walk-through against the dev vaults | done | 2da6b08 |
+| 7 | ADR-014 accepted text, ADR-021; `main.c4`; README; CHANGELOG; `chronowarden/audit/AGENTS.md` | [.ai/adr](../../adr/README.md) | Docs match the code | done | 2da6b08 |
 
 ## Validation
 
