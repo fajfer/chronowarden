@@ -39,6 +39,7 @@ the **Task Router** points to. Module detail lives next to the code; decisions l
 - Add deprecation warnings or backward-compatibility shims before 1.0: change the code and its config directly
   (#16, #30).
 - Catch bare `Exception`, except in top-level handlers that must not crash and in cleanup blocks (log at debug).
+- Merge a PR or push a final release tag without the maintainer's go.
 
 ## Validation Commands
 
@@ -72,7 +73,8 @@ Shorthand: `<area>` means `<area>/AGENTS.md`. Read root + the listed files, noth
 | Record a decision | [.ai/adr](.ai/adr/README.md) |
 | Plan a 3+ step task | [.ai/specs](.ai/specs/README.md) |
 
-User docs in `docs/` (mkdocs) are written by a human; agents don't edit them unless asked.
+User docs in `docs/` (mkdocs) are for humans. Agents may draft pages there when a spec asks for it; every drafted
+page starts with a notice that it is an AI-generated draft, and only the maintainer removes or rewords that notice.
 
 ## Conventions
 

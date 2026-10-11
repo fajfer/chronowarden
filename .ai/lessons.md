@@ -21,6 +21,13 @@ If a lesson becomes a lasting rule, move it into the narrowest `AGENTS.md` it ap
 
 ## Entries
 
+### 2026-10-10: specs, scope
+
+- **Mistake:** asked to "prepare a document extending the 0.7 scope", the agent wrote specs straight into
+  `.ai/specs/` and edited the specs index, without asking the open questions first.
+- **Rule:** a scope change is a proposal until the maintainer approves it: put it in one dedicated file outside
+  `.ai/`, ask the open questions while drafting, and touch `.ai/` only after approval.
+
 ### 2026-02-07: gitignore
 
 - **Mistake:** a `lib/` pattern in the root `.gitignore` silently excluded `frontend/src/lib/`, so the files an agent
