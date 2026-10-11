@@ -66,7 +66,7 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 - `frontend-builder` runs on `$BUILDPLATFORM`: its output is arch-independent, and `npm ci` under QEMU arm64
   emulation hung intermittently (v0.6.2 tag build). Keep it native.
 - `dev-setup.py` (podman, else docker) keeps a `config.yaml` it didn't write; `devenv/` images are fully qualified.
-- `deployment.yaml` pins the production image (`ghcr.io/fajfer/chronowarden:v0.6.3`); bump the tag with each
+- `deployment.yaml` pins the production image (`ghcr.io/fajfer/chronowarden:v0.7.0`); bump the tag with each
   release.
 
 ## Related ADRs
