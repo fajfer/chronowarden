@@ -220,6 +220,43 @@ class TestListSecretsNullKeys:
         assert secrets == []
 
 
+class TestListSecretsStrict:
+    """strict=True lets sync tell an empty engine from a failed listing (#86)."""
+
+    def _integration(self) -> VaultIntegration:
+        integration = VaultIntegration(address="http://example.com:8200")
+        integration._client = MagicMock()
+        return integration
+
+    def test_forbidden_raises(self) -> None:
+        integration = self._integration()
+        integration._client.secrets.kv.v2.list_secrets.side_effect = Forbidden("Permission denied")
+        with pytest.raises(Forbidden):
+            integration.list_secrets("", mount_point="apps", strict=True)
+
+    def test_vault_error_raises(self) -> None:
+        integration = self._integration()
+        integration._client.secrets.kv.v2.list_secrets.side_effect = VaultError("boom")
+        with pytest.raises(VaultError):
+            integration.list_secrets("", mount_point="apps", strict=True)
+
+    def test_missing_path_is_empty_not_an_error(self) -> None:
+        """Vault answers 404 for an engine whose last secret was deleted: that is an empty engine."""
+        integration = self._integration()
+        integration._client.secrets.kv.v2.list_secrets.side_effect = InvalidPath("not found")
+        assert integration.list_secrets("", mount_point="apps", strict=True) == []
+
+    def test_not_connected_raises(self) -> None:
+        integration = VaultIntegration(address="http://example.com:8200")
+        with pytest.raises(VaultError, match="Not connected"):
+            integration.list_secrets("", mount_point="apps", strict=True)
+
+    def test_default_still_returns_empty_on_errors(self) -> None:
+        integration = self._integration()
+        integration._client.secrets.kv.v2.list_secrets.side_effect = VaultError("boom")
+        assert integration.list_secrets("", mount_point="apps") == []
+
+
 class TestIsConnectedDiagnostics:
     """Tests for disconnected/auth-expired diagnostics."""
 

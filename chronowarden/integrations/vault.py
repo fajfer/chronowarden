@@ -268,18 +268,25 @@ class VaultIntegration(BaseIntegration):
             logger.exception("Error retrieving secret from Vault")
             return None
 
-    def list_secrets(self, path: str, mount_point: Optional[str] = None) -> list[str]:
+    def list_secrets(self, path: str, mount_point: Optional[str] = None, strict: bool = False) -> list[str]:
         """
         List secrets at the given path in Vault.
 
         Args:
             path: Path to list secrets from.
             mount_point: Override the default mount point for this request.
+            strict: Raise on errors instead of returning []. A path that doesn't exist still returns [] (that is how
+                Vault answers for an engine whose last secret was deleted), so callers can tell empty from failed.
 
         Returns:
             List of secret names at the path.
+
+        Raises:
+            VaultError: With `strict`, when not connected or the listing fails (including permission errors).
         """
         if not self._client:
+            if strict:
+                raise VaultError("Not connected to Vault")
             logger.error("Not connected to Vault")
             return []
 
@@ -308,9 +315,13 @@ class VaultIntegration(BaseIntegration):
                 mount,
                 mount,
             )
+            if strict:
+                raise
             return []
         except VaultError:
             logger.exception("Error listing secrets from Vault")
+            if strict:
+                raise
             return []
 
     def get_secret_metadata(self, path: str, mount_point: Optional[str] = None) -> Optional[dict[str, Any]]:

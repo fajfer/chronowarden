@@ -319,15 +319,17 @@ class TestSecretsAPI:
             assert len(data) == 2
             assert all("enabled" not in secret for secret in data)
 
-    def test_removed_endpoints_delete(self) -> None:
-        """Test that DELETE /secrets/:id no longer exists."""
+    def test_delete_refuses_a_secret_that_still_exists(self) -> None:
+        """DELETE /secrets/:id only purges removed secrets (#86); a live secret can't be deleted (409)."""
+        self._insert_secret()
         client = self._build_client()
         with patch(
             "chronowarden.api.secrets._get_app_dependencies",
             return_value=(self.db, self.config, self.vault_manager),
         ):
             response = client.delete("/api/v1/secrets/1")
-            assert response.status_code == 405
+            assert response.status_code == 409
+            assert self.db.get_secret_by_id(1) is not None
 
     def test_removed_endpoints_public(self) -> None:
         """Test that GET /secrets/public/ no longer exists (returns 422 since 'public' is not a valid int ID)."""

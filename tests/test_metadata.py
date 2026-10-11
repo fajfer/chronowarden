@@ -316,7 +316,7 @@ class TestNestedSecretTraversal:
             "shared/": ["cert"],
         }
         vault = MagicMock()
-        vault.list_secrets.side_effect = lambda path, mount_point=None: tree.get(path, [])
+        vault.list_secrets.side_effect = lambda path, mount_point=None, strict=False: tree.get(path, [])
 
         paths = _list_secret_paths(vault, "secret")
 
@@ -325,7 +325,7 @@ class TestNestedSecretTraversal:
     def test_flat_engine_returns_root_secrets(self) -> None:
         """An engine without folders yields only its root-level secrets."""
         vault = MagicMock()
-        vault.list_secrets.side_effect = lambda path, mount_point=None: ["a", "b"] if path == "" else []
+        vault.list_secrets.side_effect = lambda path, mount_point=None, strict=False: ["a", "b"] if path == "" else []
 
         paths = _list_secret_paths(vault, "secret")
 

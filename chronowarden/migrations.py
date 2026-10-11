@@ -117,10 +117,16 @@ def _systems_and_owners(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _removed_at(conn: sqlite3.Connection) -> None:
+    """Remember when sync last missed a secret in its backend, instead of keeping stale rows forever (#86)."""
+    conn.execute("ALTER TABLE secret_metadata_cache ADD COLUMN removed_at TEXT")
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "baseline 0.6 schema", _baseline),
     Migration(2, "webhook notification routes only", _webhook_routes_only),
     Migration(3, "systems and secret assignments", _systems_and_owners),
+    Migration(4, "removed_at on cached secrets", _removed_at),
 ]
 
 

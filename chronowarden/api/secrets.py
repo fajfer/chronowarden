@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from chronowarden.assignments import AssignmentIndex
 from chronowarden.config import AppConfig
 from chronowarden.database import SecretIdentity, SecretMetadataCache
-from chronowarden.models.secret import SecretMetadataResponse, SecretStatus
+from chronowarden.models.secret import PurgeResult, SecretMetadataResponse, SecretStatus
 from chronowarden.models.system import OwnerIds, SystemAssignment
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
@@ -126,6 +126,7 @@ def _enrich_secret(entry: SecretMetadataCache, config: AppConfig, index: Assignm
         alert_threshold_days=alert_days,
         last_synced=last_synced,
         status=_compute_status(days_remaining, alert_days),
+        removed_at=parse_date(entry.removed_at) if entry.removed_at else None,
         system=index.system_of(_identity(entry)),
         owners=index.owners_of(_identity(entry)),
         effective_owners=index.effective_owners_of(_identity(entry)),
@@ -161,6 +162,7 @@ async def list_secrets(
     system_id: Optional[str] = Query(None, description="Filter by assigned system"),
     owner_id: Optional[str] = Query(None, description="Filter by effective owner"),
     unassigned: Optional[bool] = Query(None, description="true: neither system nor own owners; false: the rest"),
+    include_removed: bool = Query(False, description="Also list secrets that are no longer in their backend"),
 ) -> list[SecretMetadataResponse]:
     """
     List all cached secret metadata with optional filtering.
@@ -172,6 +174,7 @@ async def list_secrets(
         system_id: Filter by assigned system.
         owner_id: Filter by effective owner (own owners, or else the system's owners).
         unassigned: Filter by whether the secret has neither a system nor own owners.
+        include_removed: Also list secrets that sync no longer finds in their backend (#86).
 
     Returns:
         List of enriched secret metadata entries.
@@ -182,6 +185,7 @@ async def list_secrets(
         vault_name=vault_name,
         engine_id=engine_id,
         severity=severity,
+        include_removed=include_removed,
     )
     index = AssignmentIndex(database)
     return [
@@ -189,6 +193,52 @@ async def list_secrets(
         for e in entries
         if index.matches(_identity(e), system_id=system_id, owner_id=owner_id, unassigned=unassigned)
     ]
+
+
+@router.delete("/removed", response_model=PurgeResult, summary="Purge removed secrets")
+async def purge_removed_secrets(
+    vault_name: Optional[str] = Query(None, description="Only purge removed secrets of this vault"),
+    engine_id: Optional[str] = Query(None, description="Only purge removed secrets of this engine"),
+) -> PurgeResult:
+    """
+    Delete every secret that is no longer in its backend, with its system and owner assignments.
+
+    Args:
+        vault_name: Only purge removed secrets of this vault.
+        engine_id: Only purge removed secrets of this engine.
+
+    Returns:
+        How many secrets were purged, and which.
+    """
+    database, _, _ = _get_app_dependencies()
+    purged = ["/".join(identity) for identity in database.purge_removed(vault_name=vault_name, engine_id=engine_id)]
+    logger.info("Purged %d removed secret(s): %s", len(purged), purged)
+    return PurgeResult(purged=len(purged), secrets=purged)
+
+
+@router.delete("/{secret_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Purge a removed secret")
+async def purge_secret(secret_id: int) -> None:
+    """
+    Delete a secret that is no longer in its backend, with its system and owner assignments.
+
+    Args:
+        secret_id: The secret metadata cache row ID.
+
+    Raises:
+        HTTPException: 404 if the secret isn't cached, 409 if it still exists in its backend.
+    """
+    database, _, _ = _get_app_dependencies()
+    entry = _require_secret(database, secret_id)
+    if entry.removed_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Secret {'/'.join(_identity(entry))} still exists in its backend; "
+                "only removed secrets can be purged"
+            ),
+        )
+    database.purge_removed(secret_id=secret_id)
+    logger.info("Purged removed secret %s", "/".join(_identity(entry)))
 
 
 @router.get("/{secret_id}", response_model=SecretMetadataResponse, summary="Get cached secret metadata by ID")
