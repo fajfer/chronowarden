@@ -143,21 +143,30 @@ Development — full shell, git, --reload, 286MB \
 
 ## Development Environment
 
-For local testing with dev Vault instances:
+For local testing with dev Vault instances (podman preferred, docker works too):
 
 ```bash
 uv run python dev-setup.py
 ```
 
 This script:
-- Starts OpenBao (port 8200) and HashiCorp Vault (port 8201) containers
-- Extracts root tokens from logs
-- Creates `config.yaml` with all dev vaults configured
+- starts OpenBao (port 8200) and HashiCorp Vault (port 8201) dev servers with podman, or docker if podman isn't
+  installed (`CHRONOWARDEN_CONTAINER_RUNTIME=docker` to choose);
+- seeds three KV v2 engines with sample secrets and an AppRole with the policy below;
+- writes `config.yaml` for both (only if it doesn't exist or was written by `dev-setup.py`; `--force` replaces
+  another one, `--config PATH` writes elsewhere) and prints the dev root tokens.
 
 **Cleanup** (stops and removes both dev containers):
 ```bash
 uv run python dev-setup.py --cleanup
 ```
+
+**Integration tests** run Chronowarden against real OpenBao and Vault containers (testcontainers); CI runs them too:
+```bash
+uv run pytest -m integration
+```
+With podman, point testcontainers at its API socket: `DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock`
+(`systemctl --user start podman.socket`) and `TESTCONTAINERS_RYUK_DISABLED=true`.
 
 ## Vault Permissions
 

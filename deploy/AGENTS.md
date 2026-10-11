@@ -23,7 +23,8 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
 - `../.github/workflows/`: `docker.yaml` (both targets, amd64 + arm64, pushed except on PRs; on `v*` tags: cosign
   signature, SLSA provenance, image SBOMs), `release.yaml` (`v*` tags: wheel, sdist, source SBOMs, provenance, notes
   from `scripts/release_notes.sh`; `-rc.N` = pre-release), `ci.yaml`, `scorecard.yml`, `zizmor.yaml`,
-  `agents-docs.yaml`, `cflite_pr.yml` / `cflite_batch.yml` (ClusterFuzzLite: 5 min on code PRs, 30 min weekly).
+  `agents-docs.yaml`, `cflite_pr.yml` / `cflite_batch.yml` (ClusterFuzzLite: 5 min on code PRs, 30 min weekly); `ci.yaml` runs
+  `pytest -m integration` too (testcontainers, images and seeding in `devenv/`).
 
 ## Contracts
 
@@ -64,8 +65,7 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   `zizmor: ignore[unpinned-uses]`. A release tag fails unless `pyproject.toml` and `CHANGELOG.md` match it.
 - `frontend-builder` runs on `$BUILDPLATFORM`: its output is arch-independent, and `npm ci` under QEMU arm64
   emulation hung intermittently (v0.6.2 tag build). Keep it native.
-- Planned: headless image without the frontend, e.g. for a CronJob (#48); `dev-setup.py` rework with podman and
-  testcontainers (#78). Cleanup exists: `dev-setup.py --cleanup` (#31).
+- `dev-setup.py` (podman, else docker) keeps a `config.yaml` it didn't write; `devenv/` images are fully qualified.
 - `deployment.yaml` pins the production image (`ghcr.io/fajfer/chronowarden:v0.6.3`); bump the tag with each
   release.
 
