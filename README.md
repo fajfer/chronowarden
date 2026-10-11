@@ -183,10 +183,13 @@ path "sys/mounts" {
 
 ### Secrets
 - `GET /api/v1/secrets` - List all tracked secrets with metadata
-  - Query params: `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id` (effective owner), `unassigned`
+  - Query params: `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id` (effective owner), `unassigned`,
+    `include_removed` (secrets deleted in the backend are hidden by default)
 - `GET /api/v1/secrets/{id}` - Get secret metadata by ID, including its system, owners and effective owners
 - `PUT /api/v1/secrets/{id}/system` - Assign the secret to a system (`{"system_id": "..."}`, or `null` to unassign)
 - `PUT /api/v1/secrets/{id}/owners` - Replace the secret's owners (`{"owner_ids": [...]}`)
+- `DELETE /api/v1/secrets/{id}`, `DELETE /api/v1/secrets/removed` - Purge secrets that sync no longer finds in their
+  backend, with their assignments (`removed` takes `vault_name`/`engine_id`); a secret that still exists gives `409`
 
 Severity is set in `config.yaml` only (per vault, engine or secret). A secret's effective owners are its own owners,
 or else its system's owners.
