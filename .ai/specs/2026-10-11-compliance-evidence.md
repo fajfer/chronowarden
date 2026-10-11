@@ -94,10 +94,10 @@ None new; follows ADR-004 (only `chronowarden_*` keys written), ADR-010, ADR-017
 |---|---|---|---|---|---|
 | 1 | Privileged: sync reads `chronowarden_privileged` (strict, warnings), cache column via migration, `PUT /secrets/{id}/privileged` writing to Vault, `privileged` filter, audit event | core, models, api | Tests: true/false/invalid values, toggle round-trips through Vault, other keys untouched, filter | done | f47ebb5 |
 | 2 | Frontend: Privileged column, filter and detail toggle | frontend | `npm run check` clean; manual check against both dev vaults | done | 99f8e7c |
-| 3 | `compliance` config models and `config.example.yaml` (cadences with scope) | core | Config tests: valid, unknown period, bad scope | todo | |
-| 4 | Snapshots: tables, canonical JSON + SHA-256, scope filter, create/list/get, CSV/JSON export, supersedes link, no update/delete | models, api | Tests: same state → same hash; scope filters; correction references the original; no update path | todo | |
-| 5 | Gaps endpoint and period tracking (ended, unclosed periods per cadence) | api | Unit tests per gap type and period boundary | todo | |
-| 6 | Summaries endpoint (total, privileged per vault/engine/system) | api | Unit tests | todo | |
+| 3 | `compliance` config models and `config.example.yaml` (cadences with scope) | core | Config tests: valid, unknown period, bad scope | done | 7023427 |
+| 4 | Snapshots: tables, canonical JSON + SHA-256, scope filter, create/list/get, CSV/JSON export, supersedes link, no update/delete | models, api | Tests: same state → same hash; scope filters; correction references the original; no update path | done | 7023427 |
+| 5 | Gaps endpoint and period tracking (ended, unclosed periods per cadence) | api | Unit tests per gap type and period boundary | done | 7023427 |
+| 6 | Summaries endpoint (total, privileged per vault/engine/system) | api | Unit tests | done | 7023427 |
 | 7 | Compliance tab: Summaries, Snapshots (create with scope, close period with gap warning, downloads), Tree, Settings | frontend | `npm run check` clean; walk-through against the dev vaults | todo | |
 | 8 | `main.c4` (compliance component), README (features, API, export warning next to the unauthenticated notice), `chronowarden/compliance/AGENTS.md`, CHANGELOG | [architecture](../../architecture/AGENTS.md) | Docs match the code; `check_agents_docs.py` passes | todo | |
 
