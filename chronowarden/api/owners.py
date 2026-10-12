@@ -192,11 +192,18 @@ async def delete_route(
     owner_id: str = Path(description="Owner ID"),
     route_id: str = Path(description="Route ID"),
 ) -> None:
-    """Remove a notification route from an owner."""
+    """
+    Remove a notification route from an owner.
+
+    Raises:
+        HTTPException: 404 if the owner doesn't exist or the route isn't one of its routes.
+    """
     db = _get_db()
     existing = db.get_owner(owner_id)
     if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Owner '{owner_id}' not found")
+    if not any(route["id"] == route_id for route in db.list_notification_routes(owner_id)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Route '{route_id}' not found")
     db.delete_notification_route(route_id)
 
 
@@ -217,5 +224,5 @@ async def test_route(
     route = next((r for r in routes if r["id"] == route_id), None)
     if route is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Route '{route_id}' not found")
-    logger.info("Test notification sent via %s to %s", route["type"], route["address"])
-    return {"success": True, "message": f"Test notification sent to {route['address']}"}
+    # Webhook URLs are credentials (Slack, Teams): never log them. Delivery comes with webhook alerting in 0.8.
+    return {"success": False, "message": "Nothing was sent: notification delivery comes with webhook alerting (0.8)"}

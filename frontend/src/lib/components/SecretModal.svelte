@@ -14,6 +14,7 @@
   import { revertAuditEvent } from '#lib/api/audit.js';
   import { updateSecret, loadSecrets } from '#lib/stores/secrets.js';
   import AuditEventList from './AuditEventList.svelte';
+  import { safeHttpUrl } from '#lib/utils/safeUrl.js';
   import type { AuditEvent } from '#lib/types/index.js';
   import { addToast } from '#lib/stores/sync.js';
 
@@ -236,9 +237,9 @@
               <option value="">Unassigned</option>
               {#each systems as system (system.id)}<option value={system.id}>{system.name}</option>{/each}
             </select>
-            {#if assignedSystem?.cmdb_uri}
-              <a href={assignedSystem.cmdb_uri} target="_blank" rel="noopener noreferrer"
-                 class="inline-block mt-1 text-xs text-indigo-400 hover:text-indigo-300">Open in CMDB{assignedSystem.asset_number ? ` (${assignedSystem.asset_number})` : ''}</a>
+            {#if safeHttpUrl(assignedSystem?.cmdb_uri)}
+              <a href={safeHttpUrl(assignedSystem?.cmdb_uri)} target="_blank" rel="noopener noreferrer"
+                 class="inline-block mt-1 text-xs text-indigo-400 hover:text-indigo-300">Open in CMDB{assignedSystem?.asset_number ? ` (${assignedSystem.asset_number})` : ''}</a>
             {/if}
           </div>
           <fieldset>

@@ -13,8 +13,8 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 
 ## Files
 
-- Sentry (`_configure_sentry`): disabled without `sentry_dsn`. PII off; tracing/profiling off unless
-  `sentry_traces_sample_rate`/`sentry_profiles_sample_rate` are set.
+- `_configure_sentry`: PII and frame locals off (they hold the Vault token, 0.7.1). `request_guard.py`: cross-site
+  writes → 403, Hosts outside `allowed_hosts` → 400.
 - `app.py`: module-level singletons `vault_manager`, `db`, `app_config`; `lifespan` (load config → Sentry →
   `connect_all` → open DB → `record_config_change` → `start_reconnect_loop`); routers mounted under `/api/v1`; SPA serving.
 - `config.py`: `AppConfig`, `VaultConfig`, `EngineConfigNested`, `SecretConfig`, `ExpiryProfile`, `load_config`.

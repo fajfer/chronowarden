@@ -125,7 +125,9 @@ def parse_privileged(value: Optional[str], where: str) -> bool:
     return normalized == "true"
 
 
-def calculate_ttl(updated_time: str, severity: str, config: AppConfig) -> Optional[str]:
+def calculate_ttl(
+    updated_time: str, severity: str, config: AppConfig, vault_name: Optional[str] = None
+) -> Optional[str]:
     """
     Calculate the expiry date (TTL) for a secret.
 
@@ -133,6 +135,7 @@ def calculate_ttl(updated_time: str, severity: str, config: AppConfig) -> Option
         updated_time: The secret's metadata.updated_time from Vault (ISO 8601).
         severity: The resolved severity profile name.
         config: Application configuration containing expiry profiles.
+        vault_name: The secret's vault, whose date_format the TTL is written in.
 
     Returns:
         Calculated TTL as a date string, or None if calculation fails.
@@ -152,7 +155,8 @@ def calculate_ttl(updated_time: str, severity: str, config: AppConfig) -> Option
         logger.warning("Expiry date for updated_time %s is after year 9999", updated_time)
         return None
 
-    return format_date(expiry_dt, config.date_format)
+    # The vault's own date_format, the same one the API reads the TTL with (0.7.1: was always the global one)
+    return format_date(expiry_dt, config.resolve_date_format(vault_name))
 
 
 def sync_secret_metadata(
@@ -210,7 +214,7 @@ def sync_secret_metadata(
     # Calculate the desired TTL from config, counting from a confirmed applied date when it is later (ADR-021)
     from chronowarden.confirmations import rotation_base  # here: confirmations imports parse_date from this module
 
-    desired_ttl = calculate_ttl(rotation_base(db, identity, updated_time), severity, config)
+    desired_ttl = calculate_ttl(rotation_base(db, identity, updated_time), severity, config, vault_name)
 
     # Determine if the remote backend needs updating
     remote_needs_update = False

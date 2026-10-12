@@ -137,6 +137,14 @@ class TestChain:
         }
 
 
+def test_iteration_crosses_batches(db: Database) -> None:
+    """The export and verify read the log in batches; the chain must not break at batch boundaries."""
+    for n in range(7):
+        db.append_audit_event("test.a", "api", after={"n": n})
+    assert [e["id"] for e in db.iter_audit_events(batch=3)] == list(range(1, 8))
+    assert verify_chain(db.iter_audit_events(batch=3)).valid
+
+
 class TestListing:
     def test_filters_and_paging(self, client: TestClient, db: Database) -> None:
         for n in range(5):

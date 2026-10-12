@@ -4,15 +4,17 @@
 
 import logging
 import os
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from importlib.metadata import metadata, version
 from pathlib import Path
 from typing import AsyncIterator, Optional
 
 import sentry_sdk
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import FileResponse
+from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
+from starlette.responses import FileResponse, Response
 
 from chronowarden.api import (
     audit_router,
@@ -30,6 +32,7 @@ from chronowarden.config import AppConfig, load_config
 from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
 from chronowarden.logging_config import configure_logging
+from chronowarden.request_guard import guard_requests
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -39,6 +42,10 @@ configure_logging()
 vault_manager = VaultManager()
 db = Database()
 app_config = AppConfig()
+
+
+# Vault credential names the Sentry scrubber must also redact, at any depth
+_SENTRY_EXTRA_DENYLIST = ["x-vault-token", "client_token", "role_id", "secret_id", "token_file", "secret_id_file"]
 
 
 def _configure_sentry(config: AppConfig) -> None:
@@ -52,6 +59,10 @@ def _configure_sentry(config: AppConfig) -> None:
         # Off by default: request headers and client IPs are PII and Chronowarden targets regulated users.
         # See https://docs.sentry.io/platforms/python/data-management/data-collected/
         send_default_pii=False,
+        # Frame locals would carry the Vault token: hvac keeps it in the request headers of the failing call, and
+        # AppRole logins keep role_id/secret_id; the default scrubber doesn't look inside nested values (0.7.1).
+        include_local_variables=False,
+        event_scrubber=EventScrubber(recursive=True, denylist=[*DEFAULT_DENYLIST, *_SENTRY_EXTRA_DENYLIST]),
         enable_logs=True,
         # Sampling off by default; opt in via config for tracing and profiling.
         traces_sample_rate=config.sentry_traces_sample_rate,
@@ -112,6 +123,14 @@ app = FastAPI(
 )
 
 # Include routers
+
+
+@app.middleware("http")
+async def _guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """Refuse cross-site writes and Hosts outside allowed_hosts (0.7.1)."""
+    return await guard_requests(request, call_next, app_config.allowed_hosts)
+
+
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(secrets_router, prefix="/api/v1")
 app.include_router(vault_router, prefix="/api/v1")

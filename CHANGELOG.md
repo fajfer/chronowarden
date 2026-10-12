@@ -12,6 +12,45 @@ Before 1.0, minor versions may contain breaking changes; they are marked **Break
 Releases before 0.6.0 are described in the [GitHub releases](https://github.com/fajfer/chronowarden/releases) and the
 git history.
 
+## [0.7.1] - 2026-10-12
+
+Security release from an audit of 0.7.0. **Upgrade now if `sentry_dsn` is set**, and then rotate Chronowarden's
+Vault credentials.
+
+### Security
+
+- **Vault credentials could reach Sentry (High, when `sentry_dsn` is set; all releases with Sentry support).** Sentry
+  captured the local variables of each stack frame. When a Vault call failed (for example a 403 from a policy gap),
+  the reported frames included the HTTP headers holding the Vault token, and AppRole logins held `role_id` and
+  `secret_id`. Sentry's scrubber doesn't look inside such nested values. Chronowarden no longer sends frame locals,
+  and redacts Vault credential names at any depth. **If you had `sentry_dsn` set: rotate the Vault token or the
+  AppRole `secret_id` Chronowarden uses, and delete Chronowarden's events in Sentry.**
+- **Other web pages could change Chronowarden through an operator's browser (Medium).** Body-less writes (revert an
+  audit event, start a sync) could be triggered by a plain HTML form on any site the operator visited. Cross-site
+  writes are now refused (`Sec-Fetch-Site`, else `Origin` must match `Host`). Requests without these headers (curl,
+  pipelines) work as before. The new `allowed_hosts` setting also stops DNS rebinding; set it to your host names.
+- **A CMDB link could run JavaScript (Medium-Low).** A system's `cmdb_uri` is shown as a link; a `javascript:` URL
+  ran in Chronowarden's page when clicked. Only `http://` and `https://` links are accepted and rendered.
+- **Formulas in the snapshot CSV export (Medium-Low).** System, owner or secret names starting with `=`, `+`, `-`
+  or `@` could run as formulas when the CSV was opened in a spreadsheet. Such cells are now prefixed with `'`. The
+  JSON export, which the snapshot hash covers, is unchanged.
+- The unused `get_secret` method, the only code that could read secret values, is removed (ADR-004).
+
+### Fixed
+
+- **A vault's own `date_format` shifted expiry.** The TTL was written in the global format but read in the vault's,
+  so with `date_format: YYYY-DD-MM` on a vault, a TTL of 1 March was read as 3 January. Sync rewrites affected TTLs.
+- Deleting a notification route checked only that the owner existed, so any owner's URL could delete any route;
+  unknown routes now give `404`.
+- "Test route" said a notification was sent (nothing is sent before webhook alerting in 0.8) and logged the webhook
+  URL, which can be a credential. It now says nothing was sent and logs nothing.
+- The audit log export and chain check read the log in batches instead of loading it into memory at once.
+
+### Changed
+
+- Owner and route fields have length limits (name 200, email 320, webhook address and template 2000).
+- New option `allowed_hosts` (default `["*"]`).
+
 ## [0.7.0] - 2026-10-12
 
 Milestone [0.7 Compliance evidence](https://github.com/fajfer/chronowarden/milestone/4): Chronowarden now produces
@@ -213,6 +252,7 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
+[0.7.1]: https://github.com/fajfer/chronowarden/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/fajfer/chronowarden/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/fajfer/chronowarden/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/fajfer/chronowarden/compare/v0.6.1...v0.6.2

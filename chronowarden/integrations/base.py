@@ -25,19 +25,6 @@ class BaseIntegration(BaseModel):
         """Close connection to the secret backend."""
         pass
 
-    def get_secret(self, path: str, key: Optional[str] = None) -> Optional[dict[str, Any]]:
-        """
-        Retrieve a secret from the backend.
-
-        Args:
-            path: Path to the secret.
-            key: Optional specific key within the secret.
-
-        Returns:
-            The secret data or None if not found.
-        """
-        pass
-
     def list_secrets(self, path: str) -> list[str]:
         """
         List secrets at the given path.

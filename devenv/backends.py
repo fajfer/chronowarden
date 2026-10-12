@@ -5,6 +5,7 @@
 """The two dev backends Chronowarden is tested against, and their seed data."""
 
 import random
+import secrets
 import string
 from dataclasses import dataclass
 
@@ -62,8 +63,8 @@ BACKENDS = (OPENBAO, VAULT)
 
 
 def random_token() -> str:
-    """A throwaway dev root token."""
-    return "dev-" + "".join(random.choices(string.ascii_lowercase + string.digits, k=24))
+    """A throwaway dev root token (from a CSPRNG, though the server only listens on 127.0.0.1)."""
+    return "dev-" + secrets.token_urlsafe(24)
 
 
 def seed(client: hvac.Client) -> None:

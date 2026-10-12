@@ -421,6 +421,11 @@ class AppConfig(BaseModel):
     ui: UiConfig = Field(default_factory=UiConfig, description="Instance-wide UI settings")
     metrics: MetricsConfig = Field(default_factory=MetricsConfig, description="Prometheus metrics (off by default)")
     compliance: ComplianceConfig = Field(default_factory=ComplianceConfig, description="Compliance evidence settings")
+    allowed_hosts: list[str] = Field(
+        default_factory=lambda: ["*"],
+        description="Host names Chronowarden answers to (e.g. chronowarden.example.com, *.example.com); "
+        "set it to stop DNS rebinding from other web pages",
+    )
 
     @field_validator("confirmation_grace")
     @classmethod

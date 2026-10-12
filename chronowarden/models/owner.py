@@ -13,9 +13,10 @@ class NotificationRouteBase(BaseModel):
     """Base notification route model."""
 
     type: Literal["webhook"] = Field(description="Route type; only 'webhook' (email was removed in 0.7, ADR-022)")
-    address: str = Field(description="Webhook URL")
+    address: str = Field(max_length=2000, description="Webhook URL")
     message_template: str = Field(
         default="Secret {secret_name} in {vault} expires in {days_until_expiry} days",
+        max_length=2000,
         description="Notification message template",
     )
 
@@ -37,8 +38,8 @@ class NotificationRouteCreate(NotificationRouteBase):
 class OwnerBase(BaseModel):
     """Base owner model."""
 
-    name: str = Field(description="Owner display name")
-    email: str = Field(description="Owner email address")
+    name: str = Field(max_length=200, description="Owner display name")
+    email: str = Field(max_length=320, description="Owner email address")
 
 
 class Owner(OwnerBase):
@@ -58,5 +59,5 @@ class OwnerCreate(OwnerBase):
 class OwnerUpdate(BaseModel):
     """Schema for updating an owner."""
 
-    name: Optional[str] = None
-    email: Optional[str] = None
+    name: Optional[str] = Field(default=None, max_length=200)
+    email: Optional[str] = Field(default=None, max_length=320)
