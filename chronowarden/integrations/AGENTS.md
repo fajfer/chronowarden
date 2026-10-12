@@ -20,7 +20,7 @@ OpenBao (KV v2) via `hvac`.
 ## Contracts
 
 - `BaseIntegration` methods: `connect() -> bool`, `disconnect()`, `is_connected() -> bool`,
-  `list_secrets(path)`, `get_secret_metadata(path)`, `get_secret(path, key)`.
+  `list_secrets(path)`, `get_secret_metadata(path)`.
 - Used by sync and the API on top of the base: `VaultIntegration.write_secret_metadata`, `discover_engines`
   (KV v2 only), `check_health`, `last_error`, `last_error_kind`. `mount_point=` overrides the engine per call.
 - `last_error_kind` is one of `auth` (not retried), `offline` / `vault` / `unexpected` (retried by the loop).
@@ -52,8 +52,7 @@ OpenBao (KV v2) via `hvac`.
 
 - `BaseIntegration` is a pydantic `BaseModel` whose methods just `pass`; it is not an ABC, so nothing enforces the
   interface.
-- `VaultIntegration.get_secret` exists but no API exposes it (the value-reading endpoint was removed in `ac38af9`).
-  Don't wire it up.
+- There is no method that reads secret values (`get_secret` was removed in 0.7.1, ADR-004); never add one.
 - `get_secret_metadata` returns `None` for `InvalidPath`; `list_secrets` keys ending in `/` are folders (sync
   recurses). By default `list_secrets` returns `[]` on any error; sync calls it with `strict=True`, which raises
   instead (only `InvalidPath` stays `[]`: an engine whose last secret was deleted), so a failed listing never looks

@@ -228,46 +228,6 @@ class VaultIntegration(BaseIntegration):
             logger.exception("Unexpected error checking Vault connection at %s", self._address)
             return False
 
-    def get_secret(
-        self, path: str, key: Optional[str] = None, mount_point: Optional[str] = None
-    ) -> Optional[dict[str, Any]]:
-        """
-        Retrieve a secret from Vault KV v2 engine.
-
-        Args:
-            path: Path to the secret within the mount point.
-            key: Optional specific key to retrieve from the secret.
-            mount_point: Override the default mount point for this request.
-
-        Returns:
-            The secret data dictionary or None if not found.
-        """
-        if not self._client:
-            logger.error("Not connected to Vault")
-            return None
-
-        mount = mount_point if mount_point is not None else self._mount_path
-
-        try:
-            response = self._client.secrets.kv.v2.read_secret_version(
-                path=path,
-                mount_point=mount,
-            )
-
-            if response and "data" in response and "data" in response["data"]:
-                data = response["data"]["data"]
-                if key:
-                    return {key: data.get(key)} if key in data else None
-                return data
-
-            return None
-        except InvalidPath:
-            logger.warning("Secret not found at path: %s", path)
-            return None
-        except VaultError:
-            logger.exception("Error retrieving secret from Vault")
-            return None
-
     def list_secrets(self, path: str, mount_point: Optional[str] = None, strict: bool = False) -> list[str]:
         """
         List secrets at the given path in Vault.
