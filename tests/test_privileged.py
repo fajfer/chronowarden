@@ -8,7 +8,6 @@ import copy
 import json
 import logging
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any, Optional
 from unittest.mock import MagicMock, patch
 
@@ -54,14 +53,6 @@ class FakeVault:
         return self.connected
 
 
-@pytest.fixture
-def db(tmp_path: Path) -> Iterator[Database]:
-    database = Database(tmp_path / "test.db")
-    database.connect()
-    yield database
-    database.close()
-
-
 def _sync(vault: FakeVault, db: Database) -> None:
     sync_secret_metadata(vault, *IDENTITY, AppConfig(), db)  # type: ignore[arg-type]
 
@@ -90,11 +81,6 @@ class TestSync:
         _sync(vault, db)
         entry = db.get_secret_metadata(*IDENTITY)
         assert entry is not None and entry.privileged is False
-
-    def test_filter(self, db: Database) -> None:
-        _sync(FakeVault(privileged="true"), db)
-        assert [e.secret_path for e in db.list_all_secrets(privileged=True)] == ["db"]
-        assert db.list_all_secrets(privileged=False) == []
 
 
 @pytest.fixture

@@ -36,6 +36,7 @@ class TestOwnerDatabase:
         assert owner is not None
         assert owner["name"] == "Alice"
         assert owner["email"] == "alice@example.com"
+        assert owner["created_at"] is not None
 
     def test_list_owners(self) -> None:
         """Test listing owners."""
@@ -70,6 +71,7 @@ class TestOwnerDatabase:
         assert len(routes) == 1
         assert routes[0]["type"] == "webhook"
         assert routes[0]["address"] == "https://hooks.example.com/alice"
+        assert routes[0]["message_template"] == "Test: {secret_name}"
 
     def test_delete_notification_route(self) -> None:
         """Test deleting a notification route."""
@@ -159,15 +161,6 @@ class TestOwnerDatabase:
         routes = self.db.list_notification_routes("nonexistent")
         assert routes == []
 
-    def test_notification_route_message_template(self) -> None:
-        """Test that notification route preserves the message template."""
-        self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        template = "Secret {secret_name} in {vault} expires in {days_until_expiry} days"
-        self.db.create_notification_route("route-1", "owner-1", "webhook", "https://hooks.example.com/alice", template)
-        routes = self.db.list_notification_routes("owner-1")
-        assert len(routes) == 1
-        assert routes[0]["message_template"] == template
-
     def test_list_owners_empty(self) -> None:
         """Test listing owners when none exist returns empty list."""
         owners = self.db.list_owners()
@@ -180,13 +173,6 @@ class TestOwnerDatabase:
     def test_delete_nonexistent_notification_route(self) -> None:
         """Test deleting a nonexistent route does not raise."""
         self.db.delete_notification_route("nonexistent")
-
-    def test_owner_has_created_at(self) -> None:
-        """Test that created_at is populated automatically."""
-        self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        owner = self.db.get_owner("owner-1")
-        assert owner is not None
-        assert owner["created_at"] is not None
 
 
 class TestOwnersAPI:

@@ -8,7 +8,6 @@ import hashlib
 import json
 import sqlite3
 from collections.abc import Iterator
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -28,15 +27,13 @@ UI = {"X-Chronowarden-Client": "ui"}
 
 
 @pytest.fixture
-def db(tmp_path: Path) -> Iterator[Database]:
+def db(db: Database) -> Database:
     """A migrated database with one cached secret and two owners."""
-    database = Database(tmp_path / "test.db")
-    database.connect()
+    database = db  # the shared fixture from conftest.py, seeded here
     database.upsert_secret_metadata(SecretMetadataCache(vault_name="prod", engine_id="apps", secret_path="db"))
     database.create_owner("alice", "Alice", "alice@example.com")
     database.create_owner("bob", "Bob", "bob@example.com")
-    yield database
-    database.close()
+    return database
 
 
 @pytest.fixture

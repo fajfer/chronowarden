@@ -6,11 +6,7 @@
 
 import copy
 import json
-from collections.abc import Iterator
-from pathlib import Path
 from typing import Any, Optional
-
-import pytest
 
 from chronowarden.config import AppConfig
 from chronowarden.database import Database
@@ -47,14 +43,6 @@ class FakeVault:
         self.metadata["current_version"] = version
         self.metadata["updated_time"] = created
         self.metadata["versions"][str(version)] = {"created_time": created}
-
-
-@pytest.fixture
-def db(tmp_path: Path) -> Iterator[Database]:
-    database = Database(tmp_path / "test.db")
-    database.connect()
-    yield database
-    database.close()
 
 
 def _sync(vault: FakeVault, db: Database) -> None:

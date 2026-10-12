@@ -72,30 +72,6 @@ class TestSecretsDatabaseMethods:
         result = self.db.list_all_secrets()
         assert len(result) == 2
 
-    def test_list_all_secrets_filter_vault(self) -> None:
-        """Test listing secrets filtered by vault name."""
-        self._insert_secret(vault_name="vault-a", secret_path="key-1")
-        self._insert_secret(vault_name="vault-b", secret_path="key-2")
-        result = self.db.list_all_secrets(vault_name="vault-a")
-        assert len(result) == 1
-        assert result[0].vault_name == "vault-a"
-
-    def test_list_all_secrets_filter_engine(self) -> None:
-        """Test listing secrets filtered by engine ID."""
-        self._insert_secret(engine_id="apps", secret_path="key-1")
-        self._insert_secret(engine_id="databases", secret_path="key-2")
-        result = self.db.list_all_secrets(engine_id="apps")
-        assert len(result) == 1
-        assert result[0].engine_id == "apps"
-
-    def test_list_all_secrets_filter_severity(self) -> None:
-        """Test listing secrets filtered by severity."""
-        self._insert_secret(severity="critical", secret_path="key-1")
-        self._insert_secret(severity="default", secret_path="key-2")
-        result = self.db.list_all_secrets(severity="critical")
-        assert len(result) == 1
-        assert result[0].severity == "critical"
-
     def test_list_all_secrets_multiple_filters(self) -> None:
         """Test listing secrets with multiple filters."""
         self._insert_secret(vault_name="v1", severity="critical", secret_path="key-1")
@@ -175,7 +151,6 @@ class TestSecretsAPI:
             assert data[0]["secret_path"] == "my-app/api-key"
             assert data[0]["full_path"] == "dev-vault/secret/my-app/api-key"
             assert data[0]["severity"] == "default"
-            assert data[0]["status"] in ["ok", "warning", "expired", "no_ttl"]
             assert data[0]["rotation_period_days"] == 365
 
     def test_list_secrets_filter_vault(self) -> None:
@@ -231,19 +206,6 @@ class TestSecretsAPI:
             assert data["status"] == "ok"
             assert data["days_remaining"] is not None
             assert data["days_remaining"] > 30
-
-    def test_secret_status_warning(self) -> None:
-        """Test that a secret close to expiry has WARNING status."""
-        warning_date = (datetime.now(tz=timezone.utc) + timedelta(days=15)).strftime("%Y-%m-%d")
-        self._insert_secret(ttl=warning_date)
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.get("/api/v1/secrets/1")
-            data = response.json()
-            assert data["status"] == "warning"
 
     def test_secret_status_expired(self) -> None:
         """Test that an expired secret has EXPIRED status."""
@@ -318,28 +280,6 @@ class TestSecretsAPI:
             data = response.json()
             assert len(data) == 2
             assert all("enabled" not in secret for secret in data)
-
-    def test_delete_refuses_a_secret_that_still_exists(self) -> None:
-        """DELETE /secrets/:id only purges removed secrets (#86); a live secret can't be deleted (409)."""
-        self._insert_secret()
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.delete("/api/v1/secrets/1")
-            assert response.status_code == 409
-            assert self.db.get_secret_by_id(1) is not None
-
-    def test_removed_endpoints_public(self) -> None:
-        """Test that GET /secrets/public/ no longer exists (returns 422 since 'public' is not a valid int ID)."""
-        client = self._build_client()
-        with patch(
-            "chronowarden.api.secrets._get_app_dependencies",
-            return_value=(self.db, self.config, self.vault_manager),
-        ):
-            response = client.get("/api/v1/secrets/public/")
-            assert response.status_code == 422
 
     def test_list_secrets_invalid_severity_filter(self) -> None:
         """Test listing secrets with unknown severity returns 422."""

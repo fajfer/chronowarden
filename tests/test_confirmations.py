@@ -7,7 +7,6 @@
 import json
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -37,10 +36,9 @@ def _iso(dt: datetime) -> str:
 
 
 @pytest.fixture
-def db(tmp_path: Path) -> Iterator[Database]:
+def db(db: Database) -> Database:
     """A secret at version 1 (created 2026-01-01), cached with the default 365d profile."""
-    database = Database(tmp_path / "test.db")
-    database.connect()
+    database = db  # the shared fixture from conftest.py, seeded here
     database.upsert_secret_metadata(
         SecretMetadataCache(
             vault_name="prod",
@@ -52,8 +50,7 @@ def db(tmp_path: Path) -> Iterator[Database]:
         )
     )
     _set_version(database, 1, UPDATED)
-    yield database
-    database.close()
+    return database
 
 
 def _set_version(db: Database, version: int, created: str) -> None:
