@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-"""Record configuration changes that affect secrets (severity cascade, expiry profiles) in the audit log."""
+"""Record configuration changes that affect secrets (severity cascade, expiry profiles, policies) in the audit log."""
 
 import json
 import logging
@@ -24,9 +24,10 @@ def secret_affecting_config(config: AppConfig) -> dict[str, Any]:
         config: The loaded configuration.
 
     Returns:
-        Expiry profiles and the per-vault severity cascade.
+        Expiry profiles, the per-vault severity cascade and, when any are configured, the compliance policies
+        (ADR-019). Leaving the key out without policies keeps upgrades from recording a change.
     """
-    return {
+    affecting: dict[str, Any] = {
         "expiry_profiles": {name: profile.model_dump() for name, profile in sorted(config.expiry_profiles.items())},
         "vaults": [
             {
@@ -37,6 +38,9 @@ def secret_affecting_config(config: AppConfig) -> dict[str, Any]:
             for vault in config.vaults
         ],
     }
+    if config.compliance.policies:
+        affecting["compliance_policies"] = [policy.model_dump() for policy in config.compliance.policies]
+    return affecting
 
 
 def record_config_change(db: Any, config: AppConfig) -> None:

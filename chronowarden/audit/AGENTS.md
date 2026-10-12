@@ -41,7 +41,8 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
   backend), `compliance.snapshot` (subject `snapshot:<id>`).
 - Secret events are keyed by identity (`vault_name`, `engine_id`, `secret_path`), so history survives a rebuilt
   cache (ADR-017). Unchanged values record nothing.
-- Config events store only expiry profiles and the severity cascade, never addresses or credentials.
+- Config events store only expiry profiles, the severity cascade and compliance policies (key left out when there
+  are none), never addresses or credentials.
 - Revert (`POST /audit/events/{id}/revert`) restores `before` for `secret.system` / `secret.owners`, and revokes
   the confirmation of a `secret.confirmed` event (TTL recalculated), only while the event's `after` is still current; the new event's `after` carries `"reverts": <id>`. Everything else is 422:
   backend data isn't Chronowarden's to change (ADR-004), severity/TTL come from config (ADR-006).
