@@ -13,12 +13,13 @@ from typing import Optional
 
 from uvicorn.config import LOGGING_CONFIG
 
+from chronowarden.alerting.delivery import deliver_due
 from chronowarden.audit.config_events import record_config_change
 from chronowarden.config import ConfigError, load_config
 from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
 from chronowarden.logging_config import configure_logging
-from chronowarden.scheduler import sync_connected
+from chronowarden.scheduler import sync_and_alert
 
 EXIT_OK = 0
 EXIT_NOT_ALL_SYNCED = 1
@@ -46,7 +47,9 @@ async def sync_once(config_path: Optional[str]) -> int:
     database.connect()
     try:
         record_config_change(database, config)
-        results = await sync_connected(manager, config, database)
+        results = await sync_and_alert(manager, config, database)
+        # Webhooks queued by this run go out before it exits; failed ones wait for the next run or the server
+        await asyncio.to_thread(deliver_due, database, config)
     finally:
         database.close()
         manager.disconnect_all()

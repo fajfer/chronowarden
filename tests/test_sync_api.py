@@ -5,6 +5,7 @@
 """Tests for the sync API: reconnect loop, reconnect-first sync and locking."""
 
 import asyncio
+from collections.abc import Iterator
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +16,13 @@ from fastapi.testclient import TestClient
 from chronowarden.api.cooldown import Cooldown
 from chronowarden.api.sync import router
 from chronowarden.config import AppConfig
+
+
+@pytest.fixture(autouse=True)
+def no_alert_evaluation() -> Iterator[None]:
+    """These tests use a mock database; alert evaluation after a sync is tested in test_alerting.py."""
+    with patch("chronowarden.api.sync.evaluate_inventory"):
+        yield
 
 
 def _build_client() -> TestClient:

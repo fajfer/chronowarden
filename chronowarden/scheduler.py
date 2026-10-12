@@ -6,8 +6,10 @@
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any, Optional
 
+from chronowarden.alerting.engine import evaluate_vaults
 from chronowarden.api.sync import sync_vault_now
 
 logger = logging.getLogger("uvicorn.error")
@@ -34,6 +36,30 @@ async def sync_connected(manager: Any, config: Any, database: Any) -> dict[str, 
         except Exception:  # top level of a background job: one vault's failure must not stop the others
             logger.exception("Sync of vault '%s' failed", name)
             results[name] = None
+    return results
+
+
+def unreachable_vaults(manager: Any, results: dict[str, Optional[int]]) -> dict[str, tuple[str, Optional[str]]]:
+    """The vaults that weren't synced because Chronowarden can't reach them: name → (reason, error)."""
+    unreachable: dict[str, tuple[str, Optional[str]]] = {}
+    for name, count in results.items():
+        vault = manager.get(name)
+        if count is None and vault is not None and vault.last_error_kind is not None:
+            unreachable[name] = (vault.last_error_kind, vault.last_error)
+    return unreachable
+
+
+async def sync_and_alert(manager: Any, config: Any, database: Any) -> dict[str, Optional[int]]:
+    """Sync every connected vault, then evaluate vault health for webhooks (inventory alerts follow each sync)."""
+    results = await sync_connected(manager, config, database)
+    await asyncio.to_thread(
+        evaluate_vaults,
+        database,
+        config,
+        unreachable_vaults(manager, results),
+        set(results),
+        datetime.now(tz=timezone.utc),
+    )
     return results
 
 
@@ -65,7 +91,7 @@ class SyncScheduler:
     async def _run(self, interval: int) -> None:
         await asyncio.sleep(self._startup_delay)
         while True:
-            results = await sync_connected(self._manager, self._config, self._database)
+            results = await sync_and_alert(self._manager, self._config, self._database)
             synced = {name: count for name, count in results.items() if count is not None}
             skipped = sorted(name for name, count in results.items() if count is None)
             logger.info(

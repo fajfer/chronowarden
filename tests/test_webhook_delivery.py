@@ -4,6 +4,7 @@
 
 """Tests for webhook signing and delivery against a local receiver (#99, ADR-025)."""
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -20,6 +21,7 @@ from chronowarden.alerting.delivery import deliver_due
 from chronowarden.alerting.signing import generate_secret
 from chronowarden.config import AppConfig
 from chronowarden.database import Database
+from chronowarden.scheduler import sync_and_alert
 
 NOW = datetime(2026, 10, 12, 12, 0, tzinfo=UTC)
 
@@ -140,3 +142,76 @@ def test_deleted_route_fails_the_delivery(db: Database) -> None:
     deliver_due(db, AppConfig(), NOW)
     [delivery] = db.list_deliveries()
     assert (delivery["status"], delivery["last_error"]) == ("failed", "the route was deleted")
+
+
+class OneSecretVault:
+    """A connected backend with one secret last rotated in 2020 (expired under the default 365d profile)."""
+
+    last_error_kind = None
+    last_error = None
+
+    def is_connected(self) -> bool:
+        return True
+
+    def discover_engines(self) -> list[dict[str, Any]]:
+        return [{"path": "apps", "type": "kv", "options": {"version": "2"}}]
+
+    def list_secrets(self, path: str, mount_point: str | None = None, strict: bool = False) -> list[str]:
+        return ["db"] if path == "" else []
+
+    def get_secret_metadata(self, path: str, mount_point: str | None = None) -> dict[str, Any]:
+        return {
+            "custom_metadata": {},
+            "updated_time": "2020-01-01T00:00:00Z",
+            "current_version": 1,
+            "versions": {"1": {"created_time": "2020-01-01T00:00:00Z"}},
+        }
+
+    def write_secret_metadata(self, path: str, fields: dict[str, str], mount_point: str | None = None) -> bool:
+        return True
+
+
+class OneVaultManager:
+    def __init__(self, vault: Any) -> None:
+        self.vault = vault
+        self._locks: dict[str, Any] = {}
+
+    @property
+    def vault_names(self) -> list[str]:
+        return ["prod"]
+
+    def get(self, name: str) -> Any:
+        return self.vault if name == "prod" else None
+
+    def sync_lock(self, name: str) -> Any:
+        return self._locks.setdefault(name, asyncio.Lock())
+
+
+def test_a_sync_of_an_expired_secret_sends_one_webhook(db: Database, receiver: Receiver) -> None:
+    """Spec task 6: sync → evaluate → queue → deliver; a second sync within repeat_interval sends nothing."""
+    config = AppConfig.model_validate(
+        {
+            "vaults": [{"name": "prod", "address": "http://v:8200", "token": "t"}],
+            "alerting": {"default_routes": [{"name": "ops", "url": receiver.url}]},
+        }
+    )
+    manager = OneVaultManager(OneSecretVault())
+    asyncio.run(sync_and_alert(manager, config, db))
+    deliver_due(db, config)
+    assert [json.loads(r["body"])["alerts"][0]["labels"]["alertname"] for r in receiver.requests] == ["SecretExpired"]
+    asyncio.run(sync_and_alert(manager, config, db))
+    deliver_due(db, config)
+    assert len(receiver.requests) == 1
+
+
+def test_an_unreachable_vault_alerts_the_default_routes(db: Database, receiver: Receiver) -> None:
+    vault = OneSecretVault()
+    vault.is_connected = lambda: False  # type: ignore[method-assign]
+    vault.last_error_kind = "offline"  # type: ignore[assignment]
+    vault.last_error = "Vault at http://v:8200 appears to be offline"  # type: ignore[assignment]
+    config = AppConfig.model_validate({"alerting": {"default_routes": [{"name": "ops", "url": receiver.url}]}})
+    asyncio.run(sync_and_alert(OneVaultManager(vault), config, db))
+    deliver_due(db, config)
+    [request] = receiver.requests
+    alert = json.loads(request["body"])["alerts"][0]
+    assert alert["labels"] == {"alertname": "VaultUnreachable", "vault": "prod", "reason": "offline"}

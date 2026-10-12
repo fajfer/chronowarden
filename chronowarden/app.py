@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
 from starlette.responses import FileResponse, Response
 
+from chronowarden.alerting.delivery import DeliveryWorker
 from chronowarden.api import (
     audit_router,
     compliance_router,
@@ -85,6 +86,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan handler for startup and shutdown events."""
     global app_config
     scheduler: Optional[SyncScheduler] = None
+    deliveries: Optional[DeliveryWorker] = None
     try:
         app_config = load_config()
         _configure_sentry(app_config)
@@ -101,6 +103,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         vault_manager.start_reconnect_loop()
         scheduler = SyncScheduler(vault_manager, app_config, db)
         scheduler.start()
+        deliveries = DeliveryWorker(db, app_config)
+        deliveries.start()
         yield
     except Exception:
         logger.exception("Chronowarden startup failed")
@@ -108,6 +112,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         if scheduler is not None:
             scheduler.stop()
+        if deliveries is not None:
+            deliveries.stop()
         db.close()
         vault_manager.disconnect_all()
         logger.info("Chronowarden shutdown complete")
