@@ -16,8 +16,11 @@ frozen, hashed snapshots. Chronowarden stores **no review state** (no checkboxes
   `2026-H2`, `2026`; bounds `[start, end)` in UTC).
 - `evidence.py`: `in_scope`, `gaps_of` (`GAP_TYPES`), `summary`, `snapshot_row`, `build_document`, `rows_to_csv`.
   Pure functions over enriched `SecretMetadataResponse`s.
-- `../api/compliance.py`: `/compliance/settings`, `/summary`, `/gaps`, `/periods`, `/snapshots` (+ `.json`, `.csv`).
-- `../models/compliance.py`, config models `ComplianceScope`, `ReportingCadence` in `../config.py`.
+- `policies.py`: `in_control_scope`, `fails`, `rag`, `evaluate_policy` (ADR-019). Pure functions.
+- `../api/compliance.py`: `/compliance/settings`, `/summary`, `/gaps`, `/periods`, `/snapshots` (+ `.json`, `.csv`),
+  `/policies`, `/policies/{id}/evaluation` (now, plus the trend from snapshots).
+- `../models/compliance.py`, config models `ComplianceScope`, `ReportingCadence`, `CompliancePolicy`,
+  `PolicyControl`, `ControlScope`, `ControlThresholds` and the rule models in `../config.py`.
 
 ## Contracts
 
@@ -26,7 +29,8 @@ frozen, hashed snapshots. Chronowarden stores **no review state** (no checkboxes
 - Table `compliance_snapshots` (migration 9): triggers abort UPDATE/DELETE. A correction is a new snapshot with
   `supersedes`; closing a closed period without `supersedes` = latest id is 409.
 - Snapshot document = canonical JSON (`audit.chain.canonical_json`) of `{format, created_at, label, cadence,
-  period, scope, supersedes, audit: {events, head_hash}, rows}`; `sha256` is over its UTF-8 bytes and `GET .json`
+  period, scope, supersedes, audit: {events, head_hash}, rows, policies}` (format 2; format 1 has no
+  `policies`); `sha256` is over its UTF-8 bytes and `GET .json`
   returns exactly those bytes (`X-Content-SHA256`). The audit head anchors the log against truncation.
 - Rows: identity, severity, status, TTL, last rotation (`updated_time`), system (name, CMDB URI, asset number),
   effective owner names, privileged, `removed_at`, last confirmed applied date, awaiting confirmation (null where
@@ -34,6 +38,11 @@ frozen, hashed snapshots. Chronowarden stores **no review state** (no checkboxes
 - Gaps (`no_owner`, `no_system`, `expired`, `no_ttl`, `privileged_without_owner`, `awaiting_confirmation`) are shown
   before freezing and never stored in snapshots.
 - Every snapshot is a `compliance.snapshot` audit event (subject `snapshot:<id>`).
+- Policies (`compliance.policies`, ADR-019) are evaluated over the secrets still in the backend (removed ones are
+  skipped). A result carries the policy's and each control's definition, so a snapshot can be reported on after the
+  config changes. Rules: `max_rotation_age` (unknown rotation fails), `not_expired`, `has_owner` (effective owners),
+  `has_system`, `rotation_confirmed` (fails only when overdue). RAG: no thresholds = one failure is red; nothing in
+  scope is green. Failing secrets list the full path and owner names, never values.
 
 ## How to
 

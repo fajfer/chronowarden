@@ -13,7 +13,7 @@ from chronowarden.audit.chain import canonical_json
 from chronowarden.config import ComplianceScope
 from chronowarden.models.secret import SecretMetadataResponse
 
-SNAPSHOT_FORMAT = 1
+SNAPSHOT_FORMAT = 2  # 2: per-policy results (ADR-019)
 
 GAP_TYPES = ("no_owner", "no_system", "expired", "no_ttl", "privileged_without_owner", "awaiting_confirmation")
 
@@ -123,6 +123,7 @@ def build_document(
     cadence: Optional[str] = None,
     period: Optional[str] = None,
     supersedes: Optional[int] = None,
+    policies: Optional[list[dict[str, Any]]] = None,
 ) -> tuple[str, str]:
     """
     Build a snapshot's canonical JSON and its SHA-256.
@@ -140,6 +141,7 @@ def build_document(
         "supersedes": supersedes,
         "audit": audit_head,
         "rows": sorted(rows, key=lambda r: (r["vault"], r["engine"], r["path"])),
+        "policies": policies or [],
     }
     text = canonical_json(document)
     return text, hashlib.sha256(text.encode("utf-8")).hexdigest()

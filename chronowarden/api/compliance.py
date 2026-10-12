@@ -8,6 +8,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+import yaml
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from chronowarden.api.audit import request_source
@@ -22,9 +23,20 @@ from chronowarden.compliance.evidence import (
     summary,
 )
 from chronowarden.compliance.periods import ended_periods, period_by_id
-from chronowarden.config import AppConfig, ComplianceScope
+from chronowarden.compliance.policies import evaluate_policy
+from chronowarden.config import AppConfig, CompliancePolicy, ComplianceScope
 from chronowarden.metadata import parse_date
-from chronowarden.models.compliance import GapEntry, GapReport, PeriodStatus, Snapshot, SnapshotCreate, SnapshotInfo
+from chronowarden.models.compliance import (
+    GapEntry,
+    GapReport,
+    PeriodStatus,
+    PolicyDefinition,
+    PolicyEvaluation,
+    PolicyTrendPoint,
+    Snapshot,
+    SnapshotCreate,
+    SnapshotInfo,
+)
 from chronowarden.timestamps import utc_timestamp
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
@@ -242,6 +254,7 @@ async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInf
         cadence=data.cadence,
         period=data.period,
         supersedes=data.supersedes,
+        policies=[evaluate_policy(policy, secrets, now) for policy in config.compliance.policies],
     )
     snapshot_id = database.add_snapshot(
         created_at, content, sha256, len(secrets), data.label, data.cadence, data.period, data.supersedes
@@ -262,6 +275,67 @@ async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInf
         },
     )
     return SnapshotInfo(**{k: v for k, v in database.get_snapshot(snapshot_id).items() if k != "content"})
+
+
+def _require_policy(config: AppConfig, policy_id: str) -> CompliancePolicy:
+    """
+    Return a configured policy.
+
+    Raises:
+        HTTPException: 404 if no policy has this id.
+    """
+    policy = next((p for p in config.compliance.policies if p.id == policy_id), None)
+    if policy is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Policy '{policy_id}' not found")
+    return policy
+
+
+@router.get("/policies", response_model=list[PolicyDefinition], summary="Compliance policies from config.yaml")
+async def list_policies() -> list[PolicyDefinition]:
+    """List the configured policies (read-only; they are edited in config.yaml, ADR-019)."""
+    _, config = _get_app_dependencies()
+    return [
+        PolicyDefinition(
+            id=policy.id,
+            name=policy.name,
+            framework=policy.framework,
+            version=policy.version,
+            description=policy.description,
+            controls=len(policy.controls),
+            yaml=yaml.safe_dump(policy.model_dump(exclude_none=True, exclude_defaults=True), sort_keys=False),
+        )
+        for policy in config.compliance.policies
+    ]
+
+
+@router.get(
+    "/policies/{policy_id}/evaluation", response_model=PolicyEvaluation, summary="Evaluate a policy now, with its trend"
+)
+async def evaluate(policy_id: str) -> PolicyEvaluation:
+    """
+    Evaluate a policy against the current inventory, with its results in earlier snapshots.
+
+    Raises:
+        HTTPException: 404 for an unknown policy.
+    """
+    database, config = _get_app_dependencies()
+    policy = _require_policy(config, policy_id)
+    now = _now()
+    result = evaluate_policy(policy, _secrets(database, config), now)
+    trend = []
+    for row in database.snapshot_policy_results(policy_id):
+        frozen = json.loads(row["result"])
+        trend.append(
+            PolicyTrendPoint(
+                snapshot_id=row["id"],
+                created_at=row["created_at"],
+                label=row["label"],
+                period=row["period"],
+                status=frozen["status"],
+                counts=frozen["counts"],
+            )
+        )
+    return PolicyEvaluation(**result, evaluated_at=utc_timestamp(now), trend=trend)
 
 
 def _require_snapshot(database: Any, snapshot_id: int) -> dict:

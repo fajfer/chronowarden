@@ -910,6 +910,25 @@ class Database:
             )
             return [dict(row) for row in rows]
 
+    def snapshot_policy_results(self, policy_id: str) -> list[dict]:
+        """
+        One policy's frozen results across snapshots, oldest first, read inside SQLite (no full documents).
+
+        Returns:
+            Snapshot id, created_at, label, period and the policy's result (JSON text) for each snapshot that has it.
+        """
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            rows = conn.execute(
+                "SELECT s.id, s.created_at, s.label, s.period, p.value AS result "
+                "FROM compliance_snapshots s, json_each(s.content, '$.policies') p "
+                "WHERE json_extract(p.value, '$.id') = ? ORDER BY s.id",
+                (policy_id,),
+            )
+            return [dict(row) for row in rows]
+
     def get_snapshot(self, snapshot_id: int) -> Optional[dict]:
         """Return one snapshot with its content."""
         with self._conn_lock:

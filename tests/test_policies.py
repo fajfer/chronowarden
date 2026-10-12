@@ -4,15 +4,27 @@
 
 """Tests for compliance policies (ADR-019)."""
 
+import hashlib
+import json
 import pathlib
 import re
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 import yaml
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from chronowarden.config import AppConfig, ControlThresholds
+from chronowarden.api.compliance import router as compliance_router
+from chronowarden.compliance.policies import evaluate_policy, fails, in_control_scope, rag
+from chronowarden.config import AppConfig, CompliancePolicy, ControlScope, ControlThresholds
+from chronowarden.database import Database, SecretMetadataCache
+from chronowarden.models.secret import SecretMetadataResponse, SecretStatus
+from chronowarden.models.system import OwnerRef, SystemRef
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
@@ -104,3 +116,187 @@ class TestPolicyConfig:
         data = yaml.safe_load("\n".join(lines))
         config = _config(*data["policies"])
         assert [c.id for c in config.compliance.policies[0].controls] == ["PAM-01", "PAM-02"]
+
+
+NOW = datetime(2026, 10, 12, 12, 0, tzinfo=UTC)
+
+
+def _secret(path: str = "app/db", **fields: Any) -> SecretMetadataResponse:
+    return SecretMetadataResponse(
+        id=1, vault_name="prod", engine_id="apps", secret_path=path, full_path=f"prod/apps/{path}", **fields
+    )
+
+
+def _rule(**rule: Any) -> Any:
+    return CompliancePolicy.model_validate(_policy(rule=rule)).controls[0].rule
+
+
+class TestRules:
+    def test_max_rotation_age_edges(self) -> None:
+        rule = _rule(type="max_rotation_age", days=90)
+        exactly = (NOW - timedelta(days=90)).isoformat().replace("+00:00", "Z")
+        older = (NOW - timedelta(days=90, seconds=1)).isoformat().replace("+00:00", "Z")
+        assert not fails(_secret(updated_time=exactly), rule, NOW)
+        assert fails(_secret(updated_time=older), rule, NOW)
+        assert fails(_secret(updated_time=None), rule, NOW), "an unknown rotation date can't prove compliance"
+
+    def test_not_expired(self) -> None:
+        rule = _rule(type="not_expired")
+        assert fails(_secret(status=SecretStatus.EXPIRED), rule, NOW)
+        assert not any(fails(_secret(status=s), rule, NOW) for s in (SecretStatus.WARNING, SecretStatus.NO_TTL))
+
+    def test_has_owner_uses_effective_owners(self) -> None:
+        rule = _rule(type="has_owner")
+        assert fails(_secret(owners=[]), rule, NOW)
+        assert not fails(_secret(effective_owners=[OwnerRef(id="a", name="Alice")]), rule, NOW)
+
+    def test_has_system(self) -> None:
+        rule = _rule(type="has_system")
+        assert fails(_secret(), rule, NOW)
+        assert not fails(_secret(system=SystemRef(id="s", name="Billing")), rule, NOW)
+
+    def test_rotation_confirmed_fails_only_when_overdue(self) -> None:
+        rule = _rule(type="rotation_confirmed")
+        assert not fails(_secret(awaiting_confirmation=True), rule, NOW), "still within the grace period"
+        assert fails(_secret(awaiting_confirmation=True, confirmation_overdue=True), rule, NOW)
+
+
+class TestScope:
+    def test_every_selector(self) -> None:
+        secret = _secret("db/main", severity="critical", privileged=True, system=SystemRef(id="s", name="Billing"))
+        assert in_control_scope(secret, ControlScope())
+        for scope in (
+            ControlScope(vaults=["prod"], engines=["apps"], systems=["Billing"], severities=["critical"]),
+            ControlScope(paths=["prod/apps/db/*"], privileged=True),
+        ):
+            assert in_control_scope(secret, scope)
+        for scope in (
+            ControlScope(vaults=["dev"]),
+            ControlScope(systems=["CRM"]),
+            ControlScope(severities=["default"]),
+            ControlScope(paths=["prod/other/*"]),
+            ControlScope(privileged=False),
+        ):
+            assert not in_control_scope(secret, scope)
+        assert not in_control_scope(_secret(), ControlScope(systems=["Billing"])), "unassigned is outside"
+
+
+class TestThresholds:
+    @pytest.mark.parametrize(
+        "failing,total,thresholds,expected",
+        [
+            (0, 10, {}, "green"),
+            (1, 10, {}, "red"),
+            (3, 0, {"red": 1}, "green"),
+            (1, 10, {"amber": 2, "red": 5}, "green"),
+            (2, 10, {"amber": 2, "red": 5}, "amber"),
+            (5, 10, {"amber": 2, "red": 5}, "red"),
+            (3, 10, {"red": 5}, "green"),
+            (3, 10, {"amber": 1}, "amber"),
+            (1, 10, {"amber_pct": 10, "red_pct": 50}, "amber"),
+            (1, 11, {"amber_pct": 10, "red_pct": 50}, "green"),
+            (5, 10, {"amber_pct": 10, "red_pct": 50}, "red"),
+        ],
+    )
+    def test_rag(self, failing: int, total: int, thresholds: dict[str, Any], expected: str) -> None:
+        assert rag(failing, total, ControlThresholds.model_validate(thresholds)) == expected
+
+
+def test_evaluate_policy_skips_removed_and_takes_the_worst_status() -> None:
+    policy = CompliancePolicy.model_validate(
+        {
+            "id": "p",
+            "name": "P",
+            "controls": [
+                {"id": "OWN", "title": "Owner", "rule": {"type": "has_owner"}, "thresholds": {"amber": 1, "red": 3}},
+                {"id": "EXP", "title": "Not expired", "rule": {"type": "not_expired"}},
+            ],
+        }
+    )
+    secrets = [
+        _secret("b", effective_owners=[OwnerRef(id="a", name="Alice")]),
+        _secret("a"),
+        _secret("gone", removed_at=NOW, status=SecretStatus.EXPIRED),
+    ]
+    result = evaluate_policy(policy, secrets, NOW)
+    own, exp = result["controls"]
+    assert (own["in_scope"], own["failing"], own["status"]) == (2, 1, "amber")
+    assert own["failing_secrets"] == [{"full_path": "prod/apps/a", "owners": []}]
+    assert (exp["failing"], exp["status"]) == (0, "green"), "the removed, expired secret isn't held any more"
+    assert (result["status"], result["counts"]) == ("amber", {"green": 1, "amber": 1, "red": 0})
+
+
+POLICY = {
+    "id": "pam",
+    "name": "PAM",
+    "framework": "Internal",
+    "controls": [
+        {
+            "id": "PAM-01",
+            "title": "Privileged have an owner",
+            "scope": {"privileged": True},
+            "rule": {"type": "has_owner"},
+        },
+        {"id": "PAM-02", "title": "Everything has a system", "rule": {"type": "has_system"}},
+    ],
+}
+
+
+@pytest.fixture
+def client(db: Database) -> Iterator[TestClient]:
+    for path, privileged in (("db", True), ("api", False)):
+        db.upsert_secret_metadata(
+            SecretMetadataCache(
+                vault_name="prod", engine_id="apps", secret_path=path, ttl="2030-01-01", privileged=privileged
+            )
+        )
+    config = AppConfig.model_validate(
+        {
+            "vaults": [{"name": "prod", "address": "http://v:8200", "token": "t"}],
+            "compliance": {"policies": [POLICY]},
+        }
+    )
+    app = FastAPI()
+    app.include_router(compliance_router, prefix="/api/v1")
+    with (
+        patch("chronowarden.api.compliance._get_app_dependencies", return_value=(db, config)),
+        patch("chronowarden.api.secrets._get_app_dependencies", return_value=(db, config, None)),
+    ):
+        yield TestClient(app)
+
+
+class TestApi:
+    def test_list_policies_with_yaml(self, client: TestClient) -> None:
+        [policy] = client.get("/api/v1/compliance/policies").json()
+        assert (policy["id"], policy["framework"], policy["controls"]) == ("pam", "Internal", 2)
+        assert yaml.safe_load(policy["yaml"])["controls"][0]["rule"] == {"type": "has_owner"}
+
+    def test_evaluation(self, client: TestClient) -> None:
+        result = client.get("/api/v1/compliance/policies/pam/evaluation").json()
+        assert result["status"] == "red"
+        assert [(c["id"], c["in_scope"], c["failing"]) for c in result["controls"]] == [
+            ("PAM-01", 1, 1),
+            ("PAM-02", 2, 2),
+        ]
+        assert result["trend"] == []
+
+    def test_unknown_policy_is_404(self, client: TestClient) -> None:
+        assert client.get("/api/v1/compliance/policies/nope/evaluation").status_code == 404
+
+    def test_snapshots_freeze_policy_results_for_the_trend(self, client: TestClient, db: Database) -> None:
+        created = client.post("/api/v1/compliance/snapshots", json={"label": "before"}).json()
+        document = client.get(f"/api/v1/compliance/snapshots/{created['id']}").json()["document"]
+        assert document["format"] == 2
+        [frozen] = document["policies"]
+        assert frozen["id"] == "pam" and frozen["controls"][0]["title"] == "Privileged have an owner"
+        db.create_owner("alice", "Alice", "alice@example.com")
+        db.set_secret_owners(("prod", "apps", "db"), ["alice"])
+        client.post("/api/v1/compliance/snapshots", json={"label": "after"})
+        trend = client.get("/api/v1/compliance/policies/pam/evaluation").json()["trend"]
+        assert [(t["label"], t["counts"]["red"]) for t in trend] == [("before", 2), ("after", 1)]
+
+    def test_snapshot_hash_covers_the_policy_results(self, client: TestClient, db: Database) -> None:
+        created = client.post("/api/v1/compliance/snapshots", json={"label": "x"}).json()
+        content = client.get(f"/api/v1/compliance/snapshots/{created['id']}.json").content
+        assert hashlib.sha256(content).hexdigest() == created["sha256"]
+        assert json.loads(content)["policies"][0]["id"] == "pam"
