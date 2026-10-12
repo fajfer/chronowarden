@@ -72,7 +72,3 @@ export function apiDelete<T = void>(path: string): Promise<T> {
   return request<T>('DELETE', path);
 }
 
-/** Perform a PATCH request. */
-export function apiPatch<T>(path: string, body?: unknown): Promise<T> {
-  return request<T>('PATCH', path, body);
-}

@@ -5,16 +5,6 @@
 import type { SecretStatus } from '#lib/types/index.js';
 
 /**
- * Determine status from days until expiry.
- */
-export function getStatusFromDays(days: number | null | undefined): SecretStatus {
-  if (days == null) return 'no_ttl';
-  if (days <= 0) return 'expired';
-  if (days <= 30) return 'warning';
-  return 'ok';
-}
-
-/**
  * Get text color class for a status.
  */
 export function getStatusColor(status: SecretStatus): string {
@@ -35,31 +25,6 @@ export function getStatusBgColor(status: SecretStatus): string {
     case 'warning': return 'bg-yellow-500/20';
     case 'expired': return 'bg-red-500/20';
     case 'no_ttl': return 'bg-gray-500/20';
-  }
-}
-
-/**
- * Get icon for a status.
- */
-export function getStatusIcon(status: SecretStatus): string {
-  switch (status) {
-    case 'ok': return '🟢';
-    case 'warning': return '🟡';
-    case 'expired': return '🔴';
-    case 'no_ttl': return '⚫';
-  }
-}
-
-/**
- * Get color class for a severity level.
- */
-export function getSeverityColor(severity: string): string {
-  switch (severity) {
-    case 'critical': return 'text-red-400 border-red-500';
-    case 'pci-dss-4.0': return 'text-orange-400 border-orange-500';
-    case 'default': return 'text-blue-400 border-blue-500';
-    case 'none': return 'text-gray-400 border-gray-500';
-    default: return 'text-gray-400 border-gray-500';
   }
 }
 
