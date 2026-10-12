@@ -52,6 +52,11 @@ compliance:
     #   - period: yearly
     #     scope: {}
 
+# Host names Chronowarden answers to. "*" (default) answers any; listing yours stops other web pages from reaching it
+# through DNS rebinding. Cross-site writes from browsers are refused either way.
+allowed_hosts: ["*"]
+# allowed_hosts: [chronowarden.example.com, "*.internal.example.com"]
+
 # Prometheus metrics at /api/v1/metrics. Off by default since 0.7: turn them on if Prometheus scrapes Chronowarden.
 metrics:
   enabled: false
