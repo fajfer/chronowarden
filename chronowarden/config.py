@@ -38,6 +38,9 @@ DEFAULT_THEME = "default"
 _ENV_THEME = "CHRONOWARDEN_THEME"
 
 _DURATION_PATTERN = re.compile(r"^(\d+)([dmy])$")
+_INTERVAL_PATTERN = re.compile(r"^(\d+)([smhd])$")
+_INTERVAL_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+MIN_POLLING_SECONDS = 60
 
 # Unknown keys are rejected so that typos never get silently ignored
 _STRICT = ConfigDict(extra="forbid")
@@ -75,6 +78,27 @@ def parse_duration_to_days(duration: str) -> int:
         return value * 365
     else:
         raise ValueError(f"Unknown duration unit: '{unit}'")
+
+
+def parse_interval_seconds(interval: str) -> Optional[int]:
+    """
+    Parse a polling interval such as '30m', '6h' or '1d' to seconds; 'off' gives None.
+
+    Unlike expiry durations, `m` means minutes here (ADR-013).
+
+    Raises:
+        ValueError: If the format is invalid or the interval is shorter than `MIN_POLLING_SECONDS`.
+    """
+    text = interval.strip().lower()
+    if text == "off":
+        return None
+    match = _INTERVAL_PATTERN.match(text)
+    if not match:
+        raise ValueError(f"Invalid interval: '{interval}'. Expected <number><s|m|h|d> (e.g. '30m', '6h') or 'off'")
+    seconds = int(match.group(1)) * _INTERVAL_UNITS[match.group(2)]
+    if seconds < MIN_POLLING_SECONDS:
+        raise ValueError(f"Interval '{interval}' is shorter than {MIN_POLLING_SECONDS} seconds")
+    return seconds
 
 
 class ExpiryProfile(BaseModel):
@@ -500,7 +524,9 @@ class AppConfig(BaseModel):
     confirmation_grace: str = Field(
         default="7d", description="How long a rotation may stay unconfirmed before it is overdue (per profile override)"
     )
-    polling_interval: str = Field(default="6h", description="Global polling interval for change detection")
+    polling_interval: str = Field(
+        default="6h", description="How often the server syncs every vault (e.g. '30m', '6h'), or 'off' (ADR-013)"
+    )
     vault_reconnect_interval: int = Field(
         default=120,
         ge=10,
@@ -529,6 +555,18 @@ class AppConfig(BaseModel):
         description="Host names Chronowarden answers to (e.g. chronowarden.example.com, *.example.com); "
         "set it to stop DNS rebinding from other web pages",
     )
+
+    @field_validator("polling_interval")
+    @classmethod
+    def validate_polling_interval(cls, v: str) -> str:
+        """Reject intervals the scheduler can't use."""
+        parse_interval_seconds(v)
+        return v
+
+    @property
+    def polling_seconds(self) -> Optional[int]:
+        """The polling interval in seconds, or None when the schedule is off."""
+        return parse_interval_seconds(self.polling_interval)
 
     @field_validator("confirmation_grace")
     @classmethod
