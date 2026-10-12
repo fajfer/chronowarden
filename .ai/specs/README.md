@@ -34,6 +34,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-12-scheduled-sync](implemented/2026-10-12-scheduled-sync.md) | #74: sync every `polling_interval`, plus `python -m chronowarden sync` for CronJobs (ADR-013) |
 | [2026-10-12-audit-followups](implemented/2026-10-12-audit-followups.md) | Mask webhook URLs, audit route changes, cooldowns on manual sync and snapshots |
 | [2026-10-11-dev-setup-rework](implemented/2026-10-11-dev-setup-rework.md) | dev-setup.py on podman, testcontainers integration tests in CI (#78) |
 | [2026-10-11-compliance-evidence](implemented/2026-10-11-compliance-evidence.md) | Privileged flag in Vault, snapshots with scope and cadences, gap warnings, Compliance tab |

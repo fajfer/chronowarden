@@ -4,6 +4,7 @@
 
 """Chronowarden against real OpenBao and HashiCorp Vault dev servers (#78). Run with: pytest -m integration."""
 
+import asyncio
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -14,6 +15,7 @@ import pytest
 from requests.exceptions import RequestException
 from testcontainers.core.container import DockerContainer
 
+from chronowarden.__main__ import sync_once
 from chronowarden.config import AppConfig
 from chronowarden.database import Database
 from chronowarden.integrations.vault import VaultIntegration
@@ -24,11 +26,14 @@ pytestmark = pytest.mark.integration
 
 
 class Running(NamedTuple):
-    """A started backend: root client and Chronowarden's AppRole integration."""
+    """A started backend: root client, Chronowarden's AppRole integration and its credentials."""
 
     backend: Backend
     root: hvac.Client
     integration: VaultIntegration
+    address: str
+    role_id: str
+    secret_id: str
 
 
 def _wait(address: str, token: str, timeout: float = 60) -> hvac.Client:
@@ -67,7 +72,7 @@ def running(request: pytest.FixtureRequest) -> Iterator[Running]:
             verify_ssl=False,
         )
         assert integration.connect(), integration.last_error
-        yield Running(backend, root, integration)
+        yield Running(backend, root, integration, address, role_id, secret_id)
 
 
 @pytest.fixture
@@ -132,3 +137,25 @@ def test_rotation_is_observed(running: Running, db: Database) -> None:
     _sync(running, db)
     events = db.list_audit_events(event_type="secret.version", secret_path="secret-3", engine_id="databases")
     assert events, "a new version is recorded as a rotation"
+
+
+def test_one_shot_sync_command(running: Running, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`python -m chronowarden sync` syncs the backend into the database in the working directory (ADR-013)."""
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        "vaults:\n"
+        f"  - name: {running.backend.config_name}\n"
+        f"    address: {running.address}\n"
+        "    auth_method: approle\n"
+        f"    role_id: {running.role_id}\n"
+        f"    secret_id: {running.secret_id}\n"
+        f"    approle_mount_point: {APPROLE_MOUNT}\n"
+    )
+    monkeypatch.chdir(tmp_path)
+    assert asyncio.run(sync_once(str(config))) == 0
+    database = Database(tmp_path / "chronowarden.db")
+    database.connect()
+    try:
+        assert database.list_all_secrets(vault_name=running.backend.config_name)
+    finally:
+        database.close()

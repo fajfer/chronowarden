@@ -6,6 +6,7 @@
 
 import logging
 import pathlib
+from typing import Optional
 
 import pytest
 import yaml
@@ -977,3 +978,18 @@ class TestAppRoleConfig:
             approle_mount_point="my-approle",
         )
         assert vc.approle_mount_point == "my-approle"
+
+
+class TestPollingInterval:
+    """polling_interval: minutes, not months (ADR-013)."""
+
+    @pytest.mark.parametrize(
+        "value,seconds", [("6h", 21600), ("30m", 1800), ("60s", 60), ("1d", 86400), (" 2H ", 7200), ("off", None)]
+    )
+    def test_valid(self, value: str, seconds: Optional[int]) -> None:
+        assert AppConfig(polling_interval=value).polling_seconds == seconds
+
+    @pytest.mark.parametrize("value", ["59s", "0m", "6", "6w", "soon", ""])
+    def test_invalid(self, value: str) -> None:
+        with pytest.raises(ValidationError, match="polling_interval"):
+            AppConfig(polling_interval=value)

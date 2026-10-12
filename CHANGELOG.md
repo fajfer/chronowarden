@@ -14,6 +14,14 @@ git history.
 
 ## [Unreleased]
 
+### Added
+
+- Scheduled sync (#74, ADR-013): the server syncs every connected vault shortly after startup and then every
+  `polling_interval`. `polling_interval` now reads `m` as minutes (it was never used before), needs at least 1
+  minute, and accepts `off`.
+- `python -m chronowarden sync` (also the `chronowarden` script) syncs every vault once and exits, for a Kubernetes
+  CronJob: exit 0 when all synced, 1 when one wasn't, 2 on a configuration error.
+
 ## [0.7.3] - 2026-10-12
 
 Compliance policies and PDF reports (#97, #98). Snapshots now use format 2; earlier snapshots keep format 1.

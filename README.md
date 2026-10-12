@@ -38,7 +38,8 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
   responsible for each secret
 - **Severity Levels** - Classify secrets by (user-defined) compliance requirements (PCI-DSS, Critical, Default)
 - **Secure** - Never reads actual secret values, only metadata
-- **Real-Time Sync** - Live and on-demand synchronization with backends
+- **Scheduled Sync** - Every vault is synced every `polling_interval` (default 6h) and on demand;
+  `python -m chronowarden sync` runs one sync and exits, e.g. as a Kubernetes CronJob
 - **Prometheus Metrics** - Optional monitoring endpoint (`metrics.enabled: true`; off by default)
 - **Modern Web UI** - SvelteKit frontend with dark mode
 
@@ -228,6 +229,12 @@ or else its system's owners.
   secret and system
 
 ### Sync
+The server syncs every connected vault shortly after startup and then every `polling_interval` (`30m`, `6h`, `1d`;
+minimum `1m`; `off` turns it off). To sync from a CronJob instead, set `polling_interval: off` on the server and run
+`python -m chronowarden sync` (or the `chronowarden sync` script) in the same working directory, so both use the
+same `chronowarden.db`. It exits 0 when every vault synced, 1 when one was unreachable or failed, and 2 on a
+configuration error.
+
 - `POST /api/v1/sync/vault/{vault_name}` - Trigger synchronization for a specific Vault instance
   - Scans the specified vault instance and updates local cache
   - A disconnected vault is reconnected first. If that fails, the response is `503` with the `reason`
