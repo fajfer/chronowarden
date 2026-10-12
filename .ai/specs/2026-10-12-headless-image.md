@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Headless image without the UI or Typst
 
-- **Status:** draft
+- **Status:** approved
 - **Date:** 2026-10-12
 - **Issue:** #48
 
@@ -72,10 +72,8 @@ headless image that drops the frontend stage.
 `uv run pytest`, black, ruff, `npm run check`, `check_agents_docs.py`, `docker build` of all three targets,
 `cosign verify` and `slsa-verifier verify-image` on a published `-headless` image.
 
-## Open questions
+## Decisions (maintainer, 2026-10-12)
 
-- Tag naming: `:<tag>-headless` (like `-dev`) or a separate image name such as `chronowarden-headless`?
-- Should the headless image ship in 0.8 with the one-shot sync (#48 is in the 0.8 milestone), or earlier on its
-  own as an API-only image?
-- Do both images keep `/api/v1/compliance/snapshots/{id}/report.pdf` in the OpenAPI schema (501 in headless), or
-  does headless leave the route out?
+- Tag: `:<tag>-headless` on the same image name, like `-dev`.
+- Ships with 0.8, together with the one-shot sync ([scheduled sync spec](2026-10-12-scheduled-sync.md)).
+- `report.pdf` stays in the headless OpenAPI schema and answers 501.

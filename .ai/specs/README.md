@@ -23,6 +23,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-12-scheduled-sync](2026-10-12-scheduled-sync.md) | #74: sync every `polling_interval`, plus `python -m chronowarden sync` for CronJobs (ADR-013) |
 | [2026-10-12-headless-image](2026-10-12-headless-image.md) | #48: a `headless` image without the UI or Typst (API and sync only) |
 | [2026-10-09-wire-prometheus-metrics](2026-10-09-wire-prometheus-metrics.md) | Defined-but-unset metrics get producers |
 | [2026-10-10-release-0-7](2026-10-10-release-0-7.md) | Release 0.7 Compliance evidence, extended scope: order of work |
