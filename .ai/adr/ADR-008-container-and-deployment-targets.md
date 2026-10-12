@@ -21,6 +21,10 @@ A multi-stage Dockerfile with a distroless, non-root `production` target (defaul
 
 The production image has no shell for debugging (use the `dev` target). Kubernetes runs a single replica with a PVC for the DB.
 
+## Later decisions
+
+- Extended by ADR-024: a third target, `headless`, without the frontend or Typst.
+
 ## Related files
 
 - [`Dockerfile`](../../Dockerfile)

@@ -37,6 +37,10 @@ diacritics and `sys.inputs`, with `pdf_standards=["a-2b"]` and only embedded fon
 - Tests check the text extracted from rendered PDFs, not their bytes.
 - Report templates are versioned with the code.
 
+## Later decisions
+
+- Extended by ADR-024: Typst is the optional `reports` extra; the headless image leaves it out and answers 501.
+
 ## Related files
 
 - `chronowarden/compliance/` (renderer), `pyproject.toml`, `LICENSES/`
