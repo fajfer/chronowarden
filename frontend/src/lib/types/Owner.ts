@@ -12,6 +12,8 @@ export interface NotificationRoute {
   address: string;
   message_template: string;
   created_at: string | null;
+  /** Deliveries carry a Standard Webhooks signature (ADR-025). */
+  signed: boolean;
 }
 
 /**

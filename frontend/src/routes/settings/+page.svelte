@@ -3,17 +3,20 @@
   //
   // SPDX-License-Identifier: EUPL-1.2
 
-  import { fetchOwners, createOwner, updateOwner, deleteOwner, testNotificationRoute } from '#lib/api/owners.js';
+  import { fetchOwners, createOwner, updateOwner, deleteOwner } from '#lib/api/owners.js';
+  import { fetchDeliveries, fetchFiringAlerts } from '#lib/api/alerts.js';
   import { fetchHealthCheck, fetchApiInfo } from '#lib/api/vaults.js';
   import { fetchSystems, createSystem, updateSystem, setSystemOwners, deleteSystem } from '#lib/api/systems.js';
   import OwnerModal from '#lib/components/OwnerModal.svelte';
+  import RoutesModal from '#lib/components/RoutesModal.svelte';
   import SystemModal from '#lib/components/SystemModal.svelte';
   import { safeHttpUrl } from '#lib/utils/safeUrl.js';
   import { availableThemes, currentTheme, setTheme } from '#lib/stores/theme.js';
   import { addToast } from '#lib/stores/sync.js';
-  import type { Owner, ApiInfo, System, SystemFormData } from '#lib/types/index.js';
+  import { formatDate } from '#lib/utils/dateFormat.js';
+  import type { Owner, ApiInfo, System, SystemFormData, Delivery, FiringAlert } from '#lib/types/index.js';
 
-  let activeTab = $state<'general' | 'owners' | 'systems'>('general');
+  let activeTab = $state<'general' | 'owners' | 'systems' | 'webhooks'>('general');
 
   // General settings
   let apiInfo = $state<ApiInfo | null>(null);
@@ -25,6 +28,20 @@
   let ownersError = $state<string | null>(null);
   let modalOpen = $state(false);
   let editingOwner = $state<Owner | null>(null);
+  let routesOwnerId = $state<string | null>(null);
+  const routesOwner = $derived(owners.find((o) => o.id === routesOwnerId) ?? null);
+
+  // Webhooks
+  let firing = $state<FiringAlert[]>([]);
+  let deliveries = $state<Delivery[]>([]);
+
+  async function loadWebhooks() {
+    try {
+      [firing, deliveries] = await Promise.all([fetchFiringAlerts(), fetchDeliveries()]);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Loading webhooks failed', 'error');
+    }
+  }
 
   // Systems
   let systems = $state<System[]>([]);
@@ -86,15 +103,7 @@
     }
   }
 
-  async function handleTestRoute(ownerId: string, routeId: string) {
-    try {
-      const result = await testNotificationRoute(ownerId, routeId);
-      addToast(result.message, result.success ? 'success' : 'error');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Test failed';
-      addToast(message, 'error');
-    }
-  }
+
 
   async function loadSystems() {
     systemsLoading = true;
@@ -177,6 +186,13 @@
       Owners
     </button>
     <button
+      onclick={() => { activeTab = 'webhooks'; loadWebhooks(); }}
+      class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
+        {activeTab === 'webhooks' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-300'}"
+    >
+      Webhooks
+    </button>
+    <button
       onclick={() => activeTab = 'systems'}
       class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
         {activeTab === 'systems' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-300'}"
@@ -233,6 +249,52 @@
           </div>
           <a href={apiInfo?.docs ?? '/docs'} target="_blank" class="text-indigo-400 hover:text-indigo-300">{apiInfo?.docs ?? '/docs'}</a>
         </div>
+      </div>
+    </div>
+  {:else if activeTab === 'webhooks'}
+    <div class="space-y-4">
+      <p class="text-sm text-gray-400">
+        Owners get alerts about their secrets through their webhook routes (Owners → Webhook routes); vault-health and
+        compliance alerts and those of unowned secrets go to <code class="text-gray-300">alerting.default_routes</code>
+        in <code class="text-gray-300">config.yaml</code>.
+      </p>
+      <div class="overflow-hidden rounded-lg border border-gray-700 bg-gray-800">
+        <div class="border-b border-gray-700 px-5 py-3 text-sm font-semibold text-white">Firing now</div>
+        {#if firing.length === 0}
+          <p class="px-5 py-4 text-sm text-gray-500">Nothing is firing.</p>
+        {:else}
+          <ul class="divide-y divide-gray-700/50 text-sm">
+            {#each firing as alert (alert.fingerprint)}
+              <li class="px-5 py-2"><span class="font-mono text-xs text-red-300">{alert.alertname}</span>
+                <span class="text-gray-200">{alert.annotations.summary}</span>
+                <span class="block text-xs text-gray-500">since {formatDate(alert.starts_at)}</span></li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+      <div class="overflow-hidden rounded-lg border border-gray-700 bg-gray-800">
+        <div class="flex items-center border-b border-gray-700 px-5 py-3 text-sm font-semibold text-white">
+          Deliveries
+          <button onclick={loadWebhooks} class="ml-auto rounded bg-gray-700 px-2 py-1 text-xs text-gray-300 hover:bg-gray-600">Refresh</button>
+        </div>
+        {#if deliveries.length === 0}
+          <p class="px-5 py-4 text-sm text-gray-500">No webhooks sent yet.</p>
+        {:else}
+          <table class="w-full text-sm">
+            <thead><tr class="text-xs uppercase text-gray-500"><th class="px-5 py-2 text-left">#</th><th class="px-3 py-2 text-left">Alert</th><th class="px-3 py-2 text-left">To</th><th class="px-3 py-2 text-left">Status</th><th class="px-5 py-2 text-left">Last answer</th></tr></thead>
+            <tbody>
+              {#each deliveries as d (d.id)}
+                <tr class="border-t border-gray-700/50">
+                  <td class="px-5 py-2 font-mono text-xs text-gray-500">{d.id}</td>
+                  <td class="px-3 py-2 font-mono text-xs text-gray-300">{d.alertname}</td>
+                  <td class="px-3 py-2 text-gray-300">{d.receiver}</td>
+                  <td class="px-3 py-2 {d.status === 'delivered' ? 'text-green-400' : d.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}">{d.status} ({d.attempts})</td>
+                  <td class="px-5 py-2 text-xs text-gray-400">{d.last_error ?? (d.last_status_code ? `HTTP ${d.last_status_code}` : '—')}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
       </div>
     </div>
   {:else if activeTab === 'systems'}
@@ -329,14 +391,12 @@
                   <td class="px-4 py-3 text-gray-400">
                     {owner.notification_routes.length}
                     {#each owner.notification_routes as route}
-                      <span class="ml-1 text-xs px-1 py-0.5 rounded bg-gray-700 text-gray-300">{route.type}: {route.address}</span>
+                      <span class="ml-1 text-xs px-1 py-0.5 rounded bg-gray-700 text-gray-300">{route.address}{route.signed ? ' · signed' : ''}</span>
                     {/each}
                   </td>
                   <td class="px-4 py-3 flex gap-2">
                     <button onclick={() => openEditModal(owner)} class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Edit</button>
-                    {#each owner.notification_routes as route}
-                      <button onclick={() => handleTestRoute(owner.id, route.id)} class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Test {route.type}</button>
-                    {/each}
+                    <button onclick={() => (routesOwnerId = owner.id)} class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Webhook routes</button>
                     <button onclick={() => handleDeleteOwner(owner)} class="text-xs px-2 py-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-300">Delete</button>
                   </td>
                 </tr>
@@ -348,6 +408,8 @@
     </div>
   {/if}
 </div>
+
+<RoutesModal owner={routesOwner} onClose={() => (routesOwnerId = null)} onChange={loadOwners} />
 
 <OwnerModal
   owner={editingOwner}

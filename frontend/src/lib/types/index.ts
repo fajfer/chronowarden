@@ -4,6 +4,7 @@
 
 export type { Secret, SecretStatus, PurgeResult, Confirmation } from './Secret';
 export type { AuditEvent, AuditChainStatus, AuditFilters } from './Audit';
+export type { FiringAlert, Delivery, SigningSecret, RouteTestResult } from './Alert';
 export type {
   ComplianceScope, SnapshotInfo, GapEntry, GapReport, PeriodStatus, SummaryGroup, ComplianceSummary,
   SnapshotRequest, Rag, PolicyDefinition, FailingSecret, ControlResult, PolicyTrendPoint, PolicyEvaluation,
