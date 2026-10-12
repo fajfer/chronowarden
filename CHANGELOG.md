@@ -14,6 +14,10 @@ git history.
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-10-12
+
+Compliance policies and PDF reports (#97, #98). Snapshots now use format 2; earlier snapshots keep format 1.
+
 ### Added
 
 - Compliance policies in `config.yaml` (`compliance.policies`, ADR-019): controls with a scope (vaults, engines,
@@ -293,7 +297,8 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
-[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/fajfer/chronowarden/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/fajfer/chronowarden/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/fajfer/chronowarden/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/fajfer/chronowarden/compare/v0.6.3...v0.7.0
