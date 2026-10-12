@@ -32,6 +32,7 @@ from chronowarden.config import AppConfig, load_config
 from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
 from chronowarden.logging_config import configure_logging
+from chronowarden.metrics.refresh import refresh_secret_metrics
 from chronowarden.request_guard import guard_requests
 from chronowarden.scheduler import SyncScheduler
 
@@ -92,6 +93,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         db._db_path = db_path
         db.connect()
         record_config_change(db, app_config)
+        refresh_secret_metrics(db, app_config)  # series from the cache before the first sync
 
         logger.info("Chronowarden started with %d vault(s) configured", len(app_config.vaults))
         vault_manager.set_reconnect_callback(_sync_after_reconnect)

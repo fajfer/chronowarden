@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Path, status
 
 from chronowarden.api.cooldown import Cooldown, enforce
 from chronowarden.database import SecretMetadataCache
+from chronowarden.metrics.refresh import refresh_secret_metrics
 
 router = APIRouter(prefix="/sync", tags=["sync"])
 
@@ -33,7 +34,8 @@ async def sync_vault_now(manager: Any, vault_name: str, config: Any, database: A
     """
     Sync one vault while holding its sync lock, running the blocking backend calls in a worker thread.
 
-    Used by the sync endpoint and by the sync that follows a background reconnect.
+    Used by the sync endpoint, the schedule, the one-shot command and the sync that follows a background reconnect.
+    Refreshes the secret metrics afterwards (#71).
 
     Args:
         manager: The VaultManager.
@@ -50,7 +52,9 @@ async def sync_vault_now(manager: Any, vault_name: str, config: Any, database: A
     if vault is None:
         return []
     async with manager.sync_lock(vault_name):
-        return await asyncio.to_thread(metadata.detect_changes, vault, vault_name, config, database)
+        updated = await asyncio.to_thread(metadata.detect_changes, vault, vault_name, config, database)
+    await asyncio.to_thread(refresh_secret_metrics, database, config)
+    return updated
 
 
 @router.post(
