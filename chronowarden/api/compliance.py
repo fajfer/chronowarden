@@ -24,6 +24,7 @@ from chronowarden.compliance.periods import ended_periods, period_by_id
 from chronowarden.config import AppConfig, ComplianceScope
 from chronowarden.metadata import parse_date
 from chronowarden.models.compliance import GapEntry, GapReport, PeriodStatus, Snapshot, SnapshotCreate, SnapshotInfo
+from chronowarden.timestamps import utc_timestamp
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
 
@@ -62,10 +63,6 @@ def _cadence_scope(config: AppConfig, cadence: str) -> ComplianceScope:
 
 def _now() -> datetime:
     return datetime.now(tz=timezone.utc)
-
-
-def _iso(moment: datetime) -> str:
-    return moment.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 @router.get("/settings", summary="Compliance settings from config.yaml (read-only)")
@@ -165,8 +162,8 @@ async def get_periods() -> list[PeriodStatus]:
                 PeriodStatus(
                     cadence=period.cadence,
                     period=period.id,
-                    start=_iso(period.start),
-                    end=_iso(period.end),
+                    start=utc_timestamp(period.start),
+                    end=utc_timestamp(period.end),
                     snapshot_id=closed.get((period.cadence, period.id)),
                 )
             )
@@ -207,7 +204,7 @@ async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInf
             raise HTTPException(status_code=422, detail=str(exc)) from None
         if period.end > now:
             raise HTTPException(
-                status_code=422, detail=f"Period {period.id} hasn't ended yet (ends {_iso(period.end)})"
+                status_code=422, detail=f"Period {period.id} hasn't ended yet (ends {utc_timestamp(period.end)})"
             )
         latest = next(
             (s for s in database.list_snapshots() if s["cadence"] == data.cadence and s["period"] == data.period), None
@@ -229,7 +226,7 @@ async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInf
         scope = data.scope or ComplianceScope()
         secrets = [s for s in _secrets(database, config) if in_scope(s, scope)]
     systems = {system["id"]: system for system in database.list_systems()}
-    created_at = _iso(now)
+    created_at = utc_timestamp(now)
     content, sha256 = build_document(
         [snapshot_row(s, systems) for s in secrets],
         created_at,

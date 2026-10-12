@@ -25,6 +25,7 @@ from chronowarden.models.secret import (
     SecretStatus,
 )
 from chronowarden.models.system import OwnerIds, SystemAssignment
+from chronowarden.timestamps import utc_timestamp
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 
@@ -435,7 +436,7 @@ async def confirm_rotation(data: ConfirmationCreate, secret_id: int, request: Re
             status_code=422,
             detail=f"applied_at is before version {version['current']} was created ({version['created_time']})",
         )
-    applied_text = applied.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    applied_text = utc_timestamp(applied)
     confirmation = database.add_confirmation(identity, version["current"], applied_text, data.confirmed_by)
     database.append_audit_event(
         "secret.confirmed",

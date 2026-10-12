@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from chronowarden.audit.chain import GENESIS_HASH, canonical_json, event_hash
 from chronowarden.migrations import migrate
+from chronowarden.timestamps import utc_timestamp
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -700,7 +701,7 @@ class Database:
             vault_name, engine_id, secret_path = identity if identity is not None else (None, None, None)
             event = {
                 "id": head["id"] + 1 if head else 1,
-                "timestamp": datetime.now(tz=timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+                "timestamp": utc_timestamp(),
                 "source": source,
                 "actor": actor,
                 "event_type": event_type,
@@ -831,7 +832,7 @@ class Database:
         Returns:
             The stored confirmation.
         """
-        recorded_at = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+        recorded_at = utc_timestamp()
         with self._conn_lock:
             conn = self._require_connection()
             if conn is None:
@@ -861,7 +862,7 @@ class Database:
 
     def revoke_confirmation(self, confirmation_id: int) -> None:
         """Mark a confirmation revoked (the row stays, for the record)."""
-        revoked_at = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+        revoked_at = utc_timestamp()
         with self._conn_lock:
             conn = self._require_connection()
             if conn is None:
