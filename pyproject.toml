@@ -25,6 +25,9 @@ dependencies = [
     "typst>=0.15.0",
 ]
 
+[project.scripts]
+chronowarden = "chronowarden.__main__:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.3.0",
