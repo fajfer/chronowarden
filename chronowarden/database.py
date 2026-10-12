@@ -894,6 +894,134 @@ class Database:
             )
             conn.commit()
 
+    def audit_events_after(self, event_id: int, event_types: tuple[str, ...]) -> list[dict]:
+        """Audit events of the given types with an id above `event_id`, oldest first (alerting reads them)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            marks = ", ".join("?" for _ in event_types)
+            rows = conn.execute(
+                f"SELECT * FROM audit_events WHERE id > ? AND event_type IN ({marks}) ORDER BY id",
+                (event_id, *event_types),
+            )
+            return [dict(row) for row in rows]
+
+    def latest_audit_event_id(self) -> int:
+        """The id of the newest audit event (0 for an empty log)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return 0
+            row = conn.execute("SELECT max(id) FROM audit_events").fetchone()
+            return row[0] or 0
+
+    def get_alert_states(self, alertnames: tuple[str, ...]) -> dict[str, dict]:
+        """Stored alerts of the given names by fingerprint (ADR-025)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return {}
+            marks = ", ".join("?" for _ in alertnames)
+            rows = conn.execute(f"SELECT * FROM alert_state WHERE alertname IN ({marks})", alertnames)
+            return {row["fingerprint"]: dict(row) for row in rows}
+
+    def list_firing_alerts(self) -> list[dict]:
+        """Alerts firing now, oldest first."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            rows = conn.execute("SELECT * FROM alert_state WHERE status = 'firing' ORDER BY starts_at")
+            return [dict(row) for row in rows]
+
+    def save_alert_state(self, state: dict) -> None:
+        """Insert or replace one alert's state (keys as in the alert_state table)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "INSERT OR REPLACE INTO alert_state "
+                "(fingerprint, alertname, labels, annotations, owner_ids, status, starts_at, ends_at, last_sent_at) "
+                "VALUES (:fingerprint, :alertname, :labels, :annotations, :owner_ids, :status, :starts_at, :ends_at, "
+                ":last_sent_at)",
+                state,
+            )
+            conn.commit()
+
+    def enqueue_delivery(
+        self,
+        created_at: str,
+        receiver: str,
+        route_id: Optional[str],
+        default_route: Optional[str],
+        alertname: str,
+        fingerprint: Optional[str],
+        payload: str,
+    ) -> None:
+        """Queue one webhook for delivery, due now."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "INSERT INTO webhook_deliveries (created_at, receiver, route_id, default_route, alertname, "
+                "fingerprint, status, next_attempt_at, payload) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+                (created_at, receiver, route_id, default_route, alertname, fingerprint, created_at, payload),
+            )
+            conn.commit()
+
+    def due_deliveries(self, now: str, limit: int = 50) -> list[dict]:
+        """Pending deliveries whose next attempt is due, oldest first."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            rows = conn.execute(
+                "SELECT * FROM webhook_deliveries WHERE status = 'pending' AND next_attempt_at <= ? "
+                "ORDER BY id LIMIT ?",
+                (now, limit),
+            )
+            return [dict(row) for row in rows]
+
+    def record_delivery_attempt(
+        self,
+        delivery_id: int,
+        status: str,
+        attempted_at: str,
+        next_attempt_at: Optional[str],
+        status_code: Optional[int],
+        error: Optional[str],
+    ) -> None:
+        """Record an attempt: `delivered`, `failed` (given up) or still `pending` with its next attempt."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "UPDATE webhook_deliveries SET status = ?, attempts = attempts + 1, last_attempt_at = ?, "
+                "next_attempt_at = ?, last_status_code = ?, last_error = ? WHERE id = ?",
+                (status, attempted_at, next_attempt_at, status_code, error, delivery_id),
+            )
+            conn.commit()
+
+    def list_deliveries(self, limit: int = 100, before_id: Optional[int] = None) -> list[dict]:
+        """The delivery log, newest first, without payloads."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            where = "WHERE id < ?" if before_id is not None else ""
+            params = (before_id, limit) if before_id is not None else (limit,)
+            rows = conn.execute(
+                "SELECT id, created_at, receiver, route_id, default_route, alertname, fingerprint, status, attempts, "
+                f"next_attempt_at, last_attempt_at, last_status_code, last_error FROM webhook_deliveries {where} "
+                "ORDER BY id DESC LIMIT ?",
+                params,
+            )
+            return [dict(row) for row in rows]
+
     def add_snapshot(
         self,
         created_at: str,

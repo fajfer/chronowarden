@@ -219,6 +219,7 @@ def _alerting(conn: sqlite3.Connection) -> None:
             alertname TEXT NOT NULL,
             labels TEXT NOT NULL,
             annotations TEXT NOT NULL,
+            owner_ids TEXT NOT NULL DEFAULT '[]',
             status TEXT NOT NULL CHECK(status IN ('firing', 'resolved')),
             starts_at TEXT NOT NULL,
             ends_at TEXT,
