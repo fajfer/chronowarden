@@ -92,6 +92,6 @@ def refresh_cached_ttl(db: Any, config: AppConfig, identity: SecretIdentity) -> 
     entry = db.get_secret_metadata(*identity)
     if entry is None or entry.updated_time is None or entry.severity is None:
         return
-    ttl = calculate_ttl(rotation_base(db, identity, entry.updated_time), entry.severity, config)
+    ttl = calculate_ttl(rotation_base(db, identity, entry.updated_time), entry.severity, config, identity[0])
     if ttl != entry.ttl:
         db.upsert_secret_metadata(entry.model_copy(update={"ttl": ttl}))

@@ -339,3 +339,14 @@ class TestNestedSecretTraversal:
         paths = _list_secret_paths(vault, "secret")
 
         assert paths == []
+
+
+def test_ttl_is_written_in_the_vaults_date_format() -> None:
+    """Regression (0.7.1): the TTL was written in the global format but read in the vault's, shifting expiry."""
+    config = AppConfig.model_validate(
+        {"vaults": [{"name": "eu", "address": "http://v:8200", "token_env": "T", "date_format": "YYYY-DD-MM"}]}
+    )
+    ttl = calculate_ttl("2026-03-01T00:00:00Z", "default", config, "eu")
+    assert ttl == "2027-01-03", "1 March 2027 in YYYY-DD-MM"
+    assert parse_date(ttl, config.resolve_date_format("eu")) == parse_date("2027-03-01")
+    assert calculate_ttl("2026-03-01T00:00:00Z", "default", config, "other") == "2027-03-01"
