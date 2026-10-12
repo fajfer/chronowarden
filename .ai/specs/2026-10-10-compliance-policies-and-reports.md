@@ -72,7 +72,7 @@ New **ADR-019 Compliance policies as config, examples not built in** and **ADR-0
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | ADR-019 and ADR-020 accepted; Typst spike (arm64, distroless, PDF/A) | [.ai/adr](../adr/README.md) | Both indexed; spike result in ADR-020 | done | SPIKE |
+| 1 | ADR-019 and ADR-020 accepted; Typst spike (arm64, distroless, PDF/A) | [.ai/adr](../adr/README.md) | Both indexed; spike result in ADR-020 | done | 676bfae |
 | 2 | Policy config models and `config.example.yaml` | core | Config tests: valid, unknown rule type, duplicate ids | todo | |
 | 3 | Evaluation engine, `GET /compliance/policies` and `/policies/{id}/evaluation`; snapshots store per-policy results | core, api | Unit tests per rule type and threshold edges | todo | |
 | 4 | Example policies for KNF KRI ICT, PCI DSS 4.0, DORA in the docs, each control citing its source, marked non-authoritative (the maintainer reviews `docs/`) | none | Citations checked; maintainer approved | todo | |
