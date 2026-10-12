@@ -43,10 +43,27 @@ def confirmation_status(db: Any, config: AppConfig, identity: SecretIdentity, se
     Returns:
         The confirmation status.
     """
+    return status_from(config, identity, severity, db.latest_confirmation(identity), current_version(db, identity))
+
+
+def status_from(
+    config: AppConfig, identity: SecretIdentity, severity: str, latest: Optional[dict], version: Optional[dict]
+) -> ConfirmationStatus:
+    """
+    Confirmation state from already loaded values (see `confirmation_status`).
+
+    Args:
+        config: Application configuration (cascade and grace).
+        identity: The secret.
+        severity: Its resolved severity (selects the grace period).
+        latest: Its newest confirmation that wasn't revoked, or None.
+        version: Its newest observed version (`current`, `created_time`), or None.
+
+    Returns:
+        The confirmation status.
+    """
     vault_name, engine_id, secret_path = identity
     required = config.resolve_confirmation_required(engine_id, vault_name, secret_path)
-    latest = db.latest_confirmation(identity)
-    version = current_version(db, identity)
     if not required or version is None or version.get("current") is None:
         return ConfirmationStatus(required, False, False, latest)
     awaiting = latest is None or latest["version"] < version["current"]
@@ -54,6 +71,19 @@ def confirmation_status(db: Any, config: AppConfig, identity: SecretIdentity, se
     grace = timedelta(days=config.get_confirmation_grace_days(severity))
     overdue = awaiting and created is not None and datetime.now(tz=timezone.utc) - created > grace
     return ConfirmationStatus(required, awaiting, overdue, latest)
+
+
+class ConfirmationIndex:
+    """Latest confirmations and observed versions of all secrets, loaded in two queries per request."""
+
+    def __init__(self, db: Any) -> None:
+        """Load both maps from the database."""
+        self._latest = db.latest_confirmations()
+        self._versions = db.observed_versions()
+
+    def status(self, config: AppConfig, identity: SecretIdentity, severity: str) -> ConfirmationStatus:
+        """The confirmation status of one secret."""
+        return status_from(config, identity, severity, self._latest.get(identity), self._versions.get(identity))
 
 
 def rotation_base(db: Any, identity: SecretIdentity, updated_time: str) -> str:

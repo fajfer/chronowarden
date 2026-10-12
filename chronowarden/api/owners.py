@@ -61,12 +61,10 @@ def _build_owner(owner_dict: dict, routes: list[dict]) -> Owner:
 async def list_owners() -> list[Owner]:
     """List all owner profiles with their notification routes."""
     db = _get_db()
-    owners = db.list_owners()
-    result = []
-    for owner_dict in owners:
-        routes = db.list_notification_routes(owner_dict["id"])
-        result.append(_build_owner(owner_dict, routes))
-    return result
+    routes_by_owner: dict[str, list[dict]] = {}
+    for route in db.list_all_notification_routes():
+        routes_by_owner.setdefault(route["owner_id"], []).append(route)
+    return [_build_owner(owner, routes_by_owner.get(owner["id"], [])) for owner in db.list_owners()]
 
 
 @router.post("/", response_model=Owner, status_code=status.HTTP_201_CREATED, summary="Create an owner profile")

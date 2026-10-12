@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from chronowarden.api.audit import request_source
 from chronowarden.assignments import AssignmentIndex
 from chronowarden.config import AppConfig
-from chronowarden.confirmations import confirmation_status, current_version, refresh_cached_ttl
+from chronowarden.confirmations import current_version, refresh_cached_ttl
 from chronowarden.database import SecretIdentity, SecretMetadataCache
 from chronowarden.metadata import parse_date
 from chronowarden.models.audit import AuditEvent
@@ -138,16 +138,18 @@ def _enrich_secret(entry: SecretMetadataCache, config: AppConfig, index: Assignm
         status=_compute_status(days_remaining, alert_days),
         removed_at=parse_date(entry.removed_at) if entry.removed_at else None,
         privileged=entry.privileged,
-        **_confirmation_fields(index.db, config, _identity(entry), severity),
+        **_confirmation_fields(index, config, _identity(entry), severity),
         system=index.system_of(_identity(entry)),
         owners=index.owners_of(_identity(entry)),
         effective_owners=index.effective_owners_of(_identity(entry)),
     )
 
 
-def _confirmation_fields(database: Any, config: AppConfig, identity: SecretIdentity, severity: str) -> dict[str, Any]:
-    """The confirmation fields of a secret response (ADR-021)."""
-    status_ = confirmation_status(database, config, identity, severity)
+def _confirmation_fields(
+    index: AssignmentIndex, config: AppConfig, identity: SecretIdentity, severity: str
+) -> dict[str, Any]:
+    """The confirmation fields of a secret response (ADR-021), from the request's preloaded index."""
+    status_ = index.confirmations.status(config, identity, severity)
     latest = status_.latest
     return {
         "confirmation_required": status_.required,
