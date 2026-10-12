@@ -75,5 +75,5 @@ headless image that drops the frontend stage.
 ## Decisions (maintainer, 2026-10-12)
 
 - Tag: `:<tag>-headless` on the same image name, like `-dev`.
-- Ships with 0.8, together with the one-shot sync ([scheduled sync spec](2026-10-12-scheduled-sync.md)).
+- Ships with 0.8, together with the one-shot sync ([scheduled sync spec](implemented/2026-10-12-scheduled-sync.md)).
 - `report.pdf` stays in the headless OpenAPI schema and answers 501.

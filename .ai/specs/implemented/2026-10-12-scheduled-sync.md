@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Scheduled sync and a one-shot sync command
 
-- **Status:** approved
+- **Status:** implemented
 - **Date:** 2026-10-12
 - **Issue:** #74 (and the CronJob half of #48)
 
@@ -29,9 +29,9 @@ sync code as the API (ADR-013). This is what time-based webhooks (#99) and metri
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [core](../../chronowarden/AGENTS.md), [integrations](../../chronowarden/integrations/AGENTS.md)
-- [ADR-013](../adr/ADR-013-in-process-and-headless-sync.md), [ADR-009](../adr/ADR-009-offline-tolerant-reconnect.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [core](../../../chronowarden/AGENTS.md), [integrations](../../../chronowarden/integrations/AGENTS.md)
+- [ADR-013](../../adr/ADR-013-in-process-and-headless-sync.md), [ADR-009](../../adr/ADR-009-offline-tolerant-reconnect.md)
 
 ## ADRs affected
 
@@ -54,10 +54,10 @@ Implements ADR-013. None changed.
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | `polling_interval` parser and validation (`off`, minimum 60 s) | core | Config tests: units, `off`, too short, invalid | todo | |
-| 2 | `SyncScheduler` started and stopped in `lifespan` | core, integrations | Tests with a fake clock/short interval: syncs connected vaults, skips disconnected, survives one vault failing, stops on shutdown; `off` starts nothing | todo | |
-| 3 | `python -m chronowarden sync` and console script | core | Tests: exit codes 0/1/2 with fake vaults; runs against the integration containers | todo | |
-| 4 | Docs: `config.example.yaml`, README (scheduled sync, one-shot, CronJob note), core AGENTS.md (remove the "nothing reads polling_interval" gotcha), CHANGELOG | core, deploy | Docs match | todo | |
+| 1 | `polling_interval` parser and validation (`off`, minimum 60 s) | core | Config tests: units, `off`, too short, invalid | done | f327d07 |
+| 2 | `SyncScheduler` started and stopped in `lifespan` | core, integrations | Tests with a fake clock/short interval: syncs connected vaults, skips disconnected, survives one vault failing, stops on shutdown; `off` starts nothing | done | 3cc7065 |
+| 3 | `python -m chronowarden sync` and console script | core | Tests: exit codes 0/1/2 with fake vaults; runs against the integration containers | done | 8d637e0 |
+| 4 | Docs: `config.example.yaml`, README (scheduled sync, one-shot, CronJob note), core AGENTS.md (remove the "nothing reads polling_interval" gotcha), CHANGELOG | core, deploy | Docs match | done | ff92b17 |
 
 ## Validation
 
