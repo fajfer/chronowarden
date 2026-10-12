@@ -16,6 +16,10 @@
 #       volumes:
 #         - ./deploy/compose/config.yaml:/etc/chronowarden/config.yaml:ro
 #         - ./certs:/etc/chronowarden/certs:ro  # Mount custom CA certificates
+#
+# API only (no UI, no PDF reports): use the headless image, e.g. ghcr.io/fajfer/chronowarden:v0.8.0-headless.
+# One sync and exit, e.g. from cron: `docker compose run --rm --entrypoint python chronowarden -m chronowarden sync`
+# (set `polling_interval: off` below if nothing else should sync on a schedule).
 
 # Prometheus metrics at /api/v1/metrics (off by default; uncomment to let Prometheus scrape them)
 # metrics:

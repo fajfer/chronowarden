@@ -11,6 +11,8 @@ resources:
   - deployment.yaml
   - pvc.yaml
   - service.yaml
+  # Sync from a CronJob with the headless image; set `polling_interval: off` in the config (cronjob-sync.yaml)
+  # - cronjob-sync.yaml
   ## Supplement your own
   # - ingress.yaml
   # - config-secret.yaml
