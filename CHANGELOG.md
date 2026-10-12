@@ -21,6 +21,14 @@ git history.
   minute, and accepts `off`.
 - `python -m chronowarden sync` (also the `chronowarden` script) syncs every vault once and exits, for a Kubernetes
   CronJob: exit 0 when all synced, 1 when one wasn't, 2 on a configuration error.
+- A `headless` image (`:<tag>-headless`, #48, ADR-024): API and sync only, without the UI and Typst (~82 MB instead
+  of ~165 MB), signed and attested like the default image. `report.pdf` answers 501 there, other paths than `/api`
+  are 404, and `GET /api/v1/info` lists the image's `features`. A Kubernetes CronJob example uses it.
+
+### Changed
+
+- Typst is the optional `reports` extra (`pip install chronowarden[reports]`); the default and dev images include
+  it.
 
 ## [0.7.3] - 2026-10-12
 

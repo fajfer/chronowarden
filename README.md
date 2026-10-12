@@ -71,11 +71,25 @@ Add `-v $(pwd)/chronowarden.db:/app/chronowarden.db` to keep the database. From 
 assignments that can't be rebuilt from Vault, so **back up `chronowarden.db`**; it is upgraded automatically on
 startup.
 
+#### Image variants
+Each release publishes three images for amd64 and arm64:
+
+| Tag | Contents | Size |
+|---|---|---|
+| `v<version>` | Production (default): distroless, no shell, UI and PDF reports | ~165 MB |
+| `v<version>-headless` (from 0.8) | API and sync only: no UI, no PDF reports (`report.pdf` answers 501) | ~82 MB |
+| `v<version>-dev` | Full shell, git, `--reload` | ~430 MB |
+
+The production and headless images are signed and carry SLSA provenance and SBOM attestations.
+
 #### Building image
-Production (default) — distroless, no shell, 86MB \
+Production (default) \
 `docker build -t fajfer/chronowarden:0.7.3 .`
 
-Development — full shell, git, --reload, 286MB \
+Headless \
+`docker build --target headless -t fajfer/chronowarden:0.7.3-headless .`
+
+Development \
 `docker build --target dev -t fajfer/chronowarden:0.7.3-dev .`
 
 ### Prerequisites
