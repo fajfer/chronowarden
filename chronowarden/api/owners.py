@@ -31,6 +31,19 @@ def _get_db() -> Any:
     return db
 
 
+def _require_owner(db: Any, owner_id: str) -> dict:
+    """
+    Return an owner or raise 404.
+
+    Raises:
+        HTTPException: If the owner doesn't exist.
+    """
+    owner = db.get_owner(owner_id)
+    if owner is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Owner '{owner_id}' not found")
+    return owner
+
+
 def _owner_view(owner: dict) -> dict:
     """An owner's fields as recorded in audit events."""
     return {"name": owner["name"], "email": owner["email"]}
@@ -86,9 +99,7 @@ async def create_owner(data: OwnerCreate, request: Request) -> Owner:
 async def get_owner(owner_id: str = Path(description="Owner ID")) -> Owner:
     """Get an owner profile by ID."""
     db = _get_db()
-    owner_dict = db.get_owner(owner_id)
-    if owner_dict is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Owner '{owner_id}' not found")
+    owner_dict = _require_owner(db, owner_id)
     routes = db.list_notification_routes(owner_id)
     return _build_owner(owner_dict, routes)
 
@@ -97,9 +108,7 @@ async def get_owner(owner_id: str = Path(description="Owner ID")) -> Owner:
 async def update_owner(data: OwnerUpdate, request: Request, owner_id: str = Path(description="Owner ID")) -> Owner:
     """Update an existing owner profile."""
     db = _get_db()
-    existing = db.get_owner(owner_id)
-    if existing is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Owner '{owner_id}' not found")
+    existing = _require_owner(db, owner_id)
     db.update_owner(owner_id, name=data.name, email=data.email)
     owner_dict = db.get_owner(owner_id)
     if owner_dict is None:
@@ -120,9 +129,7 @@ async def update_owner(data: OwnerUpdate, request: Request, owner_id: str = Path
 async def delete_owner(request: Request, owner_id: str = Path(description="Owner ID")) -> None:
     """Delete an owner profile and all its notification routes."""
     db = _get_db()
-    existing = db.get_owner(owner_id)
-    if existing is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Owner '{owner_id}' not found")
+    existing = _require_owner(db, owner_id)
     source = request_source(request)
     _, secret_owners = db.get_assignments()
     systems_before = {system["id"]: system["owner_ids"] for system in db.list_systems()}
@@ -162,9 +169,7 @@ async def add_route(
 ) -> NotificationRoute:
     """Add a notification route to an owner."""
     db = _get_db()
-    existing = db.get_owner(owner_id)
-    if existing is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Owner '{owner_id}' not found")
+    _require_owner(db, owner_id)
     route_id = str(uuid.uuid4())
     db.create_notification_route(route_id, owner_id, data.type, data.address, data.message_template)
     routes = db.list_notification_routes(owner_id)
@@ -197,9 +202,7 @@ async def delete_route(
         HTTPException: 404 if the owner doesn't exist or the route isn't one of its routes.
     """
     db = _get_db()
-    existing = db.get_owner(owner_id)
-    if existing is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Owner '{owner_id}' not found")
+    _require_owner(db, owner_id)
     if not any(route["id"] == route_id for route in db.list_notification_routes(owner_id)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Route '{route_id}' not found")
     db.delete_notification_route(route_id)
@@ -215,9 +218,7 @@ async def test_route(
 ) -> dict[str, Any]:
     """Send a test notification via a specific route."""
     db = _get_db()
-    existing = db.get_owner(owner_id)
-    if existing is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Owner '{owner_id}' not found")
+    _require_owner(db, owner_id)
     routes = db.list_notification_routes(owner_id)
     route = next((r for r in routes if r["id"] == route_id), None)
     if route is None:
