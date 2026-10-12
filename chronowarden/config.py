@@ -101,6 +101,22 @@ def parse_interval_seconds(interval: str) -> Optional[int]:
     return seconds
 
 
+def _resolve_value(name: str, literal: Optional[str], env: Optional[str], path: Optional[str]) -> Optional[str]:
+    """Read a value from its file, env var or literal setting, in that order (like vault credentials)."""
+    if path:
+        try:
+            return pathlib.Path(path).read_text().strip()
+        except OSError:
+            logger.exception("Failed to read %s from %s", name, path)
+            return None
+    if env:
+        value = os.environ.get(env)
+        if value is None:
+            logger.warning("Environment variable '%s' not set for %s", env, name)
+        return value
+    return literal
+
+
 class ExpiryProfile(BaseModel):
     """Configuration for a single expiry profile."""
 
@@ -270,21 +286,12 @@ class VaultConfig(BaseModel):
         Returns:
             The resolved value, or None if resolution fails.
         """
-        path, env = getattr(self, f"{field}_file"), getattr(self, f"{field}_env")
-        if path:
-            try:
-                return pathlib.Path(path).read_text().strip()
-            except OSError:
-                logger.exception("Failed to read %s file for vault '%s'", field, self.name)
-                return None
-
-        if env:
-            value = os.environ.get(env)
-            if value is None:
-                logger.warning("Environment variable '%s' not set for vault '%s'", env, self.name)
-            return value
-
-        return getattr(self, field)
+        return _resolve_value(
+            f"{field} of vault '{self.name}'",
+            getattr(self, field),
+            getattr(self, f"{field}_env"),
+            getattr(self, f"{field}_file"),
+        )
 
     def resolve_token(self) -> Optional[str]:
         """Resolve the Vault token: token_file > token_env > token (literal)."""
@@ -478,6 +485,99 @@ class ComplianceConfig(BaseModel):
         return self
 
 
+ALERT_NAMES = (
+    "SecretExpiringSoon",
+    "SecretExpired",
+    "SecretRotationUnconfirmed",
+    "SecretRotated",
+    "SecretRotationConfirmed",
+    "VaultUnreachable",
+    "CompliancePeriodEnded",
+    "ComplianceSnapshotCreated",
+)
+AlertName = Literal[
+    "SecretExpiringSoon",
+    "SecretExpired",
+    "SecretRotationUnconfirmed",
+    "SecretRotated",
+    "SecretRotationConfirmed",
+    "VaultUnreachable",
+    "CompliancePeriodEnded",
+    "ComplianceSnapshotCreated",
+]
+
+
+class DefaultRoute(BaseModel):
+    """A webhook for alerts without an owner: vault health, compliance and unowned secrets (ADR-025)."""
+
+    model_config = _STRICT
+
+    name: str = Field(min_length=1, max_length=100, description="Shown as the receiver in the payload")
+    url: Optional[str] = Field(default=None, description="Webhook URL (prefer url_env or url_file: URLs carry tokens)")
+    url_env: Optional[str] = Field(default=None, description="Environment variable holding the URL")
+    url_file: Optional[str] = Field(default=None, description="File holding the URL")
+    signing_secret_env: Optional[str] = Field(
+        default=None, description="Environment variable with a Standard Webhooks secret (whsec_...) to sign with"
+    )
+
+    @model_validator(mode="after")
+    def check_one_source(self) -> "DefaultRoute":
+        """Exactly one of url, url_env and url_file; a literal URL must be http(s)."""
+        if sum(v is not None for v in (self.url, self.url_env, self.url_file)) != 1:
+            raise ValueError(f"default route '{self.name}' needs exactly one of url, url_env, url_file")
+        if self.url is not None and not self.url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"default route '{self.name}' url must be http:// or https://")
+        return self
+
+    def resolve_url(self) -> Optional[str]:
+        """The URL from url_file, url_env or url."""
+        return _resolve_value(f"default route '{self.name}'", self.url, self.url_env, self.url_file)
+
+    def resolve_signing_secret(self) -> Optional[str]:
+        """The signing secret, or None when the route isn't signed."""
+        if self.signing_secret_env is None:
+            return None
+        return _resolve_value(f"default route '{self.name}' signing secret", None, self.signing_secret_env, None)
+
+
+class AlertingConfig(BaseModel):
+    """Webhook alerting (#99, ADR-022, ADR-025)."""
+
+    model_config = _STRICT
+
+    enabled: bool = Field(default=True, description="Send webhooks; nothing is sent without routes")
+    events: list[AlertName] = Field(default_factory=lambda: list(ALERT_NAMES), description="Alerts to send")
+    repeat_interval: str = Field(
+        default="1d", description="How often a still-firing alert is sent again (e.g. '12h', '1d'), or 'off'"
+    )
+    max_attempts: int = Field(default=5, ge=1, le=20, description="Delivery attempts before giving up")
+    default_routes: list[DefaultRoute] = Field(default_factory=list)
+    external_url: Optional[str] = Field(
+        default=None, description="Chronowarden's own URL, for links in the payload (generatorURL)"
+    )
+
+    @field_validator("repeat_interval")
+    @classmethod
+    def validate_repeat_interval(cls, v: str) -> str:
+        """Same format as polling_interval."""
+        parse_interval_seconds(v)
+        return v
+
+    @property
+    def repeat_seconds(self) -> Optional[int]:
+        """The repeat interval in seconds, or None when firing alerts aren't repeated."""
+        return parse_interval_seconds(self.repeat_interval)
+
+    @model_validator(mode="after")
+    def check_unique_route_names(self) -> "AlertingConfig":
+        """Route names identify receivers in the payload and the delivery log."""
+        names = [route.name for route in self.default_routes]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"duplicate default route name(s): {', '.join(duplicates)}")
+        return self
+
+
 class MetricsConfig(BaseModel):
     """Prometheus metrics settings (ADR-022)."""
 
@@ -549,6 +649,7 @@ class AppConfig(BaseModel):
     )
     ui: UiConfig = Field(default_factory=UiConfig, description="Instance-wide UI settings")
     metrics: MetricsConfig = Field(default_factory=MetricsConfig, description="Prometheus metrics (off by default)")
+    alerting: AlertingConfig = Field(default_factory=AlertingConfig, description="Webhook alerting (ADR-025)")
     compliance: ComplianceConfig = Field(default_factory=ComplianceConfig, description="Compliance evidence settings")
     allowed_hosts: list[str] = Field(
         default_factory=lambda: ["*"],

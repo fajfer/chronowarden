@@ -84,6 +84,22 @@ compliance:
 allowed_hosts: ["*"]
 # allowed_hosts: [chronowarden.example.com, "*.internal.example.com"]
 
+# Webhook alerting (ADR-025). Owners get their secrets' alerts through their webhook routes (Settings -> Owners);
+# default_routes get vault-health and compliance alerts and those of secrets without an owner. Payloads are
+# Alertmanager-compatible JSON with paths, owners and dates only, never secret values.
+alerting:
+  enabled: true
+  repeat_interval: 1d         # re-send a still-firing alert this often ('12h', '1d') or 'off'; resolved is sent once
+  max_attempts: 5             # delivery attempts (backoff 1m, 5m, 30m, 2h) before giving up
+  # events: [SecretExpiringSoon, SecretExpired, SecretRotationUnconfirmed, SecretRotated, SecretRotationConfirmed,
+  #          VaultUnreachable, CompliancePeriodEnded, ComplianceSnapshotCreated]   # default: all
+  # external_url: https://chronowarden.example.com   # for links in the payload
+  default_routes: []
+  # default_routes:
+  #   - name: platform-team
+  #     url_env: PLATFORM_WEBHOOK_URL               # or url_file, or url (webhook URLs usually carry a token)
+  #     signing_secret_env: PLATFORM_WEBHOOK_SECRET  # optional Standard Webhooks secret (whsec_...)
+
 # Prometheus metrics at /api/v1/metrics. Off by default since 0.7: turn them on if Prometheus scrapes Chronowarden.
 metrics:
   enabled: false
