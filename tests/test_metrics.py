@@ -8,10 +8,12 @@ from datetime import UTC, datetime
 from typing import Optional
 from unittest.mock import MagicMock, patch
 
+from hvac.exceptions import Forbidden, InvalidPath, VaultError
 from prometheus_client import REGISTRY
 
 from chronowarden.config import AppConfig
 from chronowarden.database import Database, SecretMetadataCache
+from chronowarden.integrations.vault import VaultIntegration
 from chronowarden.metrics.refresh import refresh_secret_metrics
 
 ENABLED = AppConfig.model_validate({"metrics": {"enabled": True}})
@@ -96,3 +98,33 @@ class TestRequestMetrics:
         with patch("chronowarden.app.app_config", config):
             assert TestClient(app).get("/api/v1/health").status_code == 400
         assert _sample("chronowarden_api_requests_total", **labels) == before + 1
+
+
+class TestVaultOperationMetrics:
+    def _vault(self) -> VaultIntegration:
+        vault = VaultIntegration(address="http://v:8200", token="t")
+        vault._client = MagicMock()
+        return vault
+
+    def test_calls_are_counted_by_outcome_and_timed(self) -> None:
+        vault = self._vault()
+        kv = vault._client.secrets.kv.v2
+
+        def count(status: str) -> float:
+            return _sample("chronowarden_vault_operations_total", operation="read_metadata", status=status) or 0
+
+        def timed() -> float:
+            return _sample("chronowarden_vault_operation_duration_seconds_count", operation="read_metadata") or 0
+
+        before = {s: count(s) for s in ("success", "not_found", "forbidden", "error")}
+        samples = timed()
+        kv.read_secret_metadata.return_value = {"data": {}}
+        vault.get_secret_metadata("a")
+        kv.read_secret_metadata.side_effect = InvalidPath("gone")
+        vault.get_secret_metadata("b")
+        kv.read_secret_metadata.side_effect = Forbidden("no")
+        vault.get_secret_metadata("c")
+        kv.read_secret_metadata.side_effect = VaultError("boom")
+        vault.get_secret_metadata("d")
+        assert {s: count(s) - before[s] for s in before} == {"success": 1, "not_found": 1, "forbidden": 1, "error": 1}
+        assert timed() - samples == 4

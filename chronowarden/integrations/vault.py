@@ -13,6 +13,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import RequestException
 
 from chronowarden.integrations.base import BaseIntegration
+from chronowarden.metrics.backend import observe_vault_operation
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -253,10 +254,11 @@ class VaultIntegration(BaseIntegration):
         mount = mount_point if mount_point is not None else self._mount_path
 
         try:
-            response = self._client.secrets.kv.v2.list_secrets(
-                path=path,
-                mount_point=mount,
-            )
+            with observe_vault_operation("list_secrets"):
+                response = self._client.secrets.kv.v2.list_secrets(
+                    path=path,
+                    mount_point=mount,
+                )
 
             if response and "data" in response and "keys" in response["data"]:
                 return response["data"]["keys"] or []
@@ -302,10 +304,11 @@ class VaultIntegration(BaseIntegration):
         mount = mount_point if mount_point is not None else self._mount_path
 
         try:
-            response = self._client.secrets.kv.v2.read_secret_metadata(
-                path=path,
-                mount_point=mount,
-            )
+            with observe_vault_operation("read_metadata"):
+                response = self._client.secrets.kv.v2.read_secret_metadata(
+                    path=path,
+                    mount_point=mount,
+                )
 
             if response and "data" in response:
                 return response["data"]
@@ -338,7 +341,8 @@ class VaultIntegration(BaseIntegration):
             return {"healthy": False, "error": self._last_error or "Not connected"}
 
         try:
-            resp = self._client.sys.read_health_status(method="GET")
+            with observe_vault_operation("health"):
+                resp = self._client.sys.read_health_status(method="GET")
             health = resp if isinstance(resp, dict) else resp.json()
             return {
                 "healthy": True,
@@ -391,7 +395,8 @@ class VaultIntegration(BaseIntegration):
         mount = mount_point if mount_point is not None else self._mount_path
 
         try:
-            current = self._client.secrets.kv.v2.read_secret_metadata(path=path, mount_point=mount)["data"]
+            with observe_vault_operation("read_metadata"):
+                current = self._client.secrets.kv.v2.read_secret_metadata(path=path, mount_point=mount)["data"]
         except Forbidden:
             logger.exception(
                 "Permission denied reading metadata for '%s/%s' before writing - token lacks 'read' on "
@@ -407,12 +412,13 @@ class VaultIntegration(BaseIntegration):
 
         merged = {**(current.get("custom_metadata") or {}), **custom_metadata}
         try:
-            self._client.secrets.kv.v2.update_metadata(
-                path=path,
-                mount_point=mount,
-                custom_metadata=merged,
-                delete_version_after=current.get("delete_version_after") or "0s",
-            )
+            with observe_vault_operation("write_metadata"):
+                self._client.secrets.kv.v2.update_metadata(
+                    path=path,
+                    mount_point=mount,
+                    custom_metadata=merged,
+                    delete_version_after=current.get("delete_version_after") or "0s",
+                )
             logger.debug("Updated custom metadata for %s/%s", mount, path)
             return True
         except Forbidden:
@@ -440,7 +446,8 @@ class VaultIntegration(BaseIntegration):
             return []
 
         try:
-            mounts = self._client.sys.list_mounted_secrets_engines()
+            with observe_vault_operation("list_mounts"):
+                mounts = self._client.sys.list_mounted_secrets_engines()
             engines: list[dict[str, Any]] = []
             if mounts and "data" in mounts:
                 mount_data = mounts["data"]
