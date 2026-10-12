@@ -23,6 +23,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-12-headless-image](2026-10-12-headless-image.md) | #48: a `headless` image without the UI or Typst (API and sync only) |
 | [2026-10-09-wire-prometheus-metrics](2026-10-09-wire-prometheus-metrics.md) | Defined-but-unset metrics get producers |
 | [2026-10-10-release-0-7](2026-10-10-release-0-7.md) | Release 0.7 Compliance evidence, extended scope: order of work |
 | [2026-10-10-supply-chain-security](2026-10-10-supply-chain-security.md) | Scorecard 6.8 → ~8.7, SLSA Build L3, cosign, CycloneDX + SPDX SBOMs, fuzzing, signed Releases |
