@@ -346,6 +346,14 @@ class TestReport:
     def test_unknown_snapshot_is_404(self, client: TestClient) -> None:
         assert client.get("/api/v1/compliance/snapshots/99/report.pdf").status_code == 404
 
+    def test_without_typst_the_report_is_501(self, client: TestClient) -> None:
+        """ADR-024: the headless image keeps the route and says where reports are."""
+        created = client.post("/api/v1/compliance/snapshots", json={"label": "x"}).json()
+        with patch("chronowarden.api.compliance.reports_available", return_value=False):
+            response = client.get(f"/api/v1/compliance/snapshots/{created['id']}/report.pdf")
+        assert response.status_code == 501 and "headless" in response.json()["detail"]
+        assert client.get(f"/api/v1/compliance/snapshots/{created['id']}.json").status_code == 200
+
 
 def test_example_policies_in_the_docs_are_valid() -> None:
     """Every policy example in docs/guides/example-policies.md passes strict validation."""

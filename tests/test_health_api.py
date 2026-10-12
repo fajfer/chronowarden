@@ -4,6 +4,7 @@
 
 """Tests for the health and info endpoints."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import FastAPI
@@ -32,7 +33,17 @@ class TestInfoEndpoint:
         assert response.status_code == 200
         body = response.json()
         assert body["default_theme"] == "bison"
-        assert set(body) == {"name", "version", "docs", "default_theme"}
+        assert set(body) == {"name", "version", "docs", "default_theme", "features"}
+
+    def test_features_say_what_this_image_has(self, tmp_path: Path) -> None:
+        """ADR-024: the headless image has neither the UI nor PDF reports."""
+        with (
+            patch("chronowarden.app.app_config", AppConfig()),
+            patch("chronowarden.app._FRONTEND_DIR", tmp_path / "missing"),
+            patch("chronowarden.api.health.reports_available", return_value=False),
+        ):
+            features = _build_client().get("/api/v1/info").json()["features"]
+        assert features == {"ui": False, "pdf_reports": False}
 
 
 class TestMetricsEndpoint:

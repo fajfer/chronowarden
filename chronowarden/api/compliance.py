@@ -26,7 +26,7 @@ from chronowarden.compliance.evidence import (
 )
 from chronowarden.compliance.periods import ended_periods, period_by_id
 from chronowarden.compliance.policies import evaluate_policy
-from chronowarden.compliance.report import render_report
+from chronowarden.compliance.report import render_report, reports_available
 from chronowarden.config import AppConfig, CompliancePolicy, ComplianceScope
 from chronowarden.metadata import parse_date
 from chronowarden.models.compliance import (
@@ -386,10 +386,15 @@ async def export_snapshot_report(snapshot_id: int) -> Response:
     Render the snapshot's compliance report as PDF/A from the snapshot alone (ADR-020).
 
     Raises:
-        HTTPException: 404 for an unknown snapshot.
+        HTTPException: 404 for an unknown snapshot; 501 in the headless image, which has no Typst (ADR-024).
     """
     database, _ = _get_app_dependencies()
     snapshot = _require_snapshot(database, snapshot_id)
+    if not reports_available():
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="PDF reports aren't available in the headless image; use the default image, or the JSON export",
+        )
     pdf = await asyncio.to_thread(render_report, snapshot, f"Chronowarden {version('chronowarden')}")
     return Response(
         content=pdf,

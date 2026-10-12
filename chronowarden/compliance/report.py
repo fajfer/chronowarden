@@ -4,16 +4,21 @@
 
 """PDF reports of compliance snapshots with Typst (ADR-020)."""
 
+import importlib.util
 import json
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import typst
-
 from chronowarden.timestamps import utc_timestamp
 
 TEMPLATE = Path(__file__).with_name("report.typ")
+
+
+def reports_available() -> bool:
+    """Whether Typst is installed (the `reports` extra); the headless image leaves it out (ADR-024)."""
+    return importlib.util.find_spec("typst") is not None
+
 
 _STATUS_LABELS = (("ok", "Healthy"), ("warning", "Warning"), ("expired", "Overdue"), ("no_ttl", "No TTL"))
 
@@ -109,5 +114,7 @@ def render_report(snapshot: dict[str, Any], generator: str) -> bytes:
 
     Blocking (Typst compiles in-process); call it through `asyncio.to_thread` from async code.
     """
+    import typst  # the optional `reports` extra (ADR-024); callers check reports_available() first
+
     data = json.dumps(report_data(snapshot, generator), ensure_ascii=False)
     return typst.compile(str(TEMPLATE), sys_inputs={"data": data}, ignore_system_fonts=True, pdf_standards=["a-2b"])
