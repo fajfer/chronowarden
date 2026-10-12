@@ -8,7 +8,7 @@ import logging
 import os
 import pathlib
 import re
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional, Union
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -312,12 +312,146 @@ class ReportingConfig(BaseModel):
         return self
 
 
+class ControlScope(BaseModel):
+    """Which secrets a policy control applies to; empty lists and null match everything."""
+
+    model_config = _STRICT
+
+    vaults: list[str] = Field(default_factory=list, description="Vault names")
+    engines: list[str] = Field(default_factory=list, description="Engine mount paths")
+    systems: list[str] = Field(default_factory=list, description="System names")
+    severities: list[str] = Field(default_factory=list, description="Expiry profiles (severities)")
+    paths: list[str] = Field(
+        default_factory=list, description="Glob patterns matched against the full path, vault/engine/path"
+    )
+    privileged: Optional[bool] = Field(default=None, description="true: only privileged secrets; false: only others")
+
+
+class MaxRotationAgeRule(BaseModel):
+    """Fails a secret whose last rotation (backend update) is older than `days`, or unknown."""
+
+    model_config = _STRICT
+
+    type: Literal["max_rotation_age"]
+    days: int = Field(ge=1, description="Maximum age of the last rotation in days")
+
+
+class NotExpiredRule(BaseModel):
+    """Fails a secret whose TTL has passed."""
+
+    model_config = _STRICT
+
+    type: Literal["not_expired"]
+
+
+class HasOwnerRule(BaseModel):
+    """Fails a secret without an effective owner (its own or its system's)."""
+
+    model_config = _STRICT
+
+    type: Literal["has_owner"]
+
+
+class HasSystemRule(BaseModel):
+    """Fails a secret that isn't assigned to a system."""
+
+    model_config = _STRICT
+
+    type: Literal["has_system"]
+
+
+class RotationConfirmedRule(BaseModel):
+    """Fails a secret whose rotation has waited for confirmation longer than the grace period (ADR-021)."""
+
+    model_config = _STRICT
+
+    type: Literal["rotation_confirmed"]
+
+
+PolicyRule = Annotated[
+    Union[MaxRotationAgeRule, NotExpiredRule, HasOwnerRule, HasSystemRule, RotationConfirmedRule],
+    Field(discriminator="type"),
+]
+
+
+class ControlThresholds(BaseModel):
+    """
+    When a control turns amber or red: a number of failing secrets, or a percentage of those in scope.
+
+    Without thresholds, one failing secret is red.
+    """
+
+    model_config = _STRICT
+
+    amber: Optional[int] = Field(default=None, ge=1, description="Failing secrets that make the control amber")
+    red: Optional[int] = Field(default=None, ge=1, description="Failing secrets that make the control red")
+    amber_pct: Optional[float] = Field(default=None, gt=0, le=100, description="Failing percent for amber")
+    red_pct: Optional[float] = Field(default=None, gt=0, le=100, description="Failing percent for red")
+
+    @model_validator(mode="after")
+    def check_kind_and_order(self) -> "ControlThresholds":
+        """Counts or percentages, not both; amber below or at red."""
+        counts = self.amber is not None or self.red is not None
+        pcts = self.amber_pct is not None or self.red_pct is not None
+        if counts and pcts:
+            raise ValueError("use either amber/red (counts) or amber_pct/red_pct, not both")
+        for amber, red in ((self.amber, self.red), (self.amber_pct, self.red_pct)):
+            if amber is not None and red is not None and amber > red:
+                raise ValueError("the amber threshold must not be above the red one")
+        return self
+
+
+class PolicyControl(BaseModel):
+    """One checkable requirement: a scope, one rule and when it turns amber or red."""
+
+    model_config = _STRICT
+
+    id: str = Field(min_length=1, max_length=64, description="Control id, unique within the policy (e.g. PAM-01)")
+    title: str = Field(min_length=1, max_length=300)
+    source: Optional[str] = Field(default=None, max_length=500, description="Where the requirement comes from")
+    scope: ControlScope = Field(default_factory=ControlScope)
+    rule: PolicyRule
+    thresholds: ControlThresholds = Field(default_factory=ControlThresholds)
+
+
+class CompliancePolicy(BaseModel):
+    """A set of controls evaluated against the inventory (ADR-019)."""
+
+    model_config = _STRICT
+
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,63}$", description="Policy id used in URLs, e.g. bank-pam")
+    name: str = Field(min_length=1, max_length=200)
+    framework: Optional[str] = Field(default=None, max_length=100, description="e.g. PCI DSS, DORA, Internal")
+    version: Optional[str] = Field(default=None, max_length=50)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    controls: list[PolicyControl] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def check_unique_control_ids(self) -> "CompliancePolicy":
+        """Control ids identify results, so they must be unique within a policy."""
+        ids = [control.id for control in self.controls]
+        duplicates = sorted({cid for cid in ids if ids.count(cid) > 1})
+        if duplicates:
+            raise ValueError(f"policy '{self.id}' has duplicate control id(s): {', '.join(duplicates)}")
+        return self
+
+
 class ComplianceConfig(BaseModel):
     """Compliance evidence settings (#94)."""
 
     model_config = _STRICT
 
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
+    policies: list[CompliancePolicy] = Field(default_factory=list, description="Compliance policies (ADR-019)")
+
+    @model_validator(mode="after")
+    def check_unique_policy_ids(self) -> "ComplianceConfig":
+        """Policy ids are used in URLs and snapshots, so they must be unique."""
+        ids = [policy.id for policy in self.policies]
+        duplicates = sorted({pid for pid in ids if ids.count(pid) > 1})
+        if duplicates:
+            raise ValueError(f"duplicate compliance policy id(s): {', '.join(duplicates)}")
+        return self
 
 
 class MetricsConfig(BaseModel):
@@ -429,6 +563,22 @@ class AppConfig(BaseModel):
         )
         if unknown:
             raise ValueError(f"compliance reporting scope names unknown vault(s): {', '.join(unknown)}")
+        return self
+
+    @model_validator(mode="after")
+    def validate_policy_scopes(self) -> "AppConfig":
+        """Policy control scopes may only name configured vaults and known severities."""
+        vaults = {vault.name for vault in self.vaults}
+        severities = {*self.expiry_profiles, "none"}
+        for policy in self.compliance.policies:
+            for control in policy.controls:
+                where = f"policy '{policy.id}' control '{control.id}'"
+                unknown = sorted(set(control.scope.vaults) - vaults)
+                if unknown:
+                    raise ValueError(f"{where} names unknown vault(s): {', '.join(unknown)}")
+                unknown = sorted(set(control.scope.severities) - severities)
+                if unknown:
+                    raise ValueError(f"{where} names unknown severity value(s): {', '.join(unknown)}")
         return self
 
     @model_validator(mode="after")

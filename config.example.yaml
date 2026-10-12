@@ -54,6 +54,29 @@ compliance:
     #     scope: { systems: [Billing], privileged_only: true }
     #   - period: yearly
     #     scope: {}
+  # Policies (optional): controls checked against the inventory, shown in the Compliance tab and in snapshot reports.
+  # Example policies for KNF, PCI DSS and DORA are in the docs; they are a starting point, not legal advice.
+  policies: []
+  # policies:
+  #   - id: bank-pam                  # lowercase, used in URLs
+  #     name: Internal PAM standard
+  #     framework: Internal           # optional, e.g. "PCI DSS 4.0"
+  #     version: "2026.1"             # optional
+  #     controls:
+  #       - id: PAM-01
+  #         title: Privileged credentials rotated at least every 90 days
+  #         source: PAM standard section 4.2   # optional: where the requirement comes from
+  #         # scope (all optional; empty matches every secret): vaults, engines, systems, severities,
+  #         # paths (globs on vault/engine/path), privileged (true/false)
+  #         scope: { privileged: true }
+  #         # rule types: max_rotation_age (days), not_expired, has_owner, has_system, rotation_confirmed
+  #         rule: { type: max_rotation_age, days: 90 }
+  #         # failing secrets that turn the control amber/red, or amber_pct/red_pct; default: one failure is red
+  #         thresholds: { amber: 1, red: 5 }
+  #       - id: PAM-02
+  #         title: Every privileged credential has an owner
+  #         scope: { privileged: true }
+  #         rule: { type: has_owner }
 
 # Host names Chronowarden answers to. "*" (default) answers any; listing yours stops other web pages from reaching it
 # through DNS rebinding. Cross-site writes from browsers are refused either way.
