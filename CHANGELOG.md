@@ -12,6 +12,18 @@ Before 1.0, minor versions may contain breaking changes; they are marked **Break
 Releases before 0.6.0 are described in the [GitHub releases](https://github.com/fajfer/chronowarden/releases) and the
 git history.
 
+## [Unreleased]
+
+### Fixed
+
+- Reverting a privileged-flag change returns the revert event instead of an unrelated one.
+- Creating a compliance snapshot while the database is unavailable answers 503 instead of a success without an id.
+
+### Changed
+
+- The secrets list, systems list and notification routes load confirmations, owners and routes in a fixed number of
+  queries instead of one or more per row.
+
 ## [0.7.1] - 2026-10-12
 
 Security release from an audit of 0.7.0. **Upgrade now if `sentry_dsn` is set**, and then rotate Chronowarden's
@@ -252,6 +264,7 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
+[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.7.1...HEAD
 [0.7.1]: https://github.com/fajfer/chronowarden/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/fajfer/chronowarden/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/fajfer/chronowarden/compare/v0.6.2...v0.6.3
