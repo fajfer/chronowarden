@@ -29,6 +29,9 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 - **Credential Health Dashboard** - Visual status of secrets (OK, Warning, Expired, No TTL)
 - **Compliance Evidence** - Privileged flag (`chronowarden_privileged`), gap warnings, opt-in reporting periods and
   frozen, SHA-256 hashed inventory snapshots with CSV/JSON export; a Compliance tab with summaries and a tree
+- **Compliance Policies and Reports** - Your own policies in `config.yaml` (rotation age, expiry, owner, system,
+  confirmed rotations) with green/amber/red results per control, their trend across snapshots, and a PDF/A report
+  for every snapshot
 - **Audit Log** - Append-only, hash-chained record of every change (assignments, systems, owners, removed
   secrets, config), exportable as JSON Lines
 - **Systems and Owners** - Assign secrets to business systems (CMDB link, asset number) and owners, and see who is
@@ -241,6 +244,11 @@ or else its system's owners.
   (`cadence`, `period`; `supersedes` to correct one); `GET .../snapshots/{id}.json` returns the hashed bytes,
   `.csv` the rows
 - `GET /api/v1/compliance/settings` - Reporting and confirmation settings from `config.yaml`
+- `GET /api/v1/compliance/policies` - Configured policies with their YAML
+- `GET /api/v1/compliance/policies/{id}/evaluation` - A policy evaluated now: status per control, failing secrets
+  with their owners, and the trend across snapshots
+- `GET /api/v1/compliance/snapshots/{id}/report.pdf` - The snapshot's PDF/A report: summary, per-control results,
+  failing secrets with owners, methodology; rendered from the snapshot alone
 
 Snapshot exports list secret paths and owners; keep them as confidential as the instance itself.
 

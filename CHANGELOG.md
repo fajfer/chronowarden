@@ -14,6 +14,21 @@ git history.
 
 ## [Unreleased]
 
+### Added
+
+- Compliance policies in `config.yaml` (`compliance.policies`, ADR-019): controls with a scope (vaults, engines,
+  systems, severities, path globs, privileged), one rule (`max_rotation_age`, `not_expired`, `has_owner`,
+  `has_system`, `rotation_confirmed`) and amber/red thresholds by count or percentage.
+- `GET /api/v1/compliance/policies` and `/policies/{id}/evaluation`; snapshots now freeze each policy's results
+  (snapshot format 2), which gives every policy a trend.
+- PDF/A reports of snapshots, rendered with Typst inside the image (`GET .../snapshots/{id}/report.pdf`, ADR-020).
+- Compliance tab: policy results with failing secrets on Overview, a Policies tab with the YAML, and a PDF link per
+  snapshot.
+
+### Changed
+
+- The image is about 77 MiB larger: Typst renders the reports in-process.
+
 ## [0.7.2] - 2026-10-12
 
 Follow-ups from the 0.7.0 audit. Two new config keys limit manual syncs and snapshots; the defaults are on.

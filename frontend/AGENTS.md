@@ -29,8 +29,8 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
   `Sidebar`, …
 - `src/lib/utils/`: `dateFormat.ts`, `statusColor.ts` (status → label and colour), `auditFormat.ts` (event labels,
   one-line summaries, which events show Revert; the server re-checks).
-- `src/routes/`: `/` dashboard, `/secrets`, `/vaults`, `/sync`, `/compliance` (tabs; gap dialog before every
-  snapshot), `/audit`, `/settings`, `/login`; `+layout.ts` sets
+- `src/routes/`: `/` dashboard, `/secrets`, `/vaults`, `/sync`, `/compliance` (tabs Overview with policy results,
+  Policies, Snapshots with JSON/CSV/PDF, Tree, Settings; gap dialog before every snapshot), `/audit`, `/settings`, `/login`; `+layout.ts` sets
   `ssr = false`.
 - `static/`: logos and mascots per theme. `mockups/`: standalone HTML mockups the UI was built from (`4ee2142`).
 
@@ -62,7 +62,7 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
   here. A filter bug is usually in that `$derived.by` block or in `stores/filters.ts`.
 - `stores/auth.ts` is a placeholder: there is no auth backend, and it defaults to authenticated.
 - Svelte 5 runes (`$derived`, `$state`) are used in pages; stores use `svelte/store`.
-- `npm run check` currently reports 0 errors and 6 warnings; don't add new ones.
+- `npm run check` currently reports 0 errors and 2 warnings (OwnerModal); don't add new ones.
 - Don't edit `build/` or `.svelte-kit/`; they are generated.
 - Regenerate `package-lock.json` with the npm the build uses (Node 22, see `Dockerfile` and `ci.yaml`), e.g.
   `docker run --rm -v $PWD:/w -w /w node:22-alpine npm install --package-lock-only`. A lockfile written by a newer npm
