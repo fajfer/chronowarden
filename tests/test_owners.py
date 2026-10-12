@@ -4,10 +4,12 @@
 
 """Tests for owner management functionality."""
 
+import logging
 import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -356,16 +358,28 @@ class TestOwnersAPI:
             data = response.json()
             assert len(data) == 2
 
-    def test_test_route_success(self) -> None:
-        """Test the test-route endpoint returns success."""
+    def test_test_route_says_nothing_was_sent(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Regression (0.7.1): the stub claimed success and logged the webhook URL, which is a credential."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
         self.db.create_notification_route("route-1", "owner-1", "webhook", "https://hooks.example.com/alice", "Test")
         client = self._build_client()
         with patch("chronowarden.api.owners._get_db", return_value=self.db):
-            response = client.post("/api/v1/owners/owner-1/test-route/route-1")
+            with caplog.at_level(logging.DEBUG):
+                response = client.post("/api/v1/owners/owner-1/test-route/route-1")
             assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
+            assert response.json()["success"] is False
+            assert "hooks.example.com" not in caplog.text and "hooks.example.com" not in response.text
+
+    def test_delete_route_of_another_owner_is_404(self) -> None:
+        """Regression (0.7.1): deleting checked only the owner, so any owner's URL could delete any route."""
+        self.db.create_owner("owner-1", "Alice", "alice@example.com")
+        self.db.create_owner("owner-2", "Bob", "bob@example.com")
+        self.db.create_notification_route("route-b", "owner-2", "webhook", "https://hooks.example.com/bob", "Test")
+        client = self._build_client()
+        with patch("chronowarden.api.owners._get_db", return_value=self.db):
+            assert client.delete("/api/v1/owners/owner-1/routes/route-b").status_code == 404
+            assert client.delete("/api/v1/owners/owner-1/routes/unknown").status_code == 404
+        assert [r["id"] for r in self.db.list_notification_routes("owner-2")] == ["route-b"]
 
     def test_test_route_owner_not_found(self) -> None:
         """Test the test-route endpoint returns 404 for missing owner."""
