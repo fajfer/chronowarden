@@ -14,6 +14,10 @@ git history.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-12
+
+Follow-ups from the 0.7.0 audit. Two new config keys limit manual syncs and snapshots; the defaults are on.
+
 ### Security
 
 - Notification route addresses are masked to scheme and host in every response (webhook URLs often carry a token),
@@ -24,7 +28,6 @@ git history.
 ### Fixed
 
 - The UI shows "keeps retrying" again when a manual sync finds the vault unreachable, instead of a plain failure.
-
 - Reverting a privileged-flag change returns the revert event instead of an unrelated one.
 - Creating a compliance snapshot while the database is unavailable answers 503 instead of a success without an id.
 
@@ -32,6 +35,8 @@ git history.
 
 - The secrets list, systems list and notification routes load confirmations, owners and routes in a fixed number of
   queries instead of one or more per row.
+- Every dialog closes on Escape and is announced as a dialog to screen readers.
+- Release images build without the GitHub Actions cache, so a poisoned cache entry can't reach a signed image.
 
 ## [0.7.1] - 2026-10-12
 
@@ -273,7 +278,8 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
-[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/fajfer/chronowarden/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/fajfer/chronowarden/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/fajfer/chronowarden/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/fajfer/chronowarden/compare/v0.6.2...v0.6.3
