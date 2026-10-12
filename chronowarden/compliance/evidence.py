@@ -145,6 +145,16 @@ def build_document(
     return text, hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_cell(value: Any) -> Any:
+    """Prefix text a spreadsheet would run as a formula with ' (OWASP CSV injection guidance)."""
+    if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
+
 def rows_to_csv(rows: list[dict[str, Any]]) -> str:
     """Flatten snapshot rows to CSV (owners joined with '; ')."""
     out = io.StringIO()
@@ -152,13 +162,12 @@ def rows_to_csv(rows: list[dict[str, Any]]) -> str:
     writer.writeheader()
     for row in rows:
         system = row["system"] or {}
-        writer.writerow(
-            {
-                **{key: row[key] for key in CSV_COLUMNS if key in row and key not in ("system", "owners")},
-                "system": system.get("name"),
-                "system_cmdb_uri": system.get("cmdb_uri"),
-                "system_asset_number": system.get("asset_number"),
-                "owners": "; ".join(row["owners"]),
-            }
-        )
+        cells = {
+            **{key: row[key] for key in CSV_COLUMNS if key in row and key not in ("system", "owners")},
+            "system": system.get("name"),
+            "system_cmdb_uri": system.get("cmdb_uri"),
+            "system_asset_number": system.get("asset_number"),
+            "owners": "; ".join(row["owners"]),
+        }
+        writer.writerow({key: _csv_cell(value) for key, value in cells.items()})
     return out.getvalue()
