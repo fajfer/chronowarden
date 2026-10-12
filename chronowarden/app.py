@@ -229,10 +229,20 @@ def register_frontend(target: FastAPI, frontend_dir: Path) -> None:
     target.mount("/_app", StaticFiles(directory=frontend_dir / "_app"), name="frontend-assets")
 
 
-_FRONTEND_DIR = _resolve_frontend_dir()
+def serve_frontend_if_built(target: FastAPI, frontend_dir: Path) -> bool:
+    """
+    Serve the SPA when its build exists; otherwise serve only the API, so other paths are plain 404s.
 
-if _FRONTEND_DIR.is_dir():
-    register_frontend(app, _FRONTEND_DIR)
-    logger.info("Frontend served from %s", _FRONTEND_DIR)
-else:
-    logger.warning("Frontend build not found at %s — UI will not be served", _FRONTEND_DIR)
+    Returns:
+        Whether the UI is served. The headless image has no build (ADR-024).
+    """
+    if not frontend_dir.is_dir():
+        logger.info("No frontend build at %s; serving the API only", frontend_dir)
+        return False
+    register_frontend(target, frontend_dir)
+    logger.info("Frontend served from %s", frontend_dir)
+    return True
+
+
+_FRONTEND_DIR = _resolve_frontend_dir()
+serve_frontend_if_built(app, _FRONTEND_DIR)
