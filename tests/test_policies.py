@@ -345,3 +345,14 @@ class TestReport:
 
     def test_unknown_snapshot_is_404(self, client: TestClient) -> None:
         assert client.get("/api/v1/compliance/snapshots/99/report.pdf").status_code == 404
+
+
+def test_example_policies_in_the_docs_are_valid() -> None:
+    """Every policy example in docs/guides/example-policies.md passes strict validation."""
+    text = (REPO / "docs/guides/example-policies.md").read_text(encoding="utf-8")
+    blocks = [yaml.safe_load(block) for block in re.findall(r"```yaml\n(.*?)```", text, re.S)]
+    policies = [policy for block in blocks if isinstance(block, list) for policy in block]
+    config = _config(*policies)
+    assert [p.id for p in config.compliance.policies] == ["pci-dss-4", "dora-ict"]
+    cadences = next(b for b in blocks if isinstance(b, dict))
+    assert AppConfig.model_validate(cadences).compliance.reporting.cadences[0].period == "quarterly"
