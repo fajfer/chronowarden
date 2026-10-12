@@ -33,7 +33,8 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
   `api`. `actor` stays null until authentication (0.9).
 - Event types: `secret.system`, `secret.owners` (`{"owners": [{id, name}]}`), `secret.removed`, `secret.reappeared`,
   `secret.purged` (with the assignments that went), `system.created|updated|owners|deleted` (subject `system:<id>`),
-  `owner.created|updated|deleted` (subject `owner:<id>`), `config.baseline|changed` (subject `config`). From sync:
+  `owner.created|updated|deleted|route_added|route_deleted` (subject `owner:<id>`; route events hold
+  `{id, type, address}` with the webhook address masked to scheme and host), `config.baseline|changed` (subject `config`). From sync:
   `secret.baseline` (first sight), `secret.metadata` (custom keys, values included), `secret.settings`,
   `secret.version` (rotation; values never read), `secret.config_applied` (Chronowarden's own severity/TTL write).
   `secret.confirmed` (rotation confirmed as applied, ADR-021), `secret.privileged` (revertible; written to the

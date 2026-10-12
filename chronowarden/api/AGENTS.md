@@ -17,7 +17,7 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 | `secrets.py` | `/secrets` | `GET /` (filters `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id`, `unassigned`, `include_removed`), `GET /{id}`, `PUT /{id}/system`, `PUT /{id}/owners`, `POST /{id}/confirmations`, `PUT /{id}/privileged`, `GET /{id}/history`, `DELETE /{id}` and `DELETE /removed` (purge removed secrets only; 409 for one that still exists) |
 | `sync.py` | `/sync` | `POST /vault/{vault_name}` |
 | `vault.py` | `/vault` | `GET /instances`, `/health`, `/{name}/health` |
-| `owners.py` | `/owners` | CRUD for owners, `POST/DELETE` notification routes, `POST /{id}/test-route/{route_id}` |
+| `owners.py` | `/owners` | CRUD for owners, `POST/DELETE` notification routes (responses mask the webhook address to scheme and host), `POST /{id}/test-route/{route_id}` |
 | `audit.py` | `/audit` | `GET /events` (filters, `before_id` paging), `/events.jsonl` (export as stored), `/verify`, `POST /events/{id}/revert`; see [audit](../audit/AGENTS.md) |
 | `compliance.py` | `/compliance` | `GET /settings`, `/summary`, `/gaps`, `/periods`, `GET/POST /snapshots`, `/snapshots/{id}(.json/.csv)`; see [compliance](../compliance/AGENTS.md) |
 | `systems.py` | `/systems` | CRUD for systems, `PUT /{id}/owners`; `DELETE` is 409 (with the secret list) while secrets are assigned |

@@ -4,6 +4,7 @@
 
 """Tests for owner management functionality."""
 
+import json
 import logging
 import sqlite3
 from pathlib import Path
@@ -13,7 +14,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from chronowarden.api.owners import router
+from chronowarden.api.owners import mask_address, router
 from chronowarden.database import Database
 
 
@@ -277,8 +278,9 @@ class TestOwnersAPI:
             assert response.status_code == 201
             data = response.json()
             assert data["type"] == "webhook"
-            assert data["address"] == "https://hooks.example.com/alice"
+            assert data["address"] == "https://hooks.example.com/…"
             assert data["owner_id"] == "owner-1"
+            assert self.db.list_notification_routes("owner-1")[0]["address"] == "https://hooks.example.com/alice"
 
     def test_add_route_owner_not_found(self) -> None:
         """Test adding a route to a nonexistent owner returns 404."""
@@ -381,3 +383,33 @@ class TestOwnersAPI:
         with patch("chronowarden.api.owners._get_db", return_value=self.db):
             response = client.post("/api/v1/owners/owner-1/test-route/nonexistent")
             assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "address,masked",
+    [
+        ("https://hooks.slack.com/services/T0/B0/secret", "https://hooks.slack.com/…"),
+        ("https://user:pass@hooks.example.com:8443/x?token=t", "https://hooks.example.com:8443/…"),
+        ("not a url", "…"),
+    ],
+)
+def test_mask_address(address: str, masked: str) -> None:
+    assert mask_address(address) == masked
+
+
+def test_routes_are_masked_and_audited(db: Database) -> None:
+    """Regression (audit follow-ups): webhook URLs carry tokens, so no response or audit event holds one."""
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    db.create_owner("alice", "Alice", "alice@example.com")
+    token_url = "https://hooks.slack.com/services/T0/B0/secret-token"
+    with patch("chronowarden.api.owners._get_db", return_value=db):
+        client = TestClient(app)
+        route = client.post("/api/v1/owners/alice/routes", json={"type": "webhook", "address": token_url}).json()
+        responses = [client.get("/api/v1/owners/").text, client.get("/api/v1/owners/alice").text]
+        assert client.delete(f"/api/v1/owners/alice/routes/{route['id']}").status_code == 204
+    events = db.list_audit_events(subject="owner:alice")
+    assert [e["event_type"] for e in events] == ["owner.route_deleted", "owner.route_added"]
+    expected = {"id": route["id"], "type": "webhook", "address": "https://hooks.slack.com/…"}
+    assert json.loads(events[1]["after"]) == expected and json.loads(events[0]["before"]) == expected
+    assert all("secret-token" not in text for text in [*responses, *(json.dumps(e) for e in events)])

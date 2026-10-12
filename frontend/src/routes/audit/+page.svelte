@@ -14,7 +14,8 @@
     'secret.system', 'secret.owners', 'secret.confirmed', 'secret.version', 'secret.metadata', 'secret.settings',
     'secret.config_applied', 'secret.baseline', 'secret.removed', 'secret.reappeared', 'secret.purged',
     'system.created', 'system.updated', 'system.owners', 'system.deleted',
-    'owner.created', 'owner.updated', 'owner.deleted', 'config.baseline', 'config.changed',
+    'owner.created', 'owner.updated', 'owner.deleted', 'owner.route_added', 'owner.route_deleted',
+    'config.baseline', 'config.changed',
   ];
 
   let events = $state<AuditEvent[]>([]);

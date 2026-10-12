@@ -26,6 +26,8 @@ const LABELS: Record<string, string> = {
   'owner.created': 'Owner created',
   'owner.updated': 'Owner updated',
   'owner.deleted': 'Owner deleted',
+  'owner.route_added': 'Notification route added',
+  'owner.route_deleted': 'Notification route removed',
   'config.baseline': 'Config recorded',
   'config.changed': 'Config changed',
 };
@@ -105,6 +107,10 @@ export function describeEvent(event: AuditEvent): string {
     case 'system.deleted':
     case 'owner.deleted':
       return show(before?.name);
+    case 'owner.route_added':
+      return show(after?.address);
+    case 'owner.route_deleted':
+      return show(before?.address);
     default:
       return keyChanges(before, after);
   }
