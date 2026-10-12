@@ -6,6 +6,7 @@
 
 from datetime import UTC, datetime
 from typing import Optional
+from unittest.mock import MagicMock, patch
 
 from prometheus_client import REGISTRY
 
@@ -65,3 +66,33 @@ class TestSecretMetrics:
         refresh_secret_metrics(db, AppConfig())
         labels = {"vault": "prod", "engine": "apps", "secret_path": "fresh", "severity": "default"}
         assert _sample("chronowarden_secret_expiry_timestamp_seconds", **labels) is None
+
+
+class TestRequestMetrics:
+    def test_requests_are_labelled_with_the_route_template(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from chronowarden.app import app
+
+        labels = {"method": "GET", "endpoint": "/api/v1/compliance/snapshots/{snapshot_id}", "status": "404"}
+        before = _sample("chronowarden_api_requests_total", **labels) or 0
+        database = MagicMock(get_snapshot=MagicMock(return_value=None))
+        with patch("chronowarden.api.compliance._get_app_dependencies", return_value=(database, AppConfig())):
+            assert TestClient(app).get("/api/v1/compliance/snapshots/12345").status_code == 404
+        assert _sample("chronowarden_api_requests_total", **labels) == before + 1
+        assert (
+            _sample("chronowarden_api_requests_total", **{**labels, "endpoint": "/api/v1/compliance/snapshots/12345"})
+            is None
+        )
+
+    def test_guard_refusals_are_counted_too(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from chronowarden.app import app
+
+        config = AppConfig(allowed_hosts=["chronowarden.example.com"])
+        labels = {"method": "GET", "endpoint": "unmatched", "status": "400"}
+        before = _sample("chronowarden_api_requests_total", **labels) or 0
+        with patch("chronowarden.app.app_config", config):
+            assert TestClient(app).get("/api/v1/health").status_code == 400
+        assert _sample("chronowarden_api_requests_total", **labels) == before + 1
