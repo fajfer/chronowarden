@@ -42,9 +42,11 @@ def _retimestamp_handlers(logger: logging.Logger, formatter_cls: type[DefaultFor
 
 
 def configure_logging() -> None:
-    """Add timestamps to uvicorn's log handlers and filter quiet paths from the access log (#58)."""
+    """Add timestamps to uvicorn's log handlers, filter quiet paths from the access log (#58), keep URLs out."""
     _retimestamp_handlers(logging.getLogger("uvicorn"), DefaultFormatter, DEFAULT_FORMAT)
     _retimestamp_handlers(logging.getLogger("uvicorn.access"), AccessFormatter, ACCESS_FORMAT)
     access_logger = logging.getLogger("uvicorn.access")
     if not any(isinstance(f, QuietPathsFilter) for f in access_logger.filters):
         access_logger.addFilter(QuietPathsFilter())
+    # urllib3 logs every request line at DEBUG; webhook paths carry tokens (ADR-025), so never at DEBUG
+    logging.getLogger("urllib3.connectionpool").setLevel(logging.INFO)

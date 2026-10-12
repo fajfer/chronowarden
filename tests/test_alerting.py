@@ -177,3 +177,24 @@ def test_resolved_payload_has_an_end(status: str) -> None:
         None,
     )
     assert payload["alerts"][0]["endsAt"] == "e" and payload["externalURL"] == ""
+
+
+def test_alerts_and_deliveries_api(db: Database) -> None:
+    from unittest.mock import patch
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from chronowarden.api.alerts import router
+
+    config = AppConfig.model_validate({"alerting": {"default_routes": [{"name": "ops", "url": "https://h/x"}]}})
+    enqueue(db, config, reconcile(db, [_alert()], SECRET_STATE_ALERTS, NOW, DAY), NOW)
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    with patch("chronowarden.api.alerts._get_db", return_value=db):
+        client = TestClient(app)
+        [alert] = client.get("/api/v1/alerts").json()
+        [delivery] = client.get("/api/v1/webhooks/deliveries").json()
+    assert alert["alertname"] == "SecretExpired" and alert["labels"]["secret_path"] == "db"
+    assert (delivery["receiver"], delivery["status"], delivery["attempts"]) == ("default:ops", "pending", 0)
+    assert "payload" not in delivery and "https://h/x" not in json.dumps(delivery)

@@ -18,6 +18,7 @@ from starlette.responses import FileResponse, Response
 
 from chronowarden.alerting.delivery import DeliveryWorker
 from chronowarden.api import (
+    alerts_router,
     audit_router,
     compliance_router,
     health_router,
@@ -134,6 +135,7 @@ app = FastAPI(
         {"name": "systems", "description": "Systems that secrets are assigned to"},
         {"name": "audit", "description": "Append-only, hash-chained audit log"},
         {"name": "compliance", "description": "Compliance evidence: summary, gaps, periods, snapshots"},
+        {"name": "alerts", "description": "Firing alerts and the webhook delivery log (ADR-025)"},
     ],
 )
 
@@ -162,6 +164,7 @@ app.include_router(owners_router, prefix="/api/v1")
 app.include_router(systems_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(compliance_router, prefix="/api/v1")
+app.include_router(alerts_router, prefix="/api/v1")
 
 
 @app.get("/api/v1", tags=["root"], summary="API endpoint")

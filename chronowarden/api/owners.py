@@ -4,13 +4,19 @@
 
 """API routes for owner management."""
 
+import asyncio
+import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Path, Request, status
 
+from chronowarden.alerting.delivery import post
+from chronowarden.alerting.payload import build_payload
+from chronowarden.alerting.signing import generate_secret
 from chronowarden.api.audit import request_source
 from chronowarden.models.owner import (
     NotificationRoute,
@@ -18,7 +24,10 @@ from chronowarden.models.owner import (
     Owner,
     OwnerCreate,
     OwnerUpdate,
+    RouteTestResult,
+    SigningSecret,
 )
+from chronowarden.timestamps import utc_timestamp
 
 router = APIRouter(prefix="/owners", tags=["owners"])
 
@@ -77,6 +86,7 @@ def _build_route(route: dict) -> NotificationRoute:
         address=mask_address(route["address"]),
         message_template=route.get("message_template", ""),
         created_at=route.get("created_at"),
+        signed=bool(route.get("signed")),
     )
 
 
@@ -220,30 +230,121 @@ async def delete_route(
         HTTPException: 404 if the owner doesn't exist or the route isn't one of its routes.
     """
     db = _get_db()
-    _require_owner(db, owner_id)
-    route = next((r for r in db.list_notification_routes(owner_id) if r["id"] == route_id), None)
-    if route is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Route '{route_id}' not found")
+    route = _require_route(db, owner_id, route_id)
     db.delete_notification_route(route_id)
     db.append_audit_event(
         "owner.route_deleted", request_source(request), subject=f"owner:{owner_id}", before=_route_view(route)
     )
 
 
+def _require_route(db: Any, owner_id: str, route_id: str) -> dict:
+    """
+    Return one of an owner's routes.
+
+    Raises:
+        HTTPException: 404 if the owner doesn't exist or the route isn't one of its routes.
+    """
+    _require_owner(db, owner_id)
+    route = next((r for r in db.list_notification_routes(owner_id) if r["id"] == route_id), None)
+    if route is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Route '{route_id}' not found")
+    return route
+
+
+@router.post(
+    "/{owner_id}/routes/{route_id}/signing",
+    response_model=SigningSecret,
+    status_code=status.HTTP_201_CREATED,
+    summary="Turn on signing for a route",
+)
+async def enable_signing(
+    request: Request, owner_id: str = Path(description="Owner ID"), route_id: str = Path(description="Route ID")
+) -> SigningSecret:
+    """
+    Generate a new Standard Webhooks secret for the route; it is shown only in this response (ADR-025).
+
+    Calling it again replaces the secret (rotation): update the receiver at the same time.
+
+    Raises:
+        HTTPException: 404 if the owner or route doesn't exist.
+    """
+    db = _get_db()
+    route = _require_route(db, owner_id, route_id)
+    secret = generate_secret()
+    db.set_route_signing_secret(route_id, secret)
+    db.append_audit_event(
+        "owner.route_signing",
+        request_source(request),
+        subject=f"owner:{owner_id}",
+        before={"id": route_id, "signed": bool(route["signed"])},
+        after={"id": route_id, "signed": True},
+    )
+    return SigningSecret(route_id=route_id, secret=secret)
+
+
+@router.delete(
+    "/{owner_id}/routes/{route_id}/signing",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Turn off signing for a route",
+)
+async def disable_signing(
+    request: Request, owner_id: str = Path(description="Owner ID"), route_id: str = Path(description="Route ID")
+) -> None:
+    """
+    Forget the route's signing secret; deliveries go out unsigned.
+
+    Raises:
+        HTTPException: 404 if the owner or route doesn't exist.
+    """
+    db = _get_db()
+    route = _require_route(db, owner_id, route_id)
+    db.set_route_signing_secret(route_id, None)
+    if route["signed"]:
+        db.append_audit_event(
+            "owner.route_signing",
+            request_source(request),
+            subject=f"owner:{owner_id}",
+            before={"id": route_id, "signed": True},
+            after={"id": route_id, "signed": False},
+        )
+
+
 @router.post(
     "/{owner_id}/test-route/{route_id}",
-    summary="Test a notification route",
+    response_model=RouteTestResult,
+    summary="Send a test webhook to a route",
 )
 async def test_route(
     owner_id: str = Path(description="Owner ID"),
     route_id: str = Path(description="Route ID"),
-) -> dict[str, Any]:
-    """Send a test notification via a specific route."""
+) -> RouteTestResult:
+    """
+    POST a test alert to the route now, signed if signing is on, and report how the receiver answered.
+
+    The URL never appears in the answer or the logs: webhook URLs carry tokens.
+
+    Raises:
+        HTTPException: 404 if the owner or route doesn't exist.
+    """
+    from chronowarden.app import app_config
+
     db = _get_db()
-    _require_owner(db, owner_id)
-    routes = db.list_notification_routes(owner_id)
-    route = next((r for r in routes if r["id"] == route_id), None)
-    if route is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Route '{route_id}' not found")
-    # Webhook URLs are credentials (Slack, Teams): never log them. Delivery comes with webhook alerting in 0.8.
-    return {"success": False, "message": "Nothing was sent: notification delivery comes with webhook alerting (0.8)"}
+    _require_route(db, owner_id, route_id)
+    target = db.get_route_target(route_id)
+    now = datetime.now(tz=timezone.utc)
+    notification = {
+        "fingerprint": "test",
+        "alertname": "ChronowardenTest",
+        "labels": {"alertname": "ChronowardenTest", "owner": owner_id},
+        "annotations": {"summary": "Test webhook from Chronowarden", "description": "Nothing needs to be done"},
+        "status": "firing",
+        "starts_at": utc_timestamp(now),
+        "ends_at": utc_timestamp(now),
+    }
+    body = json.dumps(build_payload(notification, f"owner:{owner_id}", app_config.alerting.external_url))
+    status_code, error = await asyncio.to_thread(
+        post, target["address"], body.encode("utf-8"), f"msg_test_{uuid.uuid4().hex}", target["signing_secret"], now
+    )
+    if error:
+        return RouteTestResult(success=False, status_code=status_code, message=f"The receiver answered: {error}")
+    return RouteTestResult(success=True, status_code=status_code, message="Delivered")

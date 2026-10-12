@@ -4,6 +4,7 @@
 
 """API package for Chronowarden."""
 
+from chronowarden.api.alerts import router as alerts_router
 from chronowarden.api.audit import router as audit_router
 from chronowarden.api.compliance import router as compliance_router
 from chronowarden.api.health import router as health_router
@@ -14,6 +15,7 @@ from chronowarden.api.systems import router as systems_router
 from chronowarden.api.vault import router as vault_router
 
 __all__ = [
+    "alerts_router",
     "audit_router",
     "compliance_router",
     "health_router",
