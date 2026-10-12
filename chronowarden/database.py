@@ -182,30 +182,6 @@ class Database:
                 return None
             return _row_to_cache(row)
 
-    def list_secrets_for_vault(self, vault_name: str) -> list[SecretMetadataCache]:
-        """
-        List all cached secrets for a vault.
-
-        Args:
-            vault_name: The vault instance name.
-
-        Returns:
-            List of cached metadata entries.
-        """
-        with self._conn_lock:
-            conn = self._require_connection()
-            if conn is None:
-                return []
-            cursor = conn.execute(
-                f"""
-                SELECT {_CACHE_COLUMNS}
-                FROM secret_metadata_cache
-                WHERE vault_name = ?
-                """,
-                (vault_name,),
-            )
-            return [_row_to_cache(row) for row in cursor.fetchall()]
-
     def get_secret_by_id(self, secret_id: int) -> Optional[SecretMetadataCache]:
         """
         Retrieve a cached secret metadata entry by its primary key.

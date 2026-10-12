@@ -4,7 +4,6 @@
 
 """API routes for systems (ADR-010)."""
 
-import logging
 import sqlite3
 import uuid
 from typing import Any
@@ -16,8 +15,6 @@ from chronowarden.assignments import AssignmentIndex
 from chronowarden.models.system import OwnerIds, System, SystemCreate, SystemUpdate
 
 router = APIRouter(prefix="/systems", tags=["systems"])
-
-logger = logging.getLogger("uvicorn.error")
 
 
 def _get_db() -> Any:

@@ -99,8 +99,8 @@ class VaultIntegration(BaseIntegration):
         if self._client is not None:
             try:
                 self._client.adapter.close()
-            except Exception:
-                logger.exception("Failed to close previous Vault client before reconnect")
+            except Exception:  # noqa: BLE001 - cleanup: closing the old client must never stop the reconnect
+                logger.debug("Failed to close previous Vault client before reconnect", exc_info=True)
             finally:
                 self._client = None
 
