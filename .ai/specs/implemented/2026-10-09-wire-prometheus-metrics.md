@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Wire the defined-but-unset Prometheus metrics
 
-- **Status:** approved
+- **Status:** implemented
 - **Date:** 2026-10-09
 - **Issue:** #71
 
@@ -26,13 +26,13 @@ starting with the secret-expiry gauges the README alerting promise depends on.
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [metrics](../../chronowarden/metrics/AGENTS.md)
-- [core](../../chronowarden/AGENTS.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [metrics](../../../chronowarden/metrics/AGENTS.md)
+- [core](../../../chronowarden/AGENTS.md)
 
 ## ADRs affected
 
-Implements the metrics half of [ADR-022](../adr/ADR-022-webhooks-and-optional-metrics.md), which superseded
+Implements the metrics half of [ADR-022](../../adr/ADR-022-webhooks-and-optional-metrics.md), which superseded
 ADR-012: metrics stay optional (`metrics.enabled`, off by default), and alerts by Chronowarden itself are webhooks
 (#99), not this spec.
 
@@ -40,10 +40,10 @@ ADR-012: metrics stay optional (`metrics.enabled`, off by default), and alerts b
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | Expose per-secret series (e.g. days remaining, status) labeled with vault, engine, path and severity, refreshed from the cache after each sync; keep or replace the aggregate `SECRETS_*` gauges; ship example Prometheus alert rules in the docs | metrics, core, [api](../../chronowarden/api/AGENTS.md) | Test asserts gauge values after a sync of fixture data | todo | |
-| 2 | Request middleware sets `API_REQUESTS_TOTAL` and `API_REQUEST_DURATION_SECONDS` with the route template (not the raw path) as `endpoint` | metrics, core | Test asserts a counter delta after a request | todo | |
-| 3 | `VAULT_OPERATION_DURATION_SECONDS` around Vault calls in `vault.py` | metrics, [integrations](../../chronowarden/integrations/AGENTS.md) | Test asserts a histogram sample count delta | todo | |
-| 4 | Update the metrics table in `chronowarden/metrics/AGENTS.md` | metrics | Table matches code | todo | |
+| 1 | Expose per-secret series (e.g. days remaining, status) labeled with vault, engine, path and severity, refreshed from the cache after each sync; keep or replace the aggregate `SECRETS_*` gauges; ship example Prometheus alert rules in the docs | metrics, core, [api](../../../chronowarden/api/AGENTS.md) | Test asserts gauge values after a sync of fixture data | done | 38ed255 |
+| 2 | Request middleware sets `API_REQUESTS_TOTAL` and `API_REQUEST_DURATION_SECONDS` with the route template (not the raw path) as `endpoint` | metrics, core | Test asserts a counter delta after a request | done | 0dfc011 |
+| 3 | `VAULT_OPERATION_DURATION_SECONDS` around Vault calls in `vault.py` | metrics, [integrations](../../../chronowarden/integrations/AGENTS.md) | Test asserts a histogram sample count delta | done | d9a63a2 |
+| 4 | Update the metrics table in `chronowarden/metrics/AGENTS.md` | metrics | Table matches code | done | 3fefe5b |
 
 ## Validation
 
