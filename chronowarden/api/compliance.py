@@ -4,8 +4,10 @@
 
 """API routes for compliance evidence: summary, gaps, reporting periods and snapshots (#94)."""
 
+import asyncio
 import json
 from datetime import datetime, timezone
+from importlib.metadata import version
 from typing import Any, Optional
 
 import yaml
@@ -24,6 +26,7 @@ from chronowarden.compliance.evidence import (
 )
 from chronowarden.compliance.periods import ended_periods, period_by_id
 from chronowarden.compliance.policies import evaluate_policy
+from chronowarden.compliance.report import render_report
 from chronowarden.config import AppConfig, CompliancePolicy, ComplianceScope
 from chronowarden.metadata import parse_date
 from chronowarden.models.compliance import (
@@ -369,6 +372,29 @@ async def export_snapshot_csv(snapshot_id: int) -> Response:
         content=rows_to_csv(json.loads(snapshot["content"])["rows"]),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="chronowarden-snapshot-{snapshot_id}.csv"'},
+    )
+
+
+@router.get(
+    "/snapshots/{snapshot_id}/report.pdf",
+    summary="Download a snapshot's PDF report",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+async def export_snapshot_report(snapshot_id: int) -> Response:
+    """
+    Render the snapshot's compliance report as PDF/A from the snapshot alone (ADR-020).
+
+    Raises:
+        HTTPException: 404 for an unknown snapshot.
+    """
+    database, _ = _get_app_dependencies()
+    snapshot = _require_snapshot(database, snapshot_id)
+    pdf = await asyncio.to_thread(render_report, snapshot, f"Chronowarden {version('chronowarden')}")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="chronowarden-report-{snapshot_id}.pdf"'},
     )
 
 

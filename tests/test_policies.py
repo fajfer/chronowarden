@@ -5,6 +5,7 @@
 """Tests for compliance policies (ADR-019)."""
 
 import hashlib
+import io
 import json
 import pathlib
 import re
@@ -18,10 +19,13 @@ import yaml
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from pypdf import PdfReader
 
 from chronowarden.api.compliance import router as compliance_router
+from chronowarden.compliance.evidence import build_document
 from chronowarden.compliance.policies import evaluate_policy, fails, in_control_scope, rag
-from chronowarden.config import AppConfig, CompliancePolicy, ControlScope, ControlThresholds
+from chronowarden.compliance.report import render_report
+from chronowarden.config import AppConfig, CompliancePolicy, ComplianceScope, ControlScope, ControlThresholds
 from chronowarden.database import Database, SecretMetadataCache
 from chronowarden.models.secret import SecretMetadataResponse, SecretStatus
 from chronowarden.models.system import OwnerRef, SystemRef
@@ -300,3 +304,44 @@ class TestApi:
         content = client.get(f"/api/v1/compliance/snapshots/{created['id']}.json").content
         assert hashlib.sha256(content).hexdigest() == created["sha256"]
         assert json.loads(content)["policies"][0]["id"] == "pam"
+
+
+def _pdf_text(content: bytes) -> str:
+    return " ".join(" ".join(page.extract_text().split()) for page in PdfReader(io.BytesIO(content)).pages)
+
+
+class TestReport:
+    def test_report_pdf_from_a_snapshot(self, client: TestClient) -> None:
+        created = client.post("/api/v1/compliance/snapshots", json={"label": "Q3 review"}).json()
+        response = client.get(f"/api/v1/compliance/snapshots/{created['id']}/report.pdf")
+        assert response.status_code == 200 and response.headers["content-type"] == "application/pdf"
+        assert response.content.startswith(b"%PDF-") and b"pdfaid:part" in response.content
+        text = _pdf_text(response.content)
+        for expected in (
+            "Secret rotation compliance report",
+            "Q3 review",
+            created["sha256"],
+            "PAM Internal RED",
+            "PAM-01 Privileged have an owner Has an owner (its own or its system's). Red from 1 failing. 1 1 RED",
+            "PAM-01: failing secrets",
+            "prod/apps/db —",
+            "Methodology and limitations",
+        ):
+            assert expected in text, expected
+
+    def test_user_text_is_never_typst_markup(self, db: Database) -> None:
+        """Names come from users and backends; the template must show them as text, not run them."""
+        content, sha256 = build_document(
+            [],
+            "2026-10-12T10:00:00.000000Z",
+            ComplianceScope(),
+            {"events": 0, "head_hash": "0" * 64},
+            label='#read("/etc/passwd") $x$ *bold*',
+        )
+        pdf = render_report({"id": 1, "content": content, "sha256": sha256}, "Chronowarden test")
+        text = _pdf_text(pdf)
+        assert '#read("/etc/passwd") $x$ *bold*' in text and "root:" not in text
+        assert "No compliance policies were configured" in text
+
+    def test_unknown_snapshot_is_404(self, client: TestClient) -> None:
+        assert client.get("/api/v1/compliance/snapshots/99/report.pdf").status_code == 404
