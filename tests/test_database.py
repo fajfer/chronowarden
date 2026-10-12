@@ -54,44 +54,6 @@ class TestSecretMetadataCache:
         result = db.get_secret_metadata("vault-1", "apps", "nonexistent")
         assert result is None
 
-    def test_list_secrets_for_vault(self, db: Database) -> None:
-        for i in range(3):
-            db.upsert_secret_metadata(
-                SecretMetadataCache(
-                    vault_name="vault-1",
-                    engine_id="apps",
-                    secret_path=f"secret-{i}",
-                    ttl=f"2027-0{i + 1}-07",
-                    severity="default",
-                )
-            )
-        db.upsert_secret_metadata(
-            SecretMetadataCache(
-                vault_name="vault-2",
-                engine_id="apps",
-                secret_path="other-secret",
-                ttl="2027-01-01",
-                severity="default",
-            )
-        )
-
-        results = db.list_secrets_for_vault("vault-1")
-        assert len(results) == 3
-        secret_paths = {r.secret_path for r in results}
-        assert secret_paths == {"secret-0", "secret-1", "secret-2"}
-        for result in results:
-            assert result.vault_name == "vault-1"
-            assert result.engine_id == "apps"
-
-        results_v2 = db.list_secrets_for_vault("vault-2")
-        assert len(results_v2) == 1
-        assert results_v2[0].secret_path == "other-secret"
-
-    def test_list_secrets_for_vault_empty(self, db: Database) -> None:
-        """Test listing secrets for a vault with no entries returns empty list."""
-        results = db.list_secrets_for_vault("nonexistent")
-        assert results == []
-
     def test_upsert_preserves_id(self, db: Database) -> None:
         """Test that upsert on the same key preserves the row (no duplicate)."""
         entry = SecretMetadataCache(
@@ -176,7 +138,7 @@ class TestDatabaseConnection:
         db = Database(db_path=Path("/tmp/unused.db"))
         # Should not raise, just log error
         assert db.get_secret_metadata("v", "e", "s") is None
-        assert db.list_secrets_for_vault("v") == []
+        assert db.list_all_secrets(vault_name="v") == []
 
     def test_write_operations_when_disconnected(self) -> None:
         """Test that write operations on a disconnected DB do not raise."""
@@ -247,6 +209,6 @@ class TestDatabaseConcurrency:
                 results = list(executor.map(worker, range(total_entries)))
 
             assert all(result is not None for result in results)
-            assert len(db.list_secrets_for_vault("vault-1")) == total_entries
+            assert len(db.list_all_secrets(vault_name="vault-1")) == total_entries
         finally:
             db.close()

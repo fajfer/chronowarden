@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from chronowarden.audit.chain import GENESIS_HASH, canonical_json, event_hash
 from chronowarden.migrations import migrate
+from chronowarden.timestamps import utc_timestamp
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -181,30 +182,6 @@ class Database:
             if row is None:
                 return None
             return _row_to_cache(row)
-
-    def list_secrets_for_vault(self, vault_name: str) -> list[SecretMetadataCache]:
-        """
-        List all cached secrets for a vault.
-
-        Args:
-            vault_name: The vault instance name.
-
-        Returns:
-            List of cached metadata entries.
-        """
-        with self._conn_lock:
-            conn = self._require_connection()
-            if conn is None:
-                return []
-            cursor = conn.execute(
-                f"""
-                SELECT {_CACHE_COLUMNS}
-                FROM secret_metadata_cache
-                WHERE vault_name = ?
-                """,
-                (vault_name,),
-            )
-            return [_row_to_cache(row) for row in cursor.fetchall()]
 
     def get_secret_by_id(self, secret_id: int) -> Optional[SecretMetadataCache]:
         """
@@ -724,7 +701,7 @@ class Database:
             vault_name, engine_id, secret_path = identity if identity is not None else (None, None, None)
             event = {
                 "id": head["id"] + 1 if head else 1,
-                "timestamp": datetime.now(tz=timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+                "timestamp": utc_timestamp(),
                 "source": source,
                 "actor": actor,
                 "event_type": event_type,
@@ -855,7 +832,7 @@ class Database:
         Returns:
             The stored confirmation.
         """
-        recorded_at = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+        recorded_at = utc_timestamp()
         with self._conn_lock:
             conn = self._require_connection()
             if conn is None:
@@ -885,7 +862,7 @@ class Database:
 
     def revoke_confirmation(self, confirmation_id: int) -> None:
         """Mark a confirmation revoked (the row stays, for the record)."""
-        revoked_at = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+        revoked_at = utc_timestamp()
         with self._conn_lock:
             conn = self._require_connection()
             if conn is None:

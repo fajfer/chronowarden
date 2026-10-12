@@ -4,7 +4,6 @@
 
 """API routes for reading cached secret metadata."""
 
-import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -26,10 +25,9 @@ from chronowarden.models.secret import (
     SecretStatus,
 )
 from chronowarden.models.system import OwnerIds, SystemAssignment
+from chronowarden.timestamps import utc_timestamp
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
-
-logger = logging.getLogger("uvicorn.error")
 
 
 def _get_app_dependencies() -> tuple[Any, Any, Any]:
@@ -438,7 +436,7 @@ async def confirm_rotation(data: ConfirmationCreate, secret_id: int, request: Re
             status_code=422,
             detail=f"applied_at is before version {version['current']} was created ({version['created_time']})",
         )
-    applied_text = applied.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    applied_text = utc_timestamp(applied)
     confirmation = database.add_confirmation(identity, version["current"], applied_text, data.confirmed_by)
     database.append_audit_event(
         "secret.confirmed",
@@ -473,7 +471,7 @@ async def set_privileged(data: PrivilegedUpdate, secret_id: int, request: Reques
 
 def write_privileged(
     database: Any, manager: Any, entry: SecretMetadataCache, value: bool, source: str, reverts: Optional[int] = None
-) -> None:
+) -> Optional[dict]:
     """
     Write the privileged flag to the backend, cache it and record the change (also used by revert, with `reverts`).
 
@@ -495,15 +493,16 @@ def write_privileged(
             detail=f"Writing {PRIVILEGED_KEY} to vault '{entry.vault_name}' failed; see the server log",
         )
     remember_written(database, _identity(entry), written)
-    if entry.privileged != value:
-        database.upsert_secret_metadata(entry.model_copy(update={"privileged": value}))
-        database.append_audit_event(
-            "secret.privileged",
-            source,
-            identity=_identity(entry),
-            before={"privileged": entry.privileged},
-            after={"privileged": value, **({"reverts": reverts} if reverts is not None else {})},
-        )
+    if entry.privileged == value:
+        return None
+    database.upsert_secret_metadata(entry.model_copy(update={"privileged": value}))
+    return database.append_audit_event(
+        "secret.privileged",
+        source,
+        identity=_identity(entry),
+        before={"privileged": entry.privileged},
+        after={"privileged": value, **({"reverts": reverts} if reverts is not None else {})},
+    )
 
 
 def enriched_secrets(database: Any, config: AppConfig, include_removed: bool = False) -> list[SecretMetadataResponse]:

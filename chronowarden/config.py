@@ -239,77 +239,40 @@ class VaultConfig(BaseModel):
                 return secret
         return None
 
-    def resolve_token(self) -> Optional[str]:
+    def _resolve_credential(self, field: str) -> Optional[str]:
         """
-        Resolve the Vault token from the configured source.
-
-        Priority: token_file > token_env > token (literal).
+        Resolve a credential from its ``<field>_file``, ``<field>_env`` or literal setting, in that order.
 
         Returns:
-            The resolved token string, or None if resolution fails.
+            The resolved value, or None if resolution fails.
         """
-        if self.token_file:
+        path, env = getattr(self, f"{field}_file"), getattr(self, f"{field}_env")
+        if path:
             try:
-                return pathlib.Path(self.token_file).read_text().strip()
+                return pathlib.Path(path).read_text().strip()
             except OSError:
-                logger.exception("Failed to read token file for vault '%s'", self.name)
+                logger.exception("Failed to read %s file for vault '%s'", field, self.name)
                 return None
 
-        if self.token_env:
-            value = os.environ.get(self.token_env)
+        if env:
+            value = os.environ.get(env)
             if value is None:
-                logger.warning("Environment variable '%s' not set for vault '%s'", self.token_env, self.name)
+                logger.warning("Environment variable '%s' not set for vault '%s'", env, self.name)
             return value
 
-        return self.token
+        return getattr(self, field)
+
+    def resolve_token(self) -> Optional[str]:
+        """Resolve the Vault token: token_file > token_env > token (literal)."""
+        return self._resolve_credential("token")
 
     def resolve_role_id(self) -> Optional[str]:
-        """
-        Resolve the AppRole role_id from the configured source.
-
-        Priority: role_id_file > role_id_env > role_id (literal).
-
-        Returns:
-            The resolved role_id string, or None if resolution fails.
-        """
-        if self.role_id_file:
-            try:
-                return pathlib.Path(self.role_id_file).read_text().strip()
-            except OSError:
-                logger.exception("Failed to read role_id file for vault '%s'", self.name)
-                return None
-
-        if self.role_id_env:
-            value = os.environ.get(self.role_id_env)
-            if value is None:
-                logger.warning("Environment variable '%s' not set for vault '%s'", self.role_id_env, self.name)
-            return value
-
-        return self.role_id
+        """Resolve the AppRole role_id: role_id_file > role_id_env > role_id (literal)."""
+        return self._resolve_credential("role_id")
 
     def resolve_secret_id(self) -> Optional[str]:
-        """
-        Resolve the AppRole secret_id from the configured source.
-
-        Priority: secret_id_file > secret_id_env > secret_id (literal).
-
-        Returns:
-            The resolved secret_id string, or None if resolution fails.
-        """
-        if self.secret_id_file:
-            try:
-                return pathlib.Path(self.secret_id_file).read_text().strip()
-            except OSError:
-                logger.exception("Failed to read secret_id file for vault '%s'", self.name)
-                return None
-
-        if self.secret_id_env:
-            value = os.environ.get(self.secret_id_env)
-            if value is None:
-                logger.warning("Environment variable '%s' not set for vault '%s'", self.secret_id_env, self.name)
-            return value
-
-        return self.secret_id
+        """Resolve the AppRole secret_id: secret_id_file > secret_id_env > secret_id (literal)."""
+        return self._resolve_credential("secret_id")
 
 
 class ComplianceScope(BaseModel):

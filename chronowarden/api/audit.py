@@ -107,7 +107,8 @@ async def revert(request: Request, event_id: int = Path(description="Audit event
     """
     Restore the value an event replaced; the revert is recorded as a new event that names the reverted one.
 
-    Only a secret's system and owner assignments can be reverted (ADR-004: Chronowarden changes only its own data).
+    Only Chronowarden's own data can be reverted (ADR-004): a secret's system and owners, its privileged flag and
+    rotation confirmations.
 
     Returns:
         The new event.

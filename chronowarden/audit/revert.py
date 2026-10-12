@@ -70,8 +70,10 @@ def _revert_privileged(db: Any, manager: Any, event: dict, source: str) -> dict:
         raise RevertError(
             409, f"Event {event['id']} can't be reverted: the value changed since; revert the newer event"
         )
-    write_privileged(db, manager, entry, before["privileged"], source, reverts=event["id"])
-    return db.list_audit_events(limit=1, event_type="secret.privileged")[0]
+    written = write_privileged(db, manager, entry, before["privileged"], source, reverts=event["id"])
+    if written is None:
+        raise RevertError(409, f"Event {event['id']} can't be reverted: the value is already {before['privileged']}")
+    return written
 
 
 def revert_event(db: Any, event: dict, source: str, config: AppConfig, manager: Any = None) -> dict:

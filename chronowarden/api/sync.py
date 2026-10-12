@@ -5,7 +5,6 @@
 """API routes for metadata synchronization."""
 
 import asyncio
-import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Path, status
@@ -13,8 +12,6 @@ from fastapi import APIRouter, HTTPException, Path, status
 from chronowarden.database import SecretMetadataCache
 
 router = APIRouter(prefix="/sync", tags=["sync"])
-
-logger = logging.getLogger("uvicorn.error")
 
 
 def _get_app_dependencies() -> tuple[Any, Any, Any]:

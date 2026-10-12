@@ -316,11 +316,6 @@ class VaultManager:
             self._reconnect_max_attempts,
         )
 
-    def restart_reconnect_loop(self) -> None:
-        """Restart the reconnect background loop and reset retry attempts."""
-        self.stop_reconnect_loop()
-        self.start_reconnect_loop()
-
     def stop_reconnect_loop(self) -> None:
         """Cancel the reconnection background task."""
         if self._reconnect_task is not None:
