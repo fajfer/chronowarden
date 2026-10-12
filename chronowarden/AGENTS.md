@@ -15,8 +15,9 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 
 - `_configure_sentry`: PII and frame locals off (they hold the Vault token, 0.7.1). `request_guard.py`: cross-site
   writes → 403, Hosts outside `allowed_hosts` → 400.
-- `app.py`: module-level singletons `vault_manager`, `db`, `app_config`; `lifespan` (load config → Sentry →
-  `connect_all` → open DB → `record_config_change` → `start_reconnect_loop`); routers mounted under `/api/v1`; SPA serving.
+- `app.py`: singletons `vault_manager`, `db`, `app_config`; `lifespan` (config → Sentry → `connect_all` → DB →
+  `record_config_change` → reconnect loop → `SyncScheduler`); routers under `/api/v1`; SPA serving.
+- `scheduler.py`: `sync_connected`, `SyncScheduler`. `__main__.py`: `python -m chronowarden sync` (exit 0/1/2).
 - `config.py`: `AppConfig`, `VaultConfig`, `EngineConfigNested`, `SecretConfig`, `ExpiryProfile`, `load_config`.
 - `metadata.py`: `parse_date`, `calculate_ttl`, `sync_secret_metadata`, `detect_changes`.
 - `logging_config.py`: `configure_logging()` (called when `app.py` is imported) adds timestamps to uvicorn's handlers
@@ -57,9 +58,8 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 
 ## Gotchas
 
-- `polling_interval` is parsed but nothing reads it: there is no background sync scheduler. Sync only runs via the
-  API. Planned: in-process loop plus headless mode
-  ([ADR-013](../.ai/adr/ADR-013-in-process-and-headless-sync.md), #48).
+- `polling_interval`: `parse_interval_seconds` (`m` = minutes, minimum 60 s, `off`). Schedule and one-shot both use
+  `sync_connected` → `sync_vault_now` and its per-process lock (ADR-013); with a CronJob, the server runs `off`.
 - Model-level checks (unknown severities, duplicate vaults) run only once all keys are valid: two error rounds.
 - Use the `uvicorn.error` logger; its lines get timestamps from `configure_logging`. Don't call `logging.basicConfig`.
 - Unknown `/api/v1/...` paths are answered by the SPA catch-all with `index.html` and status 200, not 404.
@@ -67,7 +67,7 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
   (PR #11 Q4/Q6, #73).
 - Dates: ISO 8601 or `YYYY-MM-DD`/`YYYY-DD-MM`. `date_format` is a hint; with `YYYY-MM-DD`, an invalid month falls
   back to swapped parts.
-- The DB path is `chronowarden.db` relative to the working directory (set in `lifespan`).
+- The DB path is `chronowarden.db` in the working directory (`lifespan` and the one-shot command).
 - `app.py` registers the SPA catch-all `/{full_path:path}` last. New API routes must be included before it.
 
 ## Related ADRs
