@@ -39,6 +39,9 @@ date_format: "YYYY-MM-DD"  # or "YYYY-DD-MM", with auto-detection fallback
 polling_interval: "6h"     # Global polling interval for all vaults (e.g. '6h', '30m')
 vault_reconnect_interval: 120  # Seconds between reconnection attempts for offline vaults (minimum 10, default: 120)
 vault_reconnect_max_attempts: 5  # Number of reconnect cycles before loop stops (minimum 1, default: 5)
+# Until authentication exists, anyone who reaches Chronowarden can trigger these; requests sooner get 429
+manual_sync_cooldown: 30   # Seconds before a vault can be synced again from the UI or API (0 = off, default: 30)
+snapshot_min_interval: 60  # Seconds between compliance snapshots taken from the UI or API (0 = off, default: 60)
 
 # Compliance evidence (optional). Without cadences you can still take ad-hoc snapshots with a free label in the
 # Compliance tab. With cadences, the tab reminds you when a period ended; closing it freezes a snapshot of the

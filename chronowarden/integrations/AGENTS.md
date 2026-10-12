@@ -62,6 +62,9 @@ OpenBao (KV v2) via `hvac`.
 - `connect()`, `is_connected()` and the reconnect loop's passes block on network I/O: call them through
   `asyncio.to_thread` from async code. `is_connected()` maps network errors to `offline`/`unexpected` instead of
   raising.
+- `write_secret_metadata` reads, merges and writes the whole `custom_metadata`: Vault has no check-and-set for
+  metadata, so a key another team changes between the read and the write is lost. A race-free `PATCH` needs the
+  `patch` capability, which the maintainer chose not to require (2026-10-12); don't switch without asking.
 - `check_health` returns `initialized`/`sealed`, but the UI only shows healthy/offline (#44 follow-up).
 - OpenBao compatibility is a goal (README); test against both if you touch auth or KV calls (`dev-setup.py`).
 

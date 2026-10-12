@@ -377,6 +377,12 @@ class AppConfig(BaseModel):
         ge=1,
         description="Maximum number of reconnect cycles before the background reconnect loop stops (minimum 1)",
     )
+    manual_sync_cooldown: int = Field(
+        default=30, ge=0, description="Seconds before a vault can be synced again on request (0 turns it off)"
+    )
+    snapshot_min_interval: int = Field(
+        default=60, ge=0, description="Seconds between compliance snapshots taken on request (0 turns it off)"
+    )
     expiry_profiles: dict[str, ExpiryProfile] = Field(
         default_factory=lambda: {name: ExpiryProfile(**profile) for name, profile in DEFAULT_EXPIRY_PROFILES.items()},
         description="Expiry profiles mapping severity names to rotation periods",

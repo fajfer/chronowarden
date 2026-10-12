@@ -5,12 +5,13 @@
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
 
 /**
- * API error with HTTP status code.
+ * API error with HTTP status code, a readable message and the raw response body.
  */
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public body = '',
   ) {
     super(message);
     this.name = 'ApiError';
@@ -44,7 +45,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const response = await fetch(`${BASE_URL}${path}`, options);
   if (!response.ok) {
     const text = await response.text().catch(() => response.statusText);
-    throw new ApiError(response.status, errorDetail(text));
+    throw new ApiError(response.status, errorDetail(text), text);
   }
   if (response.status === 204) {
     return undefined as T;

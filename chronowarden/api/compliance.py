@@ -11,6 +11,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from chronowarden.api.audit import request_source
+from chronowarden.api.cooldown import Cooldown, enforce
 from chronowarden.compliance.evidence import (
     GAP_TYPES,
     build_document,
@@ -27,6 +28,8 @@ from chronowarden.models.compliance import GapEntry, GapReport, PeriodStatus, Sn
 from chronowarden.timestamps import utc_timestamp
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
+
+_snapshot_cooldown = Cooldown()
 
 
 def _get_app_dependencies() -> tuple[Any, AppConfig]:
@@ -190,7 +193,8 @@ async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInf
 
     Raises:
         HTTPException: 422 for an unknown cadence, a malformed or unfinished period or an unknown `supersedes`;
-            409 when the period is already closed and `supersedes` doesn't name its latest snapshot.
+            409 when the period is already closed and `supersedes` doesn't name its latest snapshot; 429 within
+            `snapshot_min_interval` of the last snapshot taken on request.
     """
     database, config = _get_app_dependencies()
     now = _now()
@@ -225,6 +229,8 @@ async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInf
     else:
         scope = data.scope or ComplianceScope()
         secrets = [s for s in _secrets(database, config) if in_scope(s, scope)]
+    # After validation, so a rejected request doesn't start the interval
+    enforce(_snapshot_cooldown, "snapshot", config.snapshot_min_interval, "A snapshot")
     systems = {system["id"]: system for system in database.list_systems()}
     created_at = utc_timestamp(now)
     content, sha256 = build_document(

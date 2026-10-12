@@ -7,6 +7,7 @@
 import logging
 import uuid
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Path, Request, status
 
@@ -49,6 +50,36 @@ def _owner_view(owner: dict) -> dict:
     return {"name": owner["name"], "email": owner["email"]}
 
 
+def mask_address(address: str) -> str:
+    """
+    Mask a webhook URL down to its scheme and host.
+
+    Webhook URLs often carry a token in the path or query (Slack, Teams), so only the stored copy keeps them.
+    """
+    parts = urlsplit(address)
+    if not parts.scheme or not parts.hostname:
+        return "…"
+    port = f":{parts.port}" if parts.port else ""
+    return f"{parts.scheme}://{parts.hostname}{port}/…"
+
+
+def _route_view(route: dict) -> dict:
+    """A route's fields as recorded in audit events, with the address masked."""
+    return {"id": route["id"], "type": route["type"], "address": mask_address(route["address"])}
+
+
+def _build_route(route: dict) -> NotificationRoute:
+    """Build a NotificationRoute model from a database dict, with the address masked."""
+    return NotificationRoute(
+        id=route["id"],
+        owner_id=route["owner_id"],
+        type=route["type"],
+        address=mask_address(route["address"]),
+        message_template=route.get("message_template", ""),
+        created_at=route.get("created_at"),
+    )
+
+
 def _build_owner(owner_dict: dict, routes: list[dict]) -> Owner:
     """Build an Owner model from database dicts."""
     return Owner(
@@ -56,17 +87,7 @@ def _build_owner(owner_dict: dict, routes: list[dict]) -> Owner:
         name=owner_dict["name"],
         email=owner_dict["email"],
         created_at=owner_dict.get("created_at"),
-        notification_routes=[
-            NotificationRoute(
-                id=r["id"],
-                owner_id=r["owner_id"],
-                type=r["type"],
-                address=r["address"],
-                message_template=r.get("message_template", ""),
-                created_at=r.get("created_at"),
-            )
-            for r in routes
-        ],
+        notification_routes=[_build_route(r) for r in routes],
     )
 
 
@@ -165,24 +186,20 @@ async def delete_owner(request: Request, owner_id: str = Path(description="Owner
 )
 async def add_route(
     data: NotificationRouteCreate,
+    request: Request,
     owner_id: str = Path(description="Owner ID"),
 ) -> NotificationRoute:
-    """Add a notification route to an owner."""
+    """Add a notification route to an owner. The response masks the address down to its scheme and host."""
     db = _get_db()
     _require_owner(db, owner_id)
     route_id = str(uuid.uuid4())
     db.create_notification_route(route_id, owner_id, data.type, data.address, data.message_template)
-    routes = db.list_notification_routes(owner_id)
-    for r in routes:
-        if r["id"] == route_id:
-            return NotificationRoute(
-                id=r["id"],
-                owner_id=r["owner_id"],
-                type=r["type"],
-                address=r["address"],
-                message_template=r.get("message_template", ""),
-                created_at=r.get("created_at"),
-            )
+    route = next((r for r in db.list_notification_routes(owner_id) if r["id"] == route_id), None)
+    if route is not None:
+        db.append_audit_event(
+            "owner.route_added", request_source(request), subject=f"owner:{owner_id}", after=_route_view(route)
+        )
+        return _build_route(route)
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create route")
 
 
@@ -192,6 +209,7 @@ async def add_route(
     summary="Remove a notification route",
 )
 async def delete_route(
+    request: Request,
     owner_id: str = Path(description="Owner ID"),
     route_id: str = Path(description="Route ID"),
 ) -> None:
@@ -203,9 +221,13 @@ async def delete_route(
     """
     db = _get_db()
     _require_owner(db, owner_id)
-    if not any(route["id"] == route_id for route in db.list_notification_routes(owner_id)):
+    route = next((r for r in db.list_notification_routes(owner_id) if r["id"] == route_id), None)
+    if route is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Route '{route_id}' not found")
     db.delete_notification_route(route_id)
+    db.append_audit_event(
+        "owner.route_deleted", request_source(request), subject=f"owner:{owner_id}", before=_route_view(route)
+    )
 
 
 @router.post(

@@ -8,10 +8,13 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from chronowarden.api.cooldown import Cooldown
 from chronowarden.api.sync import router
+from chronowarden.config import AppConfig
 
 
 def _build_client() -> TestClient:
@@ -135,3 +138,16 @@ class TestSyncReconnectFirst:
 
         assert seen_locked == [True]
         assert not manager.sync_lock("v").locked()
+
+
+@pytest.mark.cooldowns
+def test_manual_sync_is_rate_limited_per_vault(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Within `manual_sync_cooldown` a vault answers 429, even after a failed reconnect; other vaults don't wait."""
+    monkeypatch.setattr("chronowarden.api.sync._cooldown", Cooldown())
+    manager, _ = _disconnected_vault(reconnect_ok=False)
+    client = _build_client()
+    with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())):
+        assert client.post("/api/v1/sync/vault/dev-vault").status_code == 503
+        response = client.post("/api/v1/sync/vault/dev-vault")
+        assert response.status_code == 429 and response.headers["Retry-After"] == "30"
+        assert client.post("/api/v1/sync/vault/other-vault").status_code == 503

@@ -39,7 +39,7 @@ interface SyncUnavailableDetail {
 function parseSyncUnavailable(err: unknown): SyncUnavailableDetail | null {
   if (!(err instanceof ApiError) || err.status !== 503) return null;
   try {
-    const detail = JSON.parse(err.message).detail;
+    const detail = JSON.parse(err.body).detail;
     return detail && typeof detail === 'object' ? (detail as SyncUnavailableDetail) : null;
   } catch {
     return null;
@@ -63,6 +63,8 @@ export async function syncVault(vaultName: string): Promise<SyncResult | null> {
       );
     } else if (unavailable) {
       addToast(`${vaultName}: ${unavailable.reason} error, not retried. ${unavailable.error ?? ''}`.trim(), 'error');
+    } else if (err instanceof ApiError && err.status === 429) {
+      addToast(err.message, 'info');
     } else {
       const message = err instanceof Error ? err.message : 'Sync failed';
       addToast(`Sync failed for ${vaultName}: ${message}`, 'error');

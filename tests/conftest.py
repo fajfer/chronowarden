@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from chronowarden.api.cooldown import Cooldown
 from chronowarden.database import Database
 
 
@@ -19,3 +20,10 @@ def db(tmp_path: Path) -> Iterator[Database]:
     database.connect()
     yield database
     database.close()
+
+
+@pytest.fixture(autouse=True)
+def no_cooldowns(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Turn off the manual sync and snapshot cooldowns, except in tests marked `cooldowns`."""
+    if request.node.get_closest_marker("cooldowns") is None:
+        monkeypatch.setattr(Cooldown, "take", lambda self, key, seconds: 0)
