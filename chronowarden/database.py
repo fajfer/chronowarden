@@ -7,6 +7,7 @@
 import json
 import logging
 import sqlite3
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
@@ -752,13 +753,29 @@ class Database:
             )
             return [dict(row) for row in rows]
 
-    def iter_audit_events(self) -> list[dict]:
-        """Return every audit event in id order, as stored (for verifying and exporting the chain)."""
-        with self._conn_lock:
-            conn = self._require_connection()
-            if conn is None:
-                return []
-            return [dict(row) for row in conn.execute(f"SELECT {_AUDIT_COLUMNS} FROM audit_events ORDER BY id")]
+    def iter_audit_events(self, batch: int = 1000) -> Iterator[dict]:
+        """
+        Yield every audit event in id order, as stored (for verifying and exporting the chain).
+
+        Reads in batches and takes the lock per batch, so a long log neither fills memory nor blocks other requests
+        while a slow client downloads the export (0.7.1).
+        """
+        last_id = 0
+        while True:
+            with self._conn_lock:
+                conn = self._require_connection()
+                if conn is None:
+                    return
+                rows = [
+                    dict(row)
+                    for row in conn.execute(
+                        f"SELECT {_AUDIT_COLUMNS} FROM audit_events WHERE id > ? ORDER BY id LIMIT ?", (last_id, batch)
+                    )
+                ]
+            yield from rows
+            if len(rows) < batch:
+                return
+            last_id = rows[-1]["id"]
 
     def get_audit_state(self, key: str) -> Optional[str]:
         """Return a value the audit log remembers between runs (e.g. the last config fingerprint)."""
