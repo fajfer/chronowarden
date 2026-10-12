@@ -60,7 +60,7 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 ```bash
 docker run --network=host --rm -p 8000:8000 \
     -v $(pwd)/config.yaml:/data/config.yaml \
-  ghcr.io/fajfer/chronowarden:v0.7.1
+  ghcr.io/fajfer/chronowarden:v0.7.2
 ```
 
 Add `-v $(pwd)/chronowarden.db:/app/chronowarden.db` to keep the database. From 0.7 it holds system and owner
@@ -69,10 +69,10 @@ startup.
 
 #### Building image
 Production (default) — distroless, no shell, 86MB \
-`docker build -t fajfer/chronowarden:0.7.1 .`
+`docker build -t fajfer/chronowarden:0.7.2 .`
 
 Development — full shell, git, --reload, 286MB \
-`docker build --target dev -t fajfer/chronowarden:0.7.1-dev .`
+`docker build --target dev -t fajfer/chronowarden:0.7.2-dev .`
 
 ### Prerequisites
 
