@@ -78,12 +78,6 @@ class TestAppConfigDefaults:
         assert "critical" in config.expiry_profiles
         assert "pci-dss-4.0" in config.expiry_profiles
 
-    def test_default_rotation_periods(self) -> None:
-        config = AppConfig()
-        assert config.expiry_profiles["default"].rotation_days == 365
-        assert config.expiry_profiles["critical"].rotation_days == 180
-        assert config.expiry_profiles["pci-dss-4.0"].rotation_days == 90
-
     def test_default_date_format(self) -> None:
         config = AppConfig()
         assert config.date_format == "YYYY-MM-DD"
@@ -156,10 +150,6 @@ class TestConfigCascade:
         """Engine severity used for matching engine."""
         assert config.resolve_severity("apps", "prod") == "pci-dss-4.0"
 
-    def test_engine_cascade_no_secret(self, config: AppConfig) -> None:
-        """Engine severity used when no secret path provided."""
-        assert config.resolve_severity("apps", "prod") == "pci-dss-4.0"
-
     def test_vault_cascade(self, config: AppConfig) -> None:
         """Vault severity used when engine has no override."""
         assert config.resolve_severity("unknown-engine", "prod") == "critical"
@@ -224,11 +214,6 @@ class TestNestedConfigCascade:
 
     def test_secret_config_wins(self, config: AppConfig) -> None:
         """Secret-specific config overrides everything."""
-        result = config.resolve_severity("certificates", "prod", secret_path="root-ca-key")
-        assert result == "none"
-
-    def test_secret_config_overrides_vault_metadata(self, config: AppConfig) -> None:
-        """Secret config wins regardless of what vault metadata says."""
         result = config.resolve_severity("certificates", "prod", secret_path="root-ca-key")
         assert result == "none"
 

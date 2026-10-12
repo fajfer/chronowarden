@@ -9,7 +9,6 @@ import json
 import sqlite3
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -108,10 +107,9 @@ def test_document_hash_is_deterministic() -> None:
 
 
 @pytest.fixture
-def db(tmp_path: Path) -> Iterator[Database]:
+def db(db: Database) -> Database:
     """Three secrets: a privileged one assigned to Billing with an owner, a plain one, and one removed last month."""
-    database = Database(tmp_path / "test.db")
-    database.connect()
+    database = db  # the shared fixture from conftest.py, seeded here
     for path, privileged in (("billing/db", True), ("plain", False), ("gone", False)):
         database.upsert_secret_metadata(
             SecretMetadataCache(
@@ -130,8 +128,7 @@ def db(tmp_path: Path) -> Iterator[Database]:
     database.set_secret_owners(("prod", "apps", "billing/db"), ["alice"])
     last_month = period_containing("monthly", datetime.now(tz=UTC)).start - timedelta(days=10)
     database.reconcile_engine("prod", "apps", {"billing/db", "plain"}, last_month.isoformat())
-    yield database
-    database.close()
+    return database
 
 
 def _client(db: Database, config: AppConfig) -> TestClient:

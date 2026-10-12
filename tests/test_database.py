@@ -4,22 +4,10 @@
 
 """Tests for SQLite database operations."""
 
-from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import pytest
-
 from chronowarden.database import Database, SecretMetadataCache
-
-
-@pytest.fixture()
-def db(tmp_path: Path) -> Generator[Database, None, None]:
-    """Create a temporary database for testing."""
-    database = Database(db_path=tmp_path / "test.db")
-    database.connect()
-    yield database
-    database.close()
 
 
 class TestSecretMetadataCache:

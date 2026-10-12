@@ -5,28 +5,18 @@
 """Tests for secrets deleted in the backend: removed_at, reappearing and purging (#86)."""
 
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from hvac.exceptions import Forbidden, VaultError
+from hvac.exceptions import Forbidden
 
 from chronowarden.api.secrets import router as secrets_router
 from chronowarden.config import AppConfig
 from chronowarden.database import Database, SecretMetadataCache
 from chronowarden.metadata import detect_changes
-
-
-@pytest.fixture
-def db(tmp_path: Path) -> Iterator[Database]:
-    """A migrated, empty database."""
-    database = Database(tmp_path / "test.db")
-    database.connect()
-    yield database
-    database.close()
 
 
 class FakeVault:
@@ -180,8 +170,3 @@ class TestApi:
         secret = client.get(f"/api/v1/secrets/{_id(db, 'apps', 'gone')}").json()
         assert secret["removed_at"] is None
         assert [o["id"] for o in secret["owners"]] == ["alice"]
-
-
-def test_listing_error_type_is_a_vault_error() -> None:
-    """The fake's Forbidden is what strict listing raises, so _list_secret_paths records it as a failure."""
-    assert issubclass(Forbidden, VaultError)

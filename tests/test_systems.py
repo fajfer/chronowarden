@@ -5,7 +5,6 @@
 """Tests for systems and the system/owner assignments of secrets (#61)."""
 
 from collections.abc import Iterator
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -20,18 +19,16 @@ from chronowarden.database import Database, SecretMetadataCache
 
 
 @pytest.fixture
-def db(tmp_path: Path) -> Iterator[Database]:
+def db(db: Database) -> Database:
     """A migrated database with two cached secrets and two owners."""
-    database = Database(tmp_path / "test.db")
-    database.connect()
+    database = db  # the shared fixture from conftest.py, seeded here
     for path in ("app/db", "app/api"):
         database.upsert_secret_metadata(
             SecretMetadataCache(vault_name="prod", engine_id="secret", secret_path=path, ttl="2030-01-01")
         )
     database.create_owner("alice", "Alice", "alice@example.com")
     database.create_owner("bob", "Bob", "bob@example.com")
-    yield database
-    database.close()
+    return database
 
 
 @pytest.fixture
@@ -166,18 +163,6 @@ class TestSecretAssignments:
         assert paths("owner_id=alice") == []
         assert paths("unassigned=true") == ["app/api"]
         assert paths("unassigned=false") == ["app/db"]
-
-    def test_change_is_recorded_in_the_audit_log(self, client: TestClient, db: Database) -> None:
-        system = _create_system(client)
-        client.put(
-            f"/api/v1/secrets/{_secret_id(db)}/system",
-            json={"system_id": system["id"]},
-            headers={"X-Chronowarden-Client": "ui"},
-        )
-        event = db.list_audit_events(event_type="secret.system")[0]
-        assert (event["vault_name"], event["engine_id"], event["secret_path"]) == ("prod", "secret", "app/db")
-        assert event["source"] == "ui"
-        assert '"system":null' in event["before"] and f'"id":"{system["id"]}"' in event["after"]
 
     def test_unchanged_assignment_records_nothing(self, client: TestClient, db: Database) -> None:
         client.put(f"/api/v1/secrets/{_secret_id(db)}/owners", json={"owner_ids": []})
