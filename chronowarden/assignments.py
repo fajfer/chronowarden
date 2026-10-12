@@ -6,6 +6,7 @@
 
 from typing import Any, Optional
 
+from chronowarden.confirmations import ConfirmationIndex
 from chronowarden.database import SecretIdentity
 from chronowarden.models.system import OwnerRef, SystemRef
 
@@ -24,6 +25,7 @@ class AssignmentIndex:
         self._systems = {system["id"]: system for system in db.list_systems()}
         self._owner_names = {owner["id"]: owner["name"] for owner in db.list_owners()}
         self._secret_systems, self._secret_owners = db.get_assignments()
+        self.confirmations = ConfirmationIndex(db)
 
     def _owner_refs(self, owner_ids: list[str]) -> list[OwnerRef]:
         """Turn owner IDs into references, skipping IDs that no longer exist."""

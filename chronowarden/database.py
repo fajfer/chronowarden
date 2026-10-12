@@ -481,6 +481,17 @@ class Database:
             )
             return [dict(row) for row in cursor.fetchall()]
 
+    def list_all_notification_routes(self) -> list[dict]:
+        """List every owner's notification routes (one query, for listing owners)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            cursor = conn.execute(
+                "SELECT id, owner_id, type, address, message_template, created_at FROM notification_routes"
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
     def delete_notification_route(self, route_id: str) -> None:
         """Delete a notification route."""
         with self._conn_lock:
@@ -534,7 +545,10 @@ class Database:
             rows = conn.execute(
                 "SELECT id, name, description, cmdb_uri, asset_number, created_at FROM systems ORDER BY name"
             ).fetchall()
-            return [{**dict(row), "owner_ids": self._system_owner_ids(conn, row["id"])} for row in rows]
+            owners: dict[str, list[str]] = {}
+            for link in conn.execute("SELECT system_id, owner_id FROM system_owners ORDER BY owner_id"):
+                owners.setdefault(link["system_id"], []).append(link["owner_id"])
+            return [{**dict(row), "owner_ids": owners.get(row["id"], [])} for row in rows]
 
     @staticmethod
     def _system_owner_ids(conn: sqlite3.Connection, system_id: str) -> list[str]:
@@ -945,3 +959,28 @@ class Database:
                 return None
             row = conn.execute("SELECT timestamp FROM audit_events ORDER BY id LIMIT 1").fetchone()
             return row["timestamp"] if row else None
+
+    def latest_confirmations(self) -> dict[SecretIdentity, dict]:
+        """Every secret's newest confirmation that wasn't revoked (one query, for listing secrets)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return {}
+            rows = conn.execute("SELECT * FROM rotation_confirmations WHERE revoked_at IS NULL ORDER BY id")
+            return {(row["vault_name"], row["engine_id"], row["secret_path"]): dict(row) for row in rows}
+
+    def observed_versions(self) -> dict[SecretIdentity, dict]:
+        """Every secret's newest observed version (`current`, `created_time`), without the rest of its state."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return {}
+            rows = conn.execute(
+                "SELECT vault_name, engine_id, secret_path, json_extract(state, '$.version') AS version "
+                "FROM observed_state"
+            )
+            return {
+                (row["vault_name"], row["engine_id"], row["secret_path"]): json.loads(row["version"])
+                for row in rows
+                if row["version"] is not None
+            }
