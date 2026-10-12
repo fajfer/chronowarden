@@ -210,6 +210,42 @@ def _compliance_snapshots(conn: sqlite3.Connection) -> None:
         """)
 
 
+def _alerting(conn: sqlite3.Connection) -> None:
+    """Webhook alerting (#99, ADR-025): alert state, the delivery queue and log, and route signing secrets."""
+    conn.execute("ALTER TABLE notification_routes ADD COLUMN signing_secret TEXT")
+    conn.execute("""
+        CREATE TABLE alert_state (
+            fingerprint TEXT PRIMARY KEY,
+            alertname TEXT NOT NULL,
+            labels TEXT NOT NULL,
+            annotations TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('firing', 'resolved')),
+            starts_at TEXT NOT NULL,
+            ends_at TEXT,
+            last_sent_at TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE webhook_deliveries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL,
+            receiver TEXT NOT NULL,
+            route_id TEXT,
+            default_route TEXT,
+            alertname TEXT NOT NULL,
+            fingerprint TEXT,
+            status TEXT NOT NULL CHECK(status IN ('pending', 'delivered', 'failed')),
+            attempts INTEGER NOT NULL DEFAULT 0,
+            next_attempt_at TEXT,
+            last_attempt_at TEXT,
+            last_status_code INTEGER,
+            last_error TEXT,
+            payload TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX webhook_deliveries_due ON webhook_deliveries (status, next_attempt_at)")
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "baseline 0.6 schema", _baseline),
     Migration(2, "webhook notification routes only", _webhook_routes_only),
@@ -220,6 +256,7 @@ MIGRATIONS: list[Migration] = [
     Migration(7, "rotation confirmations", _rotation_confirmations),
     Migration(8, "privileged flag on cached secrets", _privileged),
     Migration(9, "compliance snapshots", _compliance_snapshots),
+    Migration(10, "webhook alerting", _alerting),
 ]
 
 

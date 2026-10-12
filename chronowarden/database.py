@@ -452,8 +452,8 @@ class Database:
             if conn is None:
                 return []
             cursor = conn.execute(
-                "SELECT id, owner_id, type, address, message_template, created_at "
-                "FROM notification_routes WHERE owner_id = ?",
+                "SELECT id, owner_id, type, address, message_template, created_at, "
+                "signing_secret IS NOT NULL AS signed FROM notification_routes WHERE owner_id = ?",
                 (owner_id,),
             )
             return [dict(row) for row in cursor.fetchall()]
@@ -465,9 +465,30 @@ class Database:
             if conn is None:
                 return []
             cursor = conn.execute(
-                "SELECT id, owner_id, type, address, message_template, created_at FROM notification_routes"
+                "SELECT id, owner_id, type, address, message_template, created_at, "
+                "signing_secret IS NOT NULL AS signed FROM notification_routes"
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_route_target(self, route_id: str) -> Optional[dict]:
+        """A route's address and signing secret, for delivery only; listings never include the secret (ADR-025)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute(
+                "SELECT id, owner_id, address, signing_secret FROM notification_routes WHERE id = ?", (route_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def set_route_signing_secret(self, route_id: str, secret: Optional[str]) -> None:
+        """Turn signing on (a new secret) or off (None) for a route."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute("UPDATE notification_routes SET signing_secret = ? WHERE id = ?", (secret, route_id))
+            conn.commit()
 
     def delete_notification_route(self, route_id: str) -> None:
         """Delete a notification route."""
