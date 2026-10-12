@@ -18,7 +18,8 @@ This is very early work being built with focus on compliance for financial insti
 > **The API and UI have no authentication yet** (planned for a later release). Anyone who can reach the HTTP port
 > can read all tracked metadata (including other teams' custom metadata values kept in the audit log) and trigger
 > syncs. Run Chronowarden only on a trusted network or behind an authenticating reverse proxy, and never expose it
-> directly to the internet.
+> directly to the internet. Set `allowed_hosts` in `config.yaml` to the names you serve it under: other web pages
+> then can't reach it through DNS rebinding (cross-site writes are refused either way).
 
 Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and troubleshoot!
 
@@ -59,7 +60,7 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 ```bash
 docker run --network=host --rm -p 8000:8000 \
     -v $(pwd)/config.yaml:/data/config.yaml \
-  ghcr.io/fajfer/chronowarden:v0.7.0
+  ghcr.io/fajfer/chronowarden:v0.7.1
 ```
 
 Add `-v $(pwd)/chronowarden.db:/app/chronowarden.db` to keep the database. From 0.7 it holds system and owner
@@ -68,10 +69,10 @@ startup.
 
 #### Building image
 Production (default) — distroless, no shell, 86MB \
-`docker build -t fajfer/chronowarden:0.7.0 .`
+`docker build -t fajfer/chronowarden:0.7.1 .`
 
 Development — full shell, git, --reload, 286MB \
-`docker build --target dev -t fajfer/chronowarden:0.7.0-dev .`
+`docker build --target dev -t fajfer/chronowarden:0.7.1-dev .`
 
 ### Prerequisites
 
@@ -192,6 +193,10 @@ path "sys/mounts" {
 **Custom metadata fields** (written by Chronowarden from `config.yaml`, which is the source of truth):
 - `chronowarden_ttl` - Expiry date: the secret's last update plus its profile's rotation period
 - `chronowarden_severity` - Severity level resolved from config. `none` means tracked but never rotated
+- `chronowarden_privileged` - Written only when someone marks a secret privileged in Chronowarden (or reverts that);
+  you can also set it yourself (`true`)
+
+Chronowarden merges these keys into the existing metadata; other keys and settings stay as they are.
 
 ## API Endpoints
 
