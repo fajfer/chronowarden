@@ -7,6 +7,8 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from chronowarden.config import VaultConfig
 from chronowarden.integrations.manager import VaultManager
 
@@ -245,3 +247,30 @@ class TestVaultManagerReconnect:
             asyncio.run(manager._reconnect_loop())
 
         assert manager._reconnect_task is None
+
+
+class TestVaultManagerBuildIntegration:
+    """Tests for building an integration from a vault's credentials."""
+
+    def test_token_and_approle_credentials_are_passed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("CW_TEST_TOKEN", "t")
+        manager = VaultManager()
+        with patch("chronowarden.integrations.manager.VaultIntegration") as integration:
+            manager._build_integration(VaultConfig(name="a", address="http://v:8200", token_env="CW_TEST_TOKEN"))
+            assert integration.call_args.kwargs["token"] == "t" and "auth_method" not in integration.call_args.kwargs
+            manager._build_integration(
+                VaultConfig(name="b", address="http://v:8200", auth_method="approle", role_id="r", secret_id="s")
+            )
+            kwargs = integration.call_args.kwargs
+            assert (kwargs["auth_method"], kwargs["role_id"], kwargs["secret_id"]) == ("approle", "r", "s")
+
+    def test_unresolved_credential_skips_the_vault(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("CW_TEST_SECRET_ID", raising=False)
+        manager = VaultManager()
+        config = VaultConfig(
+            name="c", address="http://v:8200", auth_method="approle", role_id="r", secret_id_env="CW_TEST_SECRET_ID"
+        )
+        with patch("chronowarden.integrations.manager.VaultIntegration") as integration:
+            manager._connect_vault(config)
+        integration.assert_not_called()
+        assert manager.get("c") is None and "c" not in manager._pending_configs
