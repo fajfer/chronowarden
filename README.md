@@ -196,7 +196,9 @@ path "sys/mounts" {
 - `chronowarden_privileged` - Written only when someone marks a secret privileged in Chronowarden (or reverts that);
   you can also set it yourself (`true`)
 
-Chronowarden merges these keys into the existing metadata; other keys and settings stay as they are.
+Chronowarden merges these keys into the existing metadata; other keys and settings stay as they are. It reads the
+metadata and writes it back, so a change someone makes to the same secret's custom metadata between that read and
+write is lost (Vault has no check-and-set for metadata).
 
 ## API Endpoints
 

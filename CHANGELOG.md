@@ -14,7 +14,16 @@ git history.
 
 ## [Unreleased]
 
+### Security
+
+- Notification route addresses are masked to scheme and host in every response (webhook URLs often carry a token),
+  and adding or removing a route is recorded in the audit log.
+- `manual_sync_cooldown` (default 30 s per vault) and `snapshot_min_interval` (default 60 s) limit manual syncs
+  and snapshots; requests that come sooner get 429 with `Retry-After`. Set either to `0` to turn it off.
+
 ### Fixed
+
+- The UI shows "keeps retrying" again when a manual sync finds the vault unreachable, instead of a plain failure.
 
 - Reverting a privileged-flag change returns the revert event instead of an unrelated one.
 - Creating a compliance snapshot while the database is unavailable answers 503 instead of a success without an id.
