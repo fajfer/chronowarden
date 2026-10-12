@@ -233,6 +233,15 @@ class TestConfigEvents:
         stored = db.list_audit_events()[0]["after"]
         assert "secret-host" not in stored and "hvs.SECRET" not in stored
 
+    def test_policy_changes_are_recorded_and_no_policies_add_nothing(self, db: Database) -> None:
+        """ADR-019: policy changes show in the audit log; an upgrade without policies records no change."""
+        record_config_change(db, AppConfig())
+        assert "compliance_policies" not in json.loads(db.list_audit_events()[0]["after"])
+        policy = {"id": "p", "name": "P", "controls": [{"id": "C", "title": "T", "rule": {"type": "has_owner"}}]}
+        record_config_change(db, AppConfig.model_validate({"compliance": {"policies": [policy]}}))
+        event = db.list_audit_events(event_type="config.changed")[0]
+        assert json.loads(event["after"])["compliance_policies"][0]["controls"][0]["rule"] == {"type": "has_owner"}
+
 
 class TestRevert:
     """POST /audit/events/{id}/revert."""

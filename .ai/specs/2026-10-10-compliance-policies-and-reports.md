@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Compliance policies and PDF reports (0.7.x)
 
-- **Status:** approved
+- **Status:** in progress
 - **Date:** 2026-10-11
 - **Issue:** #97, #98
 
@@ -54,7 +54,7 @@ metadata only, never values), methodology and limitations. PDF/A. `GET /api/v1/c
 ## Scope
 
 `chronowarden/config.py`, `config.example.yaml`, `chronowarden/compliance/`, `chronowarden/api/`, `frontend/`,
-`docs/` (examples, with the maintainer), `pyproject.toml`, `LICENSES/` (report font), `architecture/main.c4`,
+`docs/` (examples, with the maintainer), `pyproject.toml`, `architecture/main.c4`,
 `README.md`, `CHANGELOG.md`, `.ai/adr/`.
 
 ## Load
@@ -72,13 +72,13 @@ New **ADR-019 Compliance policies as config, examples not built in** and **ADR-0
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | ADR-019 and ADR-020 accepted; Typst spike (arm64, distroless, PDF/A) | [.ai/adr](../adr/README.md) | Both indexed; spike result in ADR-020 | todo | |
-| 2 | Policy config models and `config.example.yaml` | core | Config tests: valid, unknown rule type, duplicate ids | todo | |
-| 3 | Evaluation engine, `GET /compliance/policies` and `/policies/{id}/evaluation`; snapshots store per-policy results | core, api | Unit tests per rule type and threshold edges | todo | |
-| 4 | Example policies for KNF KRI ICT, PCI DSS 4.0, DORA in the docs, each control citing its source, marked non-authoritative (the maintainer reviews `docs/`) | none | Citations checked; maintainer approved | todo | |
-| 5 | Typst PDF renderer from a snapshot with a bundled font (licence in `LICENSES/`) | core | Golden test on extracted text; the image smoke test renders a report | todo | |
-| 6 | Compliance tab: Overview, Policies, PDF download on Snapshots | frontend | `npm run check` clean; walk-through renders a PDF | todo | |
-| 7 | `main.c4`, README, `chronowarden/compliance/AGENTS.md`, CHANGELOG | [architecture](../../architecture/AGENTS.md) | Docs match | todo | |
+| 1 | ADR-019 and ADR-020 accepted; Typst spike (arm64, distroless, PDF/A) | [.ai/adr](../adr/README.md) | Both indexed; spike result in ADR-020 | done | 676bfae |
+| 2 | Policy config models and `config.example.yaml` | core | Config tests: valid, unknown rule type, duplicate ids | done | ca8589d |
+| 3 | Evaluation engine, `GET /compliance/policies` and `/policies/{id}/evaluation`; snapshots store per-policy results | core, api | Unit tests per rule type and threshold edges | done | ba9bf71, f42d3f6 |
+| 4 | Example policies for KNF KRI ICT, PCI DSS 4.0, DORA in the docs, each control citing its source, marked non-authoritative (the maintainer reviews `docs/`) | none | Citations checked; maintainer approved | doing | b41407e (drafted; awaiting the maintainer's review) |
+| 5 | Typst PDF renderer from a snapshot with Typst's embedded fonts (ADR-020) | core | Golden test on extracted text; the image smoke test renders a report | done | 931767e |
+| 6 | Compliance tab: Overview, Policies, PDF download on Snapshots | frontend | `npm run check` clean; walk-through renders a PDF | done | 1a33b3a |
+| 7 | `main.c4`, README, `chronowarden/compliance/AGENTS.md`, CHANGELOG | [architecture](../../architecture/AGENTS.md) | Docs match | done | c44d6a2 |
 
 ## Validation
 

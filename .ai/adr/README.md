@@ -38,7 +38,7 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-017](ADR-017-sqlite-holds-assignments.md) | SQLite holds assignments that can't be rebuilt from the backends | Accepted | 2026-10-11 |
 | [ADR-018](ADR-018-release-integrity.md) | Release integrity with SLSA Build L3, cosign and SBOMs | Accepted | 2026-10-11 |
 | [ADR-019](ADR-019-compliance-policies-as-config.md) | Compliance policies as config, with examples instead of built-in packs | Accepted | 2026-10-11 |
-| [ADR-020](ADR-020-pdf-reports-with-typst.md) | PDF reports with Typst | Proposed | 2026-10-11 |
+| [ADR-020](ADR-020-pdf-reports-with-typst.md) | PDF reports with Typst | Accepted | 2026-10-11 |
 | [ADR-021](ADR-021-rotation-handover.md) | Rotation hand-over between the rotating and the applying team | Accepted | 2026-10-11 |
 | [ADR-022](ADR-022-webhooks-and-optional-metrics.md) | Built-in webhook alerting, optional Prometheus metrics | Accepted | 2026-10-11 |
 | [ADR-023](ADR-023-schema-migrations-with-user-version.md) | Schema migrations with PRAGMA user_version | Accepted | 2026-10-11 |

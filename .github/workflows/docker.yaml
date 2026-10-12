@@ -81,6 +81,15 @@ jobs:
             echo "::error::path traversal: /etc/passwd was served"
             exit 1
           fi
+          # Typst renders a PDF/A report inside the distroless image (ADR-020)
+          id=$(curl -fsS -X POST -H 'Content-Type: application/json' -d '{"label":"smoke"}' \
+            http://127.0.0.1:8000/api/v1/compliance/snapshots | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          curl -fsS -o "$RUNNER_TEMP/report.pdf" "http://127.0.0.1:8000/api/v1/compliance/snapshots/${id}/report.pdf"
+          if ! head -c 5 "$RUNNER_TEMP/report.pdf" | grep -q '%PDF-' || ! grep -aq 'pdfaid:part' "$RUNNER_TEMP/report.pdf"; then
+            echo "::error::the production image did not render a PDF/A report"
+            docker logs smoke
+            exit 1
+          fi
           docker rm -f smoke
 
       - name: Build and push (production target)

@@ -79,3 +79,69 @@ class PeriodStatus(BaseModel):
     start: str
     end: str
     snapshot_id: Optional[int] = Field(default=None, description="The latest snapshot closing it, if any")
+
+
+Rag = Literal["green", "amber", "red"]
+
+
+class PolicyDefinition(BaseModel):
+    """A configured policy, read-only (ADR-019)."""
+
+    id: str
+    name: str
+    framework: Optional[str] = None
+    version: Optional[str] = None
+    description: Optional[str] = None
+    controls: int = Field(description="Number of controls")
+    yaml: str = Field(description="The policy as written in config.yaml")
+
+
+class FailingSecret(BaseModel):
+    """A secret that breaks a control: its path and responsible owners, never its value."""
+
+    full_path: str
+    owners: list[str]
+
+
+class ControlResult(BaseModel):
+    """One control's definition and result."""
+
+    id: str
+    title: str
+    source: Optional[str] = None
+    rule: dict[str, Any]
+    thresholds: dict[str, Any]
+    in_scope: int = Field(description="Secrets the control applies to")
+    failing: int
+    status: Rag
+    failing_secrets: list[FailingSecret]
+
+
+class PolicyResult(BaseModel):
+    """A policy's result: the worst control status and every control."""
+
+    id: str
+    name: str
+    framework: Optional[str] = None
+    version: Optional[str] = None
+    status: Rag
+    counts: dict[str, int] = Field(description="Controls per status")
+    controls: list[ControlResult]
+
+
+class PolicyTrendPoint(BaseModel):
+    """The policy's result as frozen in one snapshot."""
+
+    snapshot_id: int
+    created_at: str
+    label: Optional[str] = None
+    period: Optional[str] = None
+    status: Rag
+    counts: dict[str, int]
+
+
+class PolicyEvaluation(PolicyResult):
+    """A policy evaluated now, with its results in earlier snapshots."""
+
+    evaluated_at: str
+    trend: list[PolicyTrendPoint] = Field(description="Snapshots that evaluated this policy, oldest first")

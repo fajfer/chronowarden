@@ -6,18 +6,19 @@
   import GapDialog from '#lib/components/GapDialog.svelte';
   import SecretModal from '#lib/components/SecretModal.svelte';
   import {
-    createSnapshot, fetchComplianceSettings, fetchComplianceSummary, fetchGaps, fetchPeriods, fetchSnapshots,
-    snapshotExportUrl,
+    createSnapshot, fetchComplianceSettings, fetchComplianceSummary, fetchGaps, fetchPeriods, fetchPolicies,
+    fetchPolicyEvaluation, fetchSnapshots, snapshotExportUrl,
   } from '#lib/api/compliance.js';
   import { fetchSystems } from '#lib/api/systems.js';
   import { secrets } from '#lib/stores/secrets.js';
   import { addToast } from '#lib/stores/sync.js';
   import { formatDate } from '#lib/utils/dateFormat.js';
   import type {
-    ComplianceScope, ComplianceSummary, GapReport, PeriodStatus, Secret, SnapshotInfo, SnapshotRequest, System,
+    ComplianceScope, ComplianceSummary, ControlResult, GapReport, PeriodStatus, PolicyDefinition, PolicyEvaluation,
+    Rag, Secret, SnapshotInfo, SnapshotRequest, System,
   } from '#lib/types/index.js';
 
-  type Tab = 'overview' | 'snapshots' | 'tree' | 'settings';
+  type Tab = 'overview' | 'policies' | 'snapshots' | 'tree' | 'settings';
   let tab = $state<Tab>('overview');
 
   let summary = $state<ComplianceSummary | null>(null);
@@ -25,6 +26,8 @@
   let snapshots = $state<SnapshotInfo[]>([]);
   let settings = $state<Record<string, unknown> | null>(null);
   let systems = $state<System[]>([]);
+  let policies = $state<PolicyDefinition[]>([]);
+  let evaluations = $state<PolicyEvaluation[]>([]);
   let selectedSecret = $state<Secret | null>(null);
 
   // Ad-hoc snapshot form
@@ -54,6 +57,36 @@
     if (results[2].status === 'fulfilled') snapshots = results[2].value;
     if (results[3].status === 'fulfilled') settings = results[3].value;
     if (results[4].status === 'fulfilled') systems = results[4].value;
+    await loadPolicies();
+  }
+
+  async function loadPolicies() {
+    try {
+      policies = await fetchPolicies();
+      const results = await Promise.allSettled(policies.map((p) => fetchPolicyEvaluation(p.id)));
+      evaluations = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Loading policies failed', 'error');
+    }
+  }
+
+  const ragClass: Record<Rag, string> = {
+    green: 'border-green-600 bg-green-900/30 text-green-300',
+    amber: 'border-amber-600 bg-amber-900/30 text-amber-300',
+    red: 'border-red-600 bg-red-900/30 text-red-300',
+  };
+  const ragDot: Record<Rag, string> = { green: 'bg-green-500', amber: 'bg-amber-500', red: 'bg-red-500' };
+
+  function ruleText(control: ControlResult): string {
+    const rule = control.rule;
+    switch (rule.type) {
+      case 'max_rotation_age': return `Rotated within ${rule.days} days`;
+      case 'not_expired': return 'Not past its TTL';
+      case 'has_owner': return 'Has an owner';
+      case 'has_system': return 'Assigned to a system';
+      case 'rotation_confirmed': return 'Rotations confirmed in time';
+      default: return rule.type;
+    }
   }
 
   function adhocScope(): ComplianceScope {
@@ -152,6 +185,7 @@
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'policies', label: 'Policies' },
     { id: 'snapshots', label: 'Snapshots' },
     { id: 'tree', label: 'Tree' },
     { id: 'settings', label: 'Settings' },
@@ -171,6 +205,10 @@
   </span>
 {/snippet}
 
+{#snippet ragBadge(status: Rag)}
+  <span class="rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase {ragClass[status]}">{status}</span>
+{/snippet}
+
 {#snippet secretLeaves(list: Secret[])}
   <ul class="ml-6 border-l border-gray-700/60">
     {#each list as s (s.id)}
@@ -188,7 +226,7 @@
 <div class="space-y-5">
   <div>
     <h1 class="text-2xl font-bold text-white">Compliance</h1>
-    <p class="mt-1 text-sm text-gray-400">Inventory and evidence for your reviews: summaries, frozen snapshots, the tree and settings</p>
+    <p class="mt-1 text-sm text-gray-400">Inventory and evidence for your reviews: policies, summaries, frozen snapshots with PDF reports, the tree and settings</p>
   </div>
 
   <div class="flex gap-1 border-b border-gray-700">
@@ -208,6 +246,61 @@
         <button onclick={() => prepareClose(period)} class="rounded-lg bg-amber-600 px-3 py-1.5 text-white hover:bg-amber-500">Close {period.period}</button>
       </div>
     {/each}
+    {#if policies.length === 0}
+      <p class="rounded-lg border border-gray-700 bg-gray-800 px-5 py-4 text-sm text-gray-400">
+        No compliance policies are configured. Add them under <code class="text-gray-300">compliance.policies</code> in
+        <code class="text-gray-300">config.yaml</code> (see <code class="text-gray-300">config.example.yaml</code>) to see
+        which controls pass here and in snapshot reports.
+      </p>
+    {/if}
+    {#each evaluations as policy (policy.id)}
+      <details class="overflow-hidden rounded-lg border border-gray-700 bg-gray-800">
+        <summary class="flex cursor-pointer flex-wrap items-center gap-3 px-5 py-3 hover:bg-gray-700/30">
+          {@render ragBadge(policy.status)}
+          <span class="text-sm font-semibold text-white">{policy.name}</span>
+          {#if policy.framework || policy.version}<span class="text-xs text-gray-500">{[policy.framework, policy.version].filter(Boolean).join(' ')}</span>{/if}
+          <span class="font-mono text-xs text-gray-400">
+            <span class="text-green-400">{policy.counts.green}</span> /
+            <span class="text-amber-400">{policy.counts.amber}</span> /
+            <span class="text-red-400">{policy.counts.red}</span>
+          </span>
+          <span class="ml-auto flex items-center gap-1" title="Results frozen in snapshots, oldest first">
+            {#each policy.trend as point (point.snapshot_id)}
+              <span class="h-3 w-3 rounded-sm {ragDot[point.status]}" title="#{point.snapshot_id} {point.label ?? point.period ?? ''} {formatDate(point.created_at)}: {point.status}"></span>
+            {:else}
+              <span class="text-xs text-gray-500">no snapshots yet</span>
+            {/each}
+          </span>
+        </summary>
+        <table class="w-full text-sm">
+          <thead><tr class="text-xs uppercase text-gray-500"><th class="px-5 py-2 text-left">Control</th><th class="px-3 py-2 text-left">Requirement</th><th class="px-3 py-2 text-right">In scope</th><th class="px-3 py-2 text-right">Failing</th><th class="px-5 py-2 text-right">Status</th></tr></thead>
+          <tbody>
+            {#each policy.controls as control (control.id)}
+              <tr class="border-t border-gray-700/50 align-top">
+                <td class="px-5 py-2 font-mono text-xs text-gray-400">{control.id}</td>
+                <td class="px-3 py-2 text-gray-200">
+                  {control.title}
+                  <span class="block text-xs text-gray-500">{ruleText(control)}{control.source ? ` · ${control.source}` : ''}</span>
+                  {#if control.failing_secrets.length}
+                    <details class="mt-1">
+                      <summary class="cursor-pointer text-xs text-indigo-400">Failing secrets</summary>
+                      <ul class="mt-1 space-y-0.5">
+                        {#each control.failing_secrets as failing (failing.full_path)}
+                          <li class="text-xs"><span class="font-mono text-gray-300">{failing.full_path}</span> <span class="text-gray-500">{failing.owners.join(', ') || 'no owner'}</span></li>
+                        {/each}
+                      </ul>
+                    </details>
+                  {/if}
+                </td>
+                <td class="px-3 py-2 text-right font-mono text-gray-300">{control.in_scope}</td>
+                <td class="px-3 py-2 text-right font-mono text-gray-300">{control.failing}</td>
+                <td class="px-5 py-2 text-right">{@render ragBadge(control.status)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </details>
+    {/each}
     {#if summary}
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {#each [['By vault', summary.by_vault, (g: { vault?: string }) => g.vault], ['By engine', summary.by_engine, (g: { vault?: string; engine?: string }) => `${g.vault}/${g.engine}`], ['By system', summary.by_system, (g: { system?: string | null }) => g.system ?? 'Unassigned']] as const as [title, groups, name]}
@@ -225,6 +318,21 @@
         {/each}
       </div>
     {/if}
+  {:else if tab === 'policies'}
+    <p class="text-sm text-gray-400">Policies are set in <code class="text-gray-300">config.yaml</code> (<code class="text-gray-300">compliance.policies</code>); editing here comes with authentication (0.9). Example policies for regulations are in the docs and are a starting point, not legal advice.</p>
+    {#each policies as policy (policy.id)}
+      <div class="space-y-2 rounded-lg border border-gray-700 bg-gray-800 p-5">
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-sm font-semibold text-white">{policy.name}</h2>
+          <span class="font-mono text-xs text-gray-500">{policy.id}</span>
+          <span class="ml-auto text-xs text-gray-500">{policy.controls} control(s)</span>
+        </div>
+        {#if policy.description}<p class="text-sm text-gray-400">{policy.description}</p>{/if}
+        <pre class="overflow-x-auto rounded bg-gray-900 p-4 text-xs text-gray-300">{policy.yaml}</pre>
+      </div>
+    {:else}
+      <p class="text-sm text-gray-500">No policies configured.</p>
+    {/each}
   {:else if tab === 'snapshots'}
     <div class="space-y-3 rounded-lg border border-gray-700 bg-gray-800 p-5">
       <h2 class="text-sm font-semibold text-white">Take an ad-hoc snapshot</h2>
@@ -267,6 +375,7 @@
                 <td class="whitespace-nowrap px-5 py-2 text-right text-xs">
                   <a href={snapshotExportUrl(s.id, 'json')} download class="text-indigo-400 hover:text-indigo-300">JSON</a>
                   <a href={snapshotExportUrl(s.id, 'csv')} download class="ml-2 text-indigo-400 hover:text-indigo-300">CSV</a>
+                  <a href={snapshotExportUrl(s.id, 'pdf')} download class="ml-2 text-indigo-400 hover:text-indigo-300">PDF</a>
                 </td>
               </tr>
             {/each}

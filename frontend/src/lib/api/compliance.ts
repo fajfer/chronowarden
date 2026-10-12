@@ -4,7 +4,8 @@
 
 import { apiGet, apiPost } from './client';
 import type {
-  ComplianceScope, ComplianceSummary, GapReport, PeriodStatus, SnapshotInfo, SnapshotRequest,
+  ComplianceScope, ComplianceSummary, GapReport, PeriodStatus, PolicyDefinition, PolicyEvaluation, SnapshotInfo,
+  SnapshotRequest,
 } from '#lib/types/index.js';
 
 const BASE = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
@@ -48,7 +49,19 @@ export function fetchComplianceSettings(): Promise<Record<string, unknown>> {
   return apiGet<Record<string, unknown>>('/compliance/settings');
 }
 
-/** Download URL of a snapshot export (`json` is the verifiable form). */
-export function snapshotExportUrl(id: number, format: 'json' | 'csv'): string {
-  return `${BASE}/compliance/snapshots/${id}.${format}`;
+/** GET /api/v1/compliance/policies — configured policies with their YAML. */
+export function fetchPolicies(): Promise<PolicyDefinition[]> {
+  return apiGet<PolicyDefinition[]>('/compliance/policies');
+}
+
+/** GET /api/v1/compliance/policies/{id}/evaluation — a policy evaluated now, with its trend across snapshots. */
+export function fetchPolicyEvaluation(id: string): Promise<PolicyEvaluation> {
+  return apiGet<PolicyEvaluation>(`/compliance/policies/${encodeURIComponent(id)}/evaluation`);
+}
+
+/** Download URL of a snapshot export (`json` is the verifiable form, `pdf` the report). */
+export function snapshotExportUrl(id: number, format: 'json' | 'csv' | 'pdf'): string {
+  return format === 'pdf'
+    ? `${BASE}/compliance/snapshots/${id}/report.pdf`
+    : `${BASE}/compliance/snapshots/${id}.${format}`;
 }

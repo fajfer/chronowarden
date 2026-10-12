@@ -54,6 +54,8 @@ nav:
       - Audit log: guides/audit-log.md
       - Rotation confirmation: guides/rotation-confirmation.md
       - Compliance evidence: guides/compliance-evidence.md
+      - Compliance policies and reports: guides/compliance-policies.md
+      - Example policies: guides/example-policies.md
       - Prometheus metrics: guides/metrics.md
   - Reference:
       - Vault Permissions: reference/vault-permissions.md

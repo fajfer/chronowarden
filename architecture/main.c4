@@ -38,8 +38,8 @@ model {
     }
 
     component compliance {
-      technology 'Python'
-      description 'Compliance evidence: summaries, gaps, reporting periods and frozen, SHA-256 hashed inventory snapshots'
+      technology 'Python, Typst'
+      description 'Compliance evidence: summaries, gaps, reporting periods, policies from config evaluated per control (green/amber/red), frozen SHA-256 hashed snapshots with their policy results, and PDF/A reports of snapshots rendered with Typst'
     }
 
     // User uses the UI
@@ -51,7 +51,7 @@ model {
     // Every change is recorded in the audit log, stored in the database
     chronowarden.backend -[api]-> chronowarden.audit 'Records changes and verifies the hash chain'
     chronowarden.audit -[api]-> chronowarden.database 'Appends events to audit_events (never updates or deletes)'
-    chronowarden.backend -[api]-> chronowarden.compliance 'Builds summaries, gap reports and snapshots'
+    chronowarden.backend -[api]-> chronowarden.compliance 'Builds summaries, gap reports, policy evaluations, snapshots and PDF reports'
     chronowarden.compliance -[api]-> chronowarden.database 'Stores snapshots in compliance_snapshots (never updated or deleted)'
     // Backend uses metadata module
     chronowarden.backend -[api]-> chronowarden.metadata 'TTL calculation and sync'
