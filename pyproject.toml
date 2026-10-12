@@ -46,7 +46,10 @@ packages = ["chronowarden"]
 [tool.pytest.ini_options]
 # Integration tests start real OpenBao/Vault containers (testcontainers); run them with: pytest -m integration
 addopts = "-m 'not integration'"
-markers = ["integration: needs a container runtime; starts OpenBao and HashiCorp Vault"]
+markers = [
+    "integration: needs a container runtime; starts OpenBao and HashiCorp Vault",
+    "cooldowns: keep the manual sync and snapshot cooldowns on (tests/conftest.py turns them off)",
+]
 
 [tool.ruff]
 line-length = 120

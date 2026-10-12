@@ -9,9 +9,12 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Path, status
 
+from chronowarden.api.cooldown import Cooldown, enforce
 from chronowarden.database import SecretMetadataCache
 
 router = APIRouter(prefix="/sync", tags=["sync"])
+
+_cooldown = Cooldown()
 
 
 def _get_app_dependencies() -> tuple[Any, Any, Any]:
@@ -70,7 +73,8 @@ async def sync_vault(
         Sync results summary.
 
     Raises:
-        HTTPException: 404 if the vault is unknown; 503 if it can't be reconnected. The 503 detail has
+        HTTPException: 404 if the vault is unknown; 429 within `manual_sync_cooldown` of the last request for the
+            vault (reconnect attempts count); 503 if it can't be reconnected. The 503 detail has
             `message`, `reason` (last error kind), `error` and `retry_scheduled`.
     """
     manager, config, database = _get_app_dependencies()
@@ -82,6 +86,7 @@ async def sync_vault(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Vault instance '{vault_name}' not found",
         )
+    enforce(_cooldown, vault_name, config.manual_sync_cooldown, f"A sync of vault '{vault_name}'")
 
     connected = await asyncio.to_thread(vault.is_connected)
     if not connected and not await asyncio.to_thread(manager.reconnect, vault_name):

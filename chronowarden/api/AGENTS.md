@@ -36,6 +36,9 @@ REST API used by the frontend and by operators. Every router is mounted under `/
   Each change is an audit event (`secret.system`, `secret.owners`); `GET /secrets/{id}/history` lists them. Effective owners and the filters come from
   `chronowarden/assignments.py` (`AssignmentIndex`, loaded once per request).
 - `POST /sync/vault/{name}` also (re)starts the manager's reconnect loop.
+- `POST /sync/vault/{name}` (per vault, `manual_sync_cooldown`) and `POST /compliance/snapshots`
+  (`snapshot_min_interval`) answer 429 with `Retry-After` when called too soon (`api/cooldown.py`, in memory per
+  process). Tests run with both off (`tests/conftest.py`); mark a test `cooldowns` to keep them on.
 
 ## How to
 

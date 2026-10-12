@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from chronowarden.api.compliance import router as compliance_router
+from chronowarden.api.cooldown import Cooldown
 from chronowarden.compliance.evidence import build_document
 from chronowarden.compliance.periods import ended_periods, period_by_id, period_containing
 from chronowarden.config import AppConfig, ComplianceScope
@@ -289,3 +290,13 @@ def test_snapshot_when_the_database_is_unavailable_is_503(client: TestClient, db
     """Regression: a snapshot that couldn't be stored crashed with AttributeError (500) instead of saying why."""
     with patch.object(db, "add_snapshot", return_value=None):
         assert client.post("/api/v1/compliance/snapshots", json={"label": "x"}).status_code == 503
+
+
+@pytest.mark.cooldowns
+def test_snapshots_on_request_are_rate_limited(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A second snapshot within `snapshot_min_interval` is 429; a rejected request doesn't start the interval."""
+    monkeypatch.setattr("chronowarden.api.compliance._snapshot_cooldown", Cooldown())
+    assert client.post("/api/v1/compliance/snapshots", json={"label": "x", "supersedes": 999}).status_code == 422
+    assert client.post("/api/v1/compliance/snapshots", json={"label": "a"}).status_code == 201
+    response = client.post("/api/v1/compliance/snapshots", json={"label": "b"})
+    assert response.status_code == 429 and 0 < int(response.headers["Retry-After"]) <= 60
