@@ -33,6 +33,7 @@ from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
 from chronowarden.logging_config import configure_logging
 from chronowarden.request_guard import guard_requests
+from chronowarden.scheduler import SyncScheduler
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -81,6 +82,7 @@ async def _sync_after_reconnect(vault_name: str) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan handler for startup and shutdown events."""
     global app_config
+    scheduler: Optional[SyncScheduler] = None
     try:
         app_config = load_config()
         _configure_sentry(app_config)
@@ -94,11 +96,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Chronowarden started with %d vault(s) configured", len(app_config.vaults))
         vault_manager.set_reconnect_callback(_sync_after_reconnect)
         vault_manager.start_reconnect_loop()
+        scheduler = SyncScheduler(vault_manager, app_config, db)
+        scheduler.start()
         yield
     except Exception:
         logger.exception("Chronowarden startup failed")
         raise
     finally:
+        if scheduler is not None:
+            scheduler.stop()
         db.close()
         vault_manager.disconnect_all()
         logger.info("Chronowarden shutdown complete")
