@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Built-in webhook alerting
 
-- **Status:** approved
+- **Status:** implemented
 - **Date:** 2026-10-12
 - **Issue:** #99
 
@@ -31,11 +31,11 @@ Owners routes, deliveries), metrics (`NOTIFICATIONS_SENT_TOTAL`), docs, CHANGELO
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [core](../../chronowarden/AGENTS.md), [api](../../chronowarden/api/AGENTS.md),
-  [models](../../chronowarden/models/AGENTS.md), [audit](../../chronowarden/audit/AGENTS.md)
-- [ADR-022](../adr/ADR-022-webhooks-and-optional-metrics.md), [ADR-021](../adr/ADR-021-rotation-handover.md),
-  [ADR-013](../adr/ADR-013-in-process-and-headless-sync.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [core](../../../chronowarden/AGENTS.md), [api](../../../chronowarden/api/AGENTS.md),
+  [models](../../../chronowarden/models/AGENTS.md), [audit](../../../chronowarden/audit/AGENTS.md)
+- [ADR-022](../../adr/ADR-022-webhooks-and-optional-metrics.md), [ADR-021](../../adr/ADR-021-rotation-handover.md),
+  [ADR-013](../../adr/ADR-013-in-process-and-headless-sync.md)
 
 ## ADRs affected
 
@@ -82,15 +82,15 @@ New **ADR-025 Alert lifecycle and webhook delivery** (task 1), extending ADR-022
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | ADR-025 (alert lifecycle, delivery, default routes, signing secrets in the DB); index; ADR-022 "Later decisions" | [.ai/adr](../adr/README.md), ADR-022 | ADR indexed | todo | |
-| 2 | `alerting` config models and `config.example.yaml` | core | Config tests: defaults, routes with url/url_env/url_file, invalid interval | todo | |
-| 3 | Migration 10: alert state, delivery queue/log, route `signing_secret` | models, ADR-023 | Migration tests; old DBs upgrade | todo | |
-| 4 | Alert rules and state machine (fire, repeat, resolve; event alerts) + Alertmanager payload | core | Unit tests per alert, repeat edges, resolve, fingerprints stable | todo | |
-| 5 | Recipients, signing, delivery worker with retries and log; metrics | core, metrics | Tests against a local HTTP receiver: signature verifies, retries back off, no redirects, give-up after max attempts | todo | |
-| 6 | Hook evaluation into sync, confirmations, snapshots, vault health and the scheduler; one-shot delivers before exit | core, api, integrations | Integration-style test: a sync of an expired secret enqueues and sends one webhook; a second sync within the interval sends nothing | todo | |
-| 7 | API: alerts, deliveries, signing on/off, real test send; audit events for signing | api, audit | API tests; secret returned once | todo | |
-| 8 | UI: Settings → Owners routes (add, delete, signing, test), deliveries list | [frontend](../../frontend/AGENTS.md) | `npm run check` clean; walk-through in Chromium against a local receiver | todo | |
-| 9 | Docs (guide with payload and signature verification, SSRF note), README, AGENTS.md files, CHANGELOG, `main.c4` | [architecture](../../architecture/AGENTS.md) | Docs match; `mkdocs build --strict` | todo | |
+| 1 | ADR-025 (alert lifecycle, delivery, default routes, signing secrets in the DB); index; ADR-022 "Later decisions" | [.ai/adr](../../adr/README.md), ADR-022 | ADR indexed | done | 3a14fde |
+| 2 | `alerting` config models and `config.example.yaml` | core | Config tests: defaults, routes with url/url_env/url_file, invalid interval | done | 0af3edf |
+| 3 | Migration 10: alert state, delivery queue/log, route `signing_secret` | models, ADR-023 | Migration tests; old DBs upgrade | done | 044acc8 |
+| 4 | Alert rules and state machine (fire, repeat, resolve; event alerts) + Alertmanager payload | core | Unit tests per alert, repeat edges, resolve, fingerprints stable | done | c9b94f2 |
+| 5 | Recipients, signing, delivery worker with retries and log; metrics | core, metrics | Tests against a local HTTP receiver: signature verifies, retries back off, no redirects, give-up after max attempts | done | 5a526b0 |
+| 6 | Hook evaluation into sync, confirmations, snapshots, vault health and the scheduler; one-shot delivers before exit | core, api, integrations | Integration-style test: a sync of an expired secret enqueues and sends one webhook; a second sync within the interval sends nothing | done | 0c9f089 |
+| 7 | API: alerts, deliveries, signing on/off, real test send; audit events for signing | api, audit | API tests; secret returned once | done | af828ea |
+| 8 | UI: Settings → Owners routes (add, delete, signing, test), deliveries list | [frontend](../../../frontend/AGENTS.md) | `npm run check` clean; walk-through in Chromium against a local receiver | done | 780b7ec |
+| 9 | Docs (guide with payload and signature verification, SSRF note), README, AGENTS.md files, CHANGELOG, `main.c4` | [architecture](../../../architecture/AGENTS.md) | Docs match; `mkdocs build --strict` | done | 3529282 |
 
 ## Validation
 
