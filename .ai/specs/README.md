@@ -23,7 +23,6 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
-| [2026-10-12-audit-followups](2026-10-12-audit-followups.md) | Mask webhook URLs, audit route changes, cooldowns on manual sync and snapshots |
 | [2026-10-09-wire-prometheus-metrics](2026-10-09-wire-prometheus-metrics.md) | Defined-but-unset metrics get producers |
 | [2026-10-10-release-0-7](2026-10-10-release-0-7.md) | Release 0.7 Compliance evidence, extended scope: order of work |
 | [2026-10-10-supply-chain-security](2026-10-10-supply-chain-security.md) | Scorecard 6.8 → ~8.7, SLSA Build L3, cosign, CycloneDX + SPDX SBOMs, fuzzing, signed Releases |
@@ -34,6 +33,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-12-audit-followups](implemented/2026-10-12-audit-followups.md) | Mask webhook URLs, audit route changes, cooldowns on manual sync and snapshots |
 | [2026-10-11-dev-setup-rework](implemented/2026-10-11-dev-setup-rework.md) | dev-setup.py on podman, testcontainers integration tests in CI (#78) |
 | [2026-10-11-compliance-evidence](implemented/2026-10-11-compliance-evidence.md) | Privileged flag in Vault, snapshots with scope and cadences, gap warnings, Compliance tab |
 | [2026-10-11-audit-log-and-rotation-confirmation](implemented/2026-10-11-audit-log-and-rotation-confirmation.md) | #24: hash-chained audit log, change history with revert, rotation confirmation |
