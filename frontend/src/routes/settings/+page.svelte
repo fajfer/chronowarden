@@ -8,6 +8,7 @@
   import { fetchSystems, createSystem, updateSystem, setSystemOwners, deleteSystem } from '#lib/api/systems.js';
   import OwnerModal from '#lib/components/OwnerModal.svelte';
   import SystemModal from '#lib/components/SystemModal.svelte';
+  import { safeHttpUrl } from '#lib/utils/safeUrl.js';
   import { availableThemes, currentTheme, setTheme } from '#lib/stores/theme.js';
   import { addToast } from '#lib/stores/sync.js';
   import type { Owner, ApiInfo, System, SystemFormData } from '#lib/types/index.js';
@@ -273,8 +274,8 @@
                     {#if system.description}<div class="text-xs text-gray-500">{system.description}</div>{/if}
                   </td>
                   <td class="px-4 py-3">
-                    {#if system.cmdb_uri}
-                      <a href={system.cmdb_uri} target="_blank" rel="noopener noreferrer" class="text-indigo-400 hover:text-indigo-300">Open</a>
+                    {#if safeHttpUrl(system.cmdb_uri)}
+                      <a href={safeHttpUrl(system.cmdb_uri)} target="_blank" rel="noopener noreferrer" class="text-indigo-400 hover:text-indigo-300">Open</a>
                     {:else}<span class="text-gray-600">—</span>{/if}
                   </td>
                   <td class="px-4 py-3 text-gray-400">{system.asset_number ?? '—'}</td>

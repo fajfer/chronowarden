@@ -217,3 +217,16 @@ class TestDeleting:
         assert client.delete("/api/v1/owners/alice").status_code == 204
         assert [o["id"] for o in client.get(f"/api/v1/systems/{system['id']}").json()["owners"]] == ["bob"]
         assert client.get(f"/api/v1/secrets/{_secret_id(db)}").json()["owners"] == []
+
+
+@pytest.mark.parametrize("uri", ["javascript:alert(document.domain)", "data:text/html,x", "  JavaScript:x", "ftp://x"])
+def test_cmdb_uri_must_be_http(client: TestClient, uri: str) -> None:
+    """Regression (0.7.1): the UI renders cmdb_uri as a link, so a javascript: URL would run in Chronowarden."""
+    assert client.post("/api/v1/systems/", json={"name": "X", "cmdb_uri": uri}).status_code == 422
+    system = client.post("/api/v1/systems/", json={"name": "Y"}).json()
+    assert client.put(f"/api/v1/systems/{system['id']}", json={"cmdb_uri": uri}).status_code == 422
+
+
+def test_cmdb_uri_http_and_https_are_accepted(client: TestClient) -> None:
+    for i, uri in enumerate(["https://cmdb.example.com/ci/1", "HTTP://cmdb.example.com/ci/2"]):
+        assert client.post("/api/v1/systems/", json={"name": f"S{i}", "cmdb_uri": uri}).status_code == 201

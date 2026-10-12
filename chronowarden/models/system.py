@@ -23,6 +23,16 @@ class SystemRef(BaseModel):
     name: str
 
 
+def _check_link(value: Optional[str]) -> Optional[str]:
+    """Allow only http(s) CMDB links; the UI renders them as links (no javascript: or data: URLs)."""
+    if value is None or not value.strip():
+        return None
+    value = value.strip()
+    if not value.lower().startswith(("http://", "https://")):
+        raise ValueError("cmdb_uri must be an http:// or https:// URL")
+    return value
+
+
 def _strip_name(value: Optional[str]) -> Optional[str]:
     """Trim a system name and reject a blank one."""
     if value is None:
@@ -42,6 +52,7 @@ class SystemBase(BaseModel):
     asset_number: Optional[str] = Field(default=None, max_length=200, description="System or asset identifier")
 
     _name = field_validator("name")(_strip_name)
+    _cmdb_uri = field_validator("cmdb_uri")(_check_link)
 
 
 class System(SystemBase):
@@ -67,6 +78,7 @@ class SystemUpdate(BaseModel):
     asset_number: Optional[str] = Field(default=None, max_length=200)
 
     _name = field_validator("name")(_strip_name)
+    _cmdb_uri = field_validator("cmdb_uri")(_check_link)
 
 
 class OwnerIds(BaseModel):
