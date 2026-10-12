@@ -29,8 +29,15 @@ git history.
   labelled with vault, engine, path and severity; secrets per vault and status; API requests by route template;
   Vault calls by operation and outcome. Example alert rules are in the metrics guide.
 
+- Webhook alerting (#99, ADR-025): Alertmanager-compatible webhooks to the owners' routes and to
+  `alerting.default_routes` for expiring, expired, rotated and unconfirmed secrets, unreachable vaults and compliance
+  periods and snapshots; repeated every `alerting.repeat_interval`, resolved once; retries with backoff, a delivery
+  log (`GET /api/v1/webhooks/deliveries`), firing alerts (`GET /api/v1/alerts`) and Standard Webhooks signing.
+  Settings → Owners manages routes, and **Send test** really sends now. Database migration 10.
+
 ### Changed
 
+- Webhook route addresses must be `http://` or `https://`.
 - The never-set `chronowarden_secrets_total`, `_expiring_soon` and `_expired` gauges (label `engine_type`) are
   replaced by `chronowarden_secrets{vault, status}`.
 - Typst is the optional `reports` extra (`pip install chronowarden[reports]`); the default and dev images include

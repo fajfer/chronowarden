@@ -6,6 +6,10 @@ model {
     description 'Authenticated Chronowarden user'
   }
 
+  receivers = system 'Webhook receivers' {
+    description 'Chat tools, incident tools or Alertmanager-compatible endpoints that get Chronowarden alerts'
+  }
+
   chronowarden = system 'Chronowarden' {
     component frontend {
       technology 'SvelteKit, TypeScript, Tailwind CSS'
@@ -37,6 +41,11 @@ model {
       description 'Append-only, hash-chained audit log of every change Chronowarden makes or sees; verifiable and exportable as JSON Lines'
     }
 
+    component alerting {
+      technology 'Python'
+      description 'Webhook alerting: alert rules, state with repeat and resolve, Alertmanager-compatible payloads, Standard Webhooks signing, a delivery queue with retries and a log (ADR-025)'
+    }
+
     component compliance {
       technology 'Python, Typst'
       description 'Compliance evidence: summaries, gaps, reporting periods, policies from config evaluated per control (green/amber/red), frozen SHA-256 hashed snapshots with their policy results, and PDF/A reports of snapshots rendered with Typst'
@@ -51,6 +60,9 @@ model {
     // Every change is recorded in the audit log, stored in the database
     chronowarden.backend -[api]-> chronowarden.audit 'Records changes and verifies the hash chain'
     chronowarden.audit -[api]-> chronowarden.database 'Appends events to audit_events (never updates or deletes)'
+    chronowarden.backend -[api]-> chronowarden.alerting 'Evaluates alerts after syncs, confirmations and snapshots'
+    chronowarden.alerting -[api]-> chronowarden.database 'Keeps alert state and the webhook delivery queue'
+    chronowarden.alerting -[api]-> receivers 'POSTs signed, Alertmanager-compatible webhooks'
     chronowarden.backend -[api]-> chronowarden.compliance 'Builds summaries, gap reports, policy evaluations, snapshots and PDF reports'
     chronowarden.compliance -[api]-> chronowarden.database 'Stores snapshots in compliance_snapshots (never updated or deleted)'
     // Backend uses metadata module

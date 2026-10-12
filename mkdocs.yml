@@ -56,6 +56,7 @@ nav:
       - Compliance evidence: guides/compliance-evidence.md
       - Compliance policies and reports: guides/compliance-policies.md
       - Example policies: guides/example-policies.md
+      - Webhook alerts: guides/webhooks.md
       - Prometheus metrics: guides/metrics.md
   - Reference:
       - Vault Permissions: reference/vault-permissions.md

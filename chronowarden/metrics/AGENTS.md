@@ -30,7 +30,7 @@ Metric names and labels are what `/api/v1/metrics` scrapers see. All are prefixe
 | `VAULT_OPERATIONS_TOTAL`, `VAULT_OPERATION_DURATION_SECONDS` | `chronowarden_vault_operation*` | Counter / Histogram | `operation`, `status` (`success`/`not_found`/`forbidden`/`error`) | `backend.py` around hvac calls in `integrations/vault.py` |
 | `VAULT_CONNECTIONS_TOTAL` | `chronowarden_vault_connections_total` | Counter | `status` | `integrations/manager.py` |
 | `INTEGRATION_HEALTH` | `chronowarden_integration_health` | Gauge | `integration` (`vault:<name>`) | `integrations/manager.py` |
-| `NOTIFICATIONS_SENT_TOTAL` | `chronowarden_notifications_sent_total` | Counter | `router_type`, `status` | **reserved** for webhooks (#99) |
+| `NOTIFICATIONS_SENT_TOTAL` | `chronowarden_notifications_sent_total` | Counter | `router_type`, `status` | `alerting/delivery.py` (`status`: `delivered`, `pending`, `failed`) |
 
 - `refresh_secret_metrics(db, config)` runs at startup and after every `sync_vault_now` (API, schedule, one-shot,
   reconnect), only while `metrics.enabled`; it clears and refills the secret series, so removed secrets disappear.

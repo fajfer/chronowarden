@@ -65,6 +65,7 @@ Shorthand: `<area>` means `<area>/AGENTS.md`. Read root + the listed files, noth
 | Add or change a config option | [core](chronowarden/AGENTS.md), [deploy](deploy/AGENTS.md) |
 | DB schema or query change | [models](chronowarden/models/AGENTS.md), [ADR-017](.ai/adr/ADR-017-sqlite-holds-assignments.md) |
 | Add or wire a Prometheus metric | [metrics](chronowarden/metrics/AGENTS.md) |
+| Webhook alerts, routes, signing, delivery | [alerting](chronowarden/alerting/AGENTS.md), [ADR-025](.ai/adr/ADR-025-alert-lifecycle-and-webhook-delivery.md) |
 | Compliance evidence: snapshots, gaps, reporting periods, privileged flag | [compliance](chronowarden/compliance/AGENTS.md), [core](chronowarden/AGENTS.md) |
 | Audit log, change history, recording an event | [audit](chronowarden/audit/AGENTS.md), [ADR-014](.ai/adr/ADR-014-rotation-confirmation-and-audit-log.md) |
 | UI page, component, store, theme | [frontend](frontend/AGENTS.md) |

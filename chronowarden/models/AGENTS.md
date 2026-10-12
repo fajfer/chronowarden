@@ -14,7 +14,8 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 
 - `secret.py`: `SecretStatus` (`expired`/`warning`/`ok`/`no_ttl`), `SecretMetadataResponse`,
   `SecretMetadataUpdate` (trims severity, rejects blank).
-- `owner.py`: `Owner*`, `NotificationRoute*` (route `type` is `webhook` only since 0.7, ADR-022).
+- `owner.py`: `Owner*`, `NotificationRoute*` (webhook only, http(s) addresses, `signed`), `SigningSecret`,
+  `RouteTestResult`. `alert.py`: `FiringAlert`, `Delivery` (ADR-025).
 - `system.py`: `System*`, `OwnerRef`/`SystemRef` (used in `SecretMetadataResponse.system`, `owners`,
   `effective_owners`), `OwnerIds`, `SystemAssignment`.
 - `engine.py`, `entity.py`, `router.py`: **reserved for the roadmap, not wired.** Engine kinds (Azure Key Vault,
