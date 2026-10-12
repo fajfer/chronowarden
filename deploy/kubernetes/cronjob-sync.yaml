@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: 2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+---
+# Optional: sync every vault on a schedule with the headless image (ADR-013, ADR-024) instead of the server's own
+# schedule. Add it to kustomization.yaml and set `polling_interval: off` in the config Secret. It shares the
+# server's PVC (ReadWriteOnce), so both pods must run on the same node; without the Deployment it runs alone.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chronowarden-sync
+  namespace: chronowarden
+  labels:
+    app.kubernetes.io/name: chronowarden
+    app.kubernetes.io/component: sync
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: chronowarden
+            app.kubernetes.io/component: sync
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+            - name: sync
+              # Headless images exist from 0.8.0 on
+              image: ghcr.io/fajfer/chronowarden:v0.8.0-headless
+              imagePullPolicy: IfNotPresent
+              # Exit 0: every vault synced; 1: one was unreachable or failed; 2: configuration error
+              command: ["python", "-m", "chronowarden", "sync"]
+              env:
+                - name: CHRONOWARDEN_CONFIG
+                  value: /etc/chronowarden/config.yaml
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/chronowarden/config.yaml
+                  subPath: config.yaml
+                  readOnly: true
+                - name: data
+                  mountPath: /app/data
+              workingDir: /app/data
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "128Mi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          volumes:
+            - name: config
+              secret:
+                secretName: chronowarden-config
+            - name: data
+              persistentVolumeClaim:
+                claimName: chronowarden-data

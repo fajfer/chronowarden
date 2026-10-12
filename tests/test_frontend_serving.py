@@ -10,7 +10,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from chronowarden.app import _frontend_file, register_frontend
+from chronowarden.app import _frontend_file, register_frontend, serve_frontend_if_built
 
 SECRET = "vault-token-must-not-leak"
 
@@ -103,3 +103,18 @@ class TestServeSpa:
     def test_app_assets_are_served(self, client: TestClient) -> None:
         """The /_app mount serves bundled assets."""
         assert client.get("/_app/start.js").text == "console.log('app')"
+
+
+def test_without_a_build_only_the_api_is_served(tmp_path: Path) -> None:
+    """ADR-024: the headless image has no frontend build, so `/` and client routes are 404, not the SPA."""
+    app = FastAPI()
+
+    @app.get("/api/v1/health")
+    async def health() -> dict[str, str]:
+        return {"status": "healthy"}
+
+    assert serve_frontend_if_built(app, tmp_path / "missing") is False
+    client = TestClient(app)
+    assert client.get("/").status_code == 404
+    assert client.get("/secrets").status_code == 404
+    assert client.get("/api/v1/health").status_code == 200

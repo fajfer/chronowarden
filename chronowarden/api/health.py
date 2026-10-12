@@ -5,9 +5,12 @@
 """API routes for health and metrics."""
 
 from importlib.metadata import metadata, version
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response, status
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+from chronowarden.compliance.report import reports_available
 
 router = APIRouter(tags=["health"])
 
@@ -24,20 +27,21 @@ async def health_check() -> dict[str, str]:
 
 
 @router.get("/info", summary="API information endpoint")
-async def api_info() -> dict[str, str]:
+async def api_info() -> dict[str, Any]:
     """
-    Return API name, version, documentation link and the instance default UI theme.
+    Return API name, version, documentation link, the instance default UI theme and the features of this image.
 
     Returns:
-        API information dictionary.
+        API information dictionary; `features` says whether the UI and PDF reports are there (ADR-024).
     """
-    from chronowarden.app import app_config
+    from chronowarden.app import _FRONTEND_DIR, app_config
 
     return {
         "name": metadata("chronowarden")["Name"] + " API",
         "version": version("chronowarden"),
         "docs": "/docs",
         "default_theme": app_config.resolve_default_theme(),
+        "features": {"ui": _FRONTEND_DIR.is_dir(), "pdf_reports": reports_available()},
     }
 
 

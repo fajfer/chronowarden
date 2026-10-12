@@ -37,8 +37,10 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md /app/
 COPY chronowarden/ /app/chronowarden/
 
-# Exactly the versions in uv.lock, runtime dependencies only
-RUN uv sync --locked --no-dev --no-editable --no-cache
+# Exactly the versions in uv.lock, runtime dependencies only: with the PDF reports extra for the default and dev
+# images, and without it for the headless one (ADR-024)
+RUN uv sync --locked --no-dev --no-editable --no-cache --extra reports \
+ && UV_PROJECT_ENVIRONMENT=/app/.venv-headless uv sync --locked --no-dev --no-editable --no-cache
 
 # ============================================================================
 # Stage 3a: Development image  (--target dev)
@@ -71,7 +73,26 @@ USER chronowarden
 CMD ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # ============================================================================
-# Stage 3b: Production image  (default target)
+# Stage 3b: Headless image  (--target headless)
+#   API and sync only: no frontend and no Typst, so no PDF reports (ADR-024)
+# ============================================================================
+FROM gcr.io/distroless/python3-debian13:nonroot@sha256:83aa8d4f74a4d7f7cf2d472054139bef71a927b76c680c0f2e1021d6b1d6d732 AS headless
+
+WORKDIR /app
+
+COPY --from=backend-builder /app/.venv-headless/lib/python3.13/site-packages /app/.venv/lib/python3.13/site-packages
+COPY chronowarden/ /app/chronowarden/
+
+ENV PYTHONPATH="/app/.venv/lib/python3.13/site-packages:/app" \
+    PYTHONUNBUFFERED=1 \
+    CHRONOWARDEN_CONFIG=/data/config.yaml
+
+EXPOSE 8000
+
+ENTRYPOINT ["python", "-m", "uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# ============================================================================
+# Stage 3c: Production image  (default target, last so it stays the default)
 # ============================================================================
 FROM gcr.io/distroless/python3-debian13:nonroot@sha256:83aa8d4f74a4d7f7cf2d472054139bef71a927b76c680c0f2e1021d6b1d6d732 AS production
 

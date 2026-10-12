@@ -42,3 +42,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-021](ADR-021-rotation-handover.md) | Rotation hand-over between the rotating and the applying team | Accepted | 2026-10-11 |
 | [ADR-022](ADR-022-webhooks-and-optional-metrics.md) | Built-in webhook alerting, optional Prometheus metrics | Accepted | 2026-10-11 |
 | [ADR-023](ADR-023-schema-migrations-with-user-version.md) | Schema migrations with PRAGMA user_version | Accepted | 2026-10-11 |
+| [ADR-024](ADR-024-headless-image.md) | Headless image without the UI or Typst | Accepted | 2026-10-12 |

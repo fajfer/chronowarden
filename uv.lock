@@ -169,14 +169,19 @@ dependencies = [
     { name = "pyyaml" },
     { name = "requests" },
     { name = "sentry-sdk" },
-    { name = "typst" },
     { name = "urllib3" },
     { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+reports = [
+    { name = "typst" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "black" },
+    { name = "chronowarden", extra = ["reports"] },
     { name = "httpx" },
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extra = ["python"] },
@@ -196,14 +201,16 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "sentry-sdk", specifier = ">=2.63.0" },
-    { name = "typst", specifier = ">=0.15.0" },
+    { name = "typst", marker = "extra == 'reports'", specifier = ">=0.15.0" },
     { name = "urllib3", specifier = ">=2.8.0" },
     { name = "uvicorn", specifier = ">=0.32.0" },
 ]
+provides-extras = ["reports"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=24.10.0" },
+    { name = "chronowarden", extras = ["reports"] },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "mkdocs-material", specifier = ">=9.7.7" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0.6" },

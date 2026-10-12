@@ -23,6 +23,7 @@ jobs:
       id-token: write # keyless cosign signature of release images
     outputs:
       digest: ${{ steps.push-production.outputs.digest }}
+      headless_digest: ${{ steps.push-headless.outputs.digest }}
     # A normal run takes ~6 minutes; fail fast instead of hanging for GitHub's 6-hour default
     timeout-minutes: 30
     env:
@@ -128,10 +129,62 @@ jobs:
           no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
           cache-to: ${{ env.CACHE_TO }}
 
+      - name: Build headless image for smoke test
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: headless
+          load: true
+          tags: chronowarden:smoke-headless
+          platforms: linux/amd64
+          cache-from: ${{ env.CACHE_FROM }}
+          no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Smoke test headless image
+        run: |
+          docker run -d --name smoke-headless -p 127.0.0.1:8001:8000 \
+            -v "$RUNNER_TEMP/config.yaml:/data/config.yaml:ro" chronowarden:smoke-headless
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8001/api/v1/health && break
+            sleep 1
+          done
+          fail() { echo "::error::headless image: $1"; docker logs smoke-headless; exit 1; }
+          curl -fsS http://127.0.0.1:8001/api/v1/health > /dev/null || fail "not healthy within 30s"
+          # ADR-024: no UI, no Typst; the report route stays and answers 501
+          [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/)" = 404 ] || fail "/ is not 404"
+          id=$(curl -fsS -X POST -H 'Content-Type: application/json' -d '{"label":"smoke"}' \
+            http://127.0.0.1:8001/api/v1/compliance/snapshots | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8001/api/v1/compliance/snapshots/${id}/report.pdf")
+          [ "$code" = 501 ] || fail "report.pdf answered $code, not 501"
+          docker rm -f smoke-headless
+
+      - name: Build and push (headless target)
+        id: push-headless
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: headless
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/${{ github.repository }}:${{ env.IMAGE_TAG }}-headless
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: ${{ env.CACHE_FROM }}
+          no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          cache-to: ${{ env.CACHE_TO }}
+
+      - name: Sign the headless image
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          DIGEST: ${{ steps.push-headless.outputs.digest }}
+        run: cosign sign --yes "ghcr.io/${GITHUB_REPOSITORY}@${DIGEST}"
+
   provenance:
-    name: SLSA provenance for the production image
+    name: SLSA provenance for the ${{ matrix.variant }} image
     if: startsWith(github.ref, 'refs/tags/v')
     needs: docker-build
+    strategy:
+      matrix:
+        variant: [production, headless]
     permissions:
       actions: read # to read the workflow run
       id-token: write # to sign the provenance
@@ -140,15 +193,18 @@ jobs:
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0 # zizmor: ignore[unpinned-uses]
     with:
       image: ghcr.io/${{ github.repository }}
-      digest: ${{ needs.docker-build.outputs.digest }}
+      digest: ${{ matrix.variant == 'headless' && needs.docker-build.outputs.headless_digest || needs.docker-build.outputs.digest }}
       registry-username: ${{ github.actor }}
     secrets:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   sbom:
-    name: SBOMs for the production image
+    name: SBOMs for the ${{ matrix.variant }} image
     if: startsWith(github.ref, 'refs/tags/v')
     needs: docker-build
+    strategy:
+      matrix:
+        variant: [production, headless]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -156,7 +212,9 @@ jobs:
       packages: write # to push the attestations
       id-token: write # keyless cosign attestations
     env:
-      IMAGE: ghcr.io/${{ github.repository }}@${{ needs.docker-build.outputs.digest }}
+      IMAGE: ghcr.io/${{ github.repository }}@${{ matrix.variant == 'headless' && needs.docker-build.outputs.headless_digest || needs.docker-build.outputs.digest }}
+      # The production SBOMs keep their names from earlier releases
+      PREFIX: ${{ matrix.variant == 'headless' && 'chronowarden-headless-image' || 'chronowarden-image' }}
       SYFT_FILE_METADATA_SELECTION: none
     steps:
       - name: Install syft
@@ -179,18 +237,18 @@ jobs:
         run: |
           for arch in amd64 arm64; do
             "$SYFT" scan "registry:${IMAGE}" --platform "linux/${arch}" --quiet \
-              -o "cyclonedx-json@1.6=chronowarden-image-${arch}.cdx.json" \
-              -o "spdx-json@2.3=chronowarden-image-${arch}.spdx.json"
-            jq -e '.specVersion == "1.6"' "chronowarden-image-${arch}.cdx.json" > /dev/null
-            jq -e '.spdxVersion == "SPDX-2.3"' "chronowarden-image-${arch}.spdx.json" > /dev/null
+              -o "cyclonedx-json@1.6=${PREFIX}-${arch}.cdx.json" \
+              -o "spdx-json@2.3=${PREFIX}-${arch}.spdx.json"
+            jq -e '.specVersion == "1.6"' "${PREFIX}-${arch}.cdx.json" > /dev/null
+            jq -e '.spdxVersion == "SPDX-2.3"' "${PREFIX}-${arch}.spdx.json" > /dev/null
           done
 
       - name: Attest the SBOMs to the image
         run: |
-          for sbom in chronowarden-image-*.cdx.json; do
+          for sbom in "${PREFIX}"-*.cdx.json; do
             cosign attest --yes --type cyclonedx --predicate "$sbom" "$IMAGE"
           done
-          for sbom in chronowarden-image-*.spdx.json; do
+          for sbom in "${PREFIX}"-*.spdx.json; do
             cosign attest --yes --type spdxjson --predicate "$sbom" "$IMAGE"
           done
 
@@ -203,4 +261,4 @@ jobs:
             gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 && break
             sleep 30
           done
-          gh release upload "$GITHUB_REF_NAME" chronowarden-image-*.json --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$GITHUB_REF_NAME" "${PREFIX}"-*.json --repo "$GITHUB_REPOSITORY" --clobber

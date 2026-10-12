@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Headless image without the UI or Typst
 
-- **Status:** approved
+- **Status:** implemented
 - **Date:** 2026-10-12
 - **Issue:** #48
 
@@ -30,11 +30,11 @@ when a feature it leaves out (the UI, PDF reports) is asked for.
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [deploy](../../deploy/AGENTS.md), [core](../../chronowarden/AGENTS.md),
-  [compliance](../../chronowarden/compliance/AGENTS.md)
-- [ADR-008](../adr/ADR-008-container-and-deployment-targets.md), [ADR-013](../adr/ADR-013-in-process-and-headless-sync.md),
-  [ADR-020](../adr/ADR-020-pdf-reports-with-typst.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [deploy](../../../deploy/AGENTS.md), [core](../../../chronowarden/AGENTS.md),
+  [compliance](../../../chronowarden/compliance/AGENTS.md)
+- [ADR-008](../../adr/ADR-008-container-and-deployment-targets.md), [ADR-013](../../adr/ADR-013-in-process-and-headless-sync.md),
+  [ADR-020](../../adr/ADR-020-pdf-reports-with-typst.md)
 
 ## ADRs affected
 
@@ -59,13 +59,13 @@ headless image that drops the frontend stage.
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | Write ADR-024; mark ADR-008 and ADR-020 as extended in their text and the index | [.ai/adr](../adr/README.md), ADR-008, ADR-020 | ADR-024 Accepted by the maintainer and indexed | todo | |
-| 2 | Move `typst` to the `reports` extra; lazy import; 501 from `report.pdf` without it; `features` in `/info` | `pyproject.toml`, `chronowarden/compliance/report.py`, `chronowarden/api/compliance.py`, `chronowarden/app.py` | Tests run with and without Typst importable (monkeypatched) | todo | |
-| 3 | No SPA fallback when the frontend build is missing; API unaffected | `chronowarden/app.py`, `tests/test_app.py` | Test: no build dir → `/` is 404, `/api/v1/health` is 200 | todo | |
-| 4 | `headless` Dockerfile target; the production target installs `.[reports]` | `Dockerfile`, deploy | Both targets build for amd64 and arm64; headless image has no `typst` and no `frontend/build` | todo | |
-| 5 | CI: build, smoke-test (health 200, `/` 404, `report.pdf` 501), sign, attest and push `:<tag>-headless` | `.github/workflows/docker.yaml` | A tag build publishes a verified headless image | todo | |
-| 6 | Kubernetes CronJob example and Compose snippet for the headless image (after ADR-013's one-shot sync exists) | deploy | Manifests validate with `kubectl kustomize` | todo | |
-| 7 | README (image variants, sizes), `deploy/AGENTS.md`, CHANGELOG, architecture note if the model changes | [architecture](../../architecture/AGENTS.md), deploy | Docs match | todo | |
+| 1 | Write ADR-024; mark ADR-008 and ADR-020 as extended in their text and the index | [.ai/adr](../../adr/README.md), ADR-008, ADR-020 | ADR-024 Accepted by the maintainer and indexed | done | 1c4cf78 |
+| 2 | Move `typst` to the `reports` extra; lazy import; 501 from `report.pdf` without it; `features` in `/info` | `pyproject.toml`, `chronowarden/compliance/report.py`, `chronowarden/api/compliance.py`, `chronowarden/app.py` | Tests run with and without Typst importable (monkeypatched) | done | add774c |
+| 3 | No SPA fallback when the frontend build is missing; API unaffected | `chronowarden/app.py`, `tests/test_app.py` | Test: no build dir → `/` is 404, `/api/v1/health` is 200 | done | 4579b80 |
+| 4 | `headless` Dockerfile target; the production target installs `.[reports]` | `Dockerfile`, deploy | Both targets build for amd64 and arm64; headless image has no `typst` and no `frontend/build` | done | 0c81ac3 |
+| 5 | CI: build, smoke-test (health 200, `/` 404, `report.pdf` 501), sign, attest and push `:<tag>-headless` | `.github/workflows/docker.yaml` | A tag build publishes a verified headless image | done | 9f82f58 |
+| 6 | Kubernetes CronJob example and Compose snippet for the headless image (after ADR-013's one-shot sync exists) | deploy | Manifests validate with `kubectl kustomize` | done | ff53f48 |
+| 7 | README (image variants, sizes), `deploy/AGENTS.md`, CHANGELOG, architecture note if the model changes | [architecture](../../../architecture/AGENTS.md), deploy | Docs match | done | 30611a3 |
 
 ## Validation
 
@@ -75,5 +75,5 @@ headless image that drops the frontend stage.
 ## Decisions (maintainer, 2026-10-12)
 
 - Tag: `:<tag>-headless` on the same image name, like `-dev`.
-- Ships with 0.8, together with the one-shot sync ([scheduled sync spec](implemented/2026-10-12-scheduled-sync.md)).
+- Ships with 0.8, together with the one-shot sync ([scheduled sync spec](2026-10-12-scheduled-sync.md)).
 - `report.pdf` stays in the headless OpenAPI schema and answers 501.
