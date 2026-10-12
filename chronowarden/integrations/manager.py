@@ -95,8 +95,7 @@ class VaultManager:
 
         if integration.connect():
             self._pending_configs.pop(name, None)
-            VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
-            INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1)
+            self._record_connection(name, connected=True)
             return True
 
         INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(0)
@@ -201,6 +200,45 @@ class VaultManager:
             logger.exception("Failed to create CA bundle file")
             return None
 
+    def _build_integration(self, vault_config: VaultConfig) -> Optional[VaultIntegration]:
+        """
+        Build the integration for one vault, resolving its credentials.
+
+        Returns:
+            The integration, or None if a credential can't be resolved (logged and counted as a failure).
+        """
+        common = {
+            "address": vault_config.address,
+            "namespace": vault_config.namespace,
+            "mount_path": vault_config.mount_path,
+            "verify_ssl": vault_config.verify_ssl,
+            "ca_bundle": self._ca_bundle_path,
+        }
+        if vault_config.auth_method == "approle":
+            credentials = {"role_id": vault_config.resolve_role_id(), "secret_id": vault_config.resolve_secret_id()}
+        else:
+            credentials = {"token": vault_config.resolve_token()}
+        for name, value in credentials.items():
+            if value is None:
+                logger.error("Cannot resolve %s for vault '%s', skipping", name, vault_config.name)
+                self._record_connection(vault_config.name, connected=False)
+                return None
+
+        if vault_config.auth_method == "approle":
+            return VaultIntegration(
+                **common,
+                auth_method="approle",
+                approle_mount_point=vault_config.approle_mount_point,
+                **credentials,
+            )
+        return VaultIntegration(**common, **credentials)
+
+    @staticmethod
+    def _record_connection(name: str, connected: bool) -> None:
+        """Count a connection attempt and set the vault's health gauge."""
+        VAULT_CONNECTIONS_TOTAL.labels(status="success" if connected else "failure").inc()
+        INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1 if connected else 0)
+
     def _connect_vault(self, vault_config: VaultConfig) -> None:
         """
         Connect to a single vault instance from config.
@@ -208,58 +246,18 @@ class VaultManager:
         Args:
             vault_config: Configuration for the vault instance.
         """
-        if vault_config.auth_method == "approle":
-            role_id = vault_config.resolve_role_id()
-            secret_id = vault_config.resolve_secret_id()
-            if role_id is None:
-                logger.error("Cannot resolve role_id for vault '%s', skipping", vault_config.name)
-                VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
-                INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
-                return
-            if secret_id is None:
-                logger.error("Cannot resolve secret_id for vault '%s', skipping", vault_config.name)
-                VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
-                INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
-                return
-
-            integration = VaultIntegration(
-                address=vault_config.address,
-                namespace=vault_config.namespace,
-                mount_path=vault_config.mount_path,
-                verify_ssl=vault_config.verify_ssl,
-                ca_bundle=self._ca_bundle_path,
-                auth_method="approle",
-                role_id=role_id,
-                secret_id=secret_id,
-                approle_mount_point=vault_config.approle_mount_point,
-            )
-        else:
-            token = vault_config.resolve_token()
-            if token is None:
-                logger.error("Cannot resolve token for vault '%s', skipping", vault_config.name)
-                VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
-                INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
-                return
-
-            integration = VaultIntegration(
-                address=vault_config.address,
-                token=token,
-                namespace=vault_config.namespace,
-                mount_path=vault_config.mount_path,
-                verify_ssl=vault_config.verify_ssl,
-                ca_bundle=self._ca_bundle_path,
-            )
+        integration = self._build_integration(vault_config)
+        if integration is None:
+            return
 
         if integration.connect():
             self._vaults[vault_config.name] = integration
             self._pending_configs.pop(vault_config.name, None)
-            VAULT_CONNECTIONS_TOTAL.labels(status="success").inc()
-            INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(1)
+            self._record_connection(vault_config.name, connected=True)
             logger.info("Connected to vault '%s' at %s", vault_config.name, vault_config.address)
         else:
             self._vaults[vault_config.name] = integration
-            VAULT_CONNECTIONS_TOTAL.labels(status="failure").inc()
-            INTEGRATION_HEALTH.labels(integration=f"vault:{vault_config.name}").set(0)
+            self._record_connection(vault_config.name, connected=False)
             reason = integration.last_error or "unknown connection failure"
             if integration.last_error_kind == "auth":
                 self._pending_configs.pop(vault_config.name, None)
