@@ -243,6 +243,8 @@ async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInf
     snapshot_id = database.add_snapshot(
         created_at, content, sha256, len(secrets), data.label, data.cadence, data.period, data.supersedes
     )
+    if snapshot_id is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="The database isn't available")
     database.append_audit_event(
         "compliance.snapshot",
         request_source(request),

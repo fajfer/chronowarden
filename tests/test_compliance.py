@@ -283,3 +283,9 @@ def test_csv_export_neutralises_formulas() -> None:
     }
     lines = rows_to_csv([row]).splitlines()
     assert "'=1+1" in lines[1] and "'=HYPERLINK" in lines[1] and "'-1" in lines[1] and "'@evil; Alice" in lines[1]
+
+
+def test_snapshot_when_the_database_is_unavailable_is_503(client: TestClient, db: Database) -> None:
+    """Regression: a snapshot that couldn't be stored crashed with AttributeError (500) instead of saying why."""
+    with patch.object(db, "add_snapshot", return_value=None):
+        assert client.post("/api/v1/compliance/snapshots", json={"label": "x"}).status_code == 503
