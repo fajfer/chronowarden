@@ -20,30 +20,35 @@ endpoint returns 404 (off by default since 0.7, ADR-022). Metrics are still reco
 
 Metric names and labels are what `/api/v1/metrics` scrapers see. All are prefixed `chronowarden_`.
 
-| Constant | Type | Labels | Set by |
-|---|---|---|---|
-| `VAULT_CONNECTIONS_TOTAL` | Counter | `status` (`success`/`failure`) | `integrations/manager.py` |
-| `INTEGRATION_HEALTH` | Gauge | `integration` (`vault:<name>`) | `integrations/manager.py` |
-| `VAULT_OPERATIONS_TOTAL` | Counter | `operation`, `status` | **nothing yet** (set by the removed passthrough endpoints until 0.6.2) |
-| `SECRETS_TOTAL`, `SECRETS_EXPIRING_SOON`, `SECRETS_EXPIRED` | Gauge | `engine_type` | **nothing yet** |
-| `API_REQUESTS_TOTAL`, `API_REQUEST_DURATION_SECONDS` | Counter / Histogram | `method`, `endpoint`(, `status`) | **nothing yet** |
-| `VAULT_OPERATION_DURATION_SECONDS` | Histogram | `operation` | **nothing yet** |
-| `NOTIFICATIONS_SENT_TOTAL` | Counter | `router_type`, `status` | **nothing yet** (no notifier exists) |
+| Constant | Name | Type | Labels | Set by |
+|---|---|---|---|---|
+| `SECRETS` | `chronowarden_secrets` | Gauge | `vault`, `status` | `refresh.py` |
+| `SECRET_EXPIRY_TIMESTAMP` | `chronowarden_secret_expiry_timestamp_seconds` | Gauge | `vault`, `engine`, `secret_path`, `severity` | `refresh.py` (no series without a TTL) |
+| `SECRET_LAST_ROTATION_TIMESTAMP` | `chronowarden_secret_last_rotation_timestamp_seconds` | Gauge | same | `refresh.py` |
+| `SECRET_CONFIRMATION_OVERDUE` | `chronowarden_secret_confirmation_overdue` | Gauge | same | `refresh.py` |
+| `API_REQUESTS_TOTAL`, `API_REQUEST_DURATION_SECONDS` | `chronowarden_api_request*` | Counter / Histogram | `method`, `endpoint` (route template), `status` | `http.py` (middleware in `app.py`) |
+| `VAULT_OPERATIONS_TOTAL`, `VAULT_OPERATION_DURATION_SECONDS` | `chronowarden_vault_operation*` | Counter / Histogram | `operation`, `status` (`success`/`not_found`/`forbidden`/`error`) | `backend.py` around hvac calls in `integrations/vault.py` |
+| `VAULT_CONNECTIONS_TOTAL` | `chronowarden_vault_connections_total` | Counter | `status` | `integrations/manager.py` |
+| `INTEGRATION_HEALTH` | `chronowarden_integration_health` | Gauge | `integration` (`vault:<name>`) | `integrations/manager.py` |
+| `NOTIFICATIONS_SENT_TOTAL` | `chronowarden_notifications_sent_total` | Counter | `router_type`, `status` | **reserved** for webhooks (#99) |
+
+- `refresh_secret_metrics(db, config)` runs at startup and after every `sync_vault_now` (API, schedule, one-shot,
+  reconnect), only while `metrics.enabled`; it clears and refills the secret series, so removed secrets disappear.
+- Per-secret labels carry the full path (maintainer decision 2026-10-12); series count = number of secrets.
 
 ## How to
 
 - **Add a metric**: define it in `prometheus.py` next to its group, with a `chronowarden_` name and help text.
   Export it in `__init__.py` (`import` + `__all__`). Set it where the event happens, reusing the
   label values above.
-- **Wire an existing metric**: follow
-  [the wiring spec](../../.ai/specs/2026-10-09-wire-prometheus-metrics.md).
-- **Test**: no existing test asserts metric values yet; the wiring spec defines the first ones.
+- **Test**: read values with `prometheus_client.REGISTRY.get_sample_value(name, labels)`; compare deltas, since the
+  registry is shared by the whole test run (`tests/test_metrics.py`).
 
 ## Gotchas
 
 - Metrics are module-level objects on the default registry, shared by the whole process (including the test run).
-- The README promises "Prometheus Metrics … for alerting", but the expiry gauges are not set yet (see the table
-  above).
+- `endpoint` is rebuilt as prefix + route template (`http.endpoint_of`): FastAPI keeps an included router's paths
+  without the `/api/v1` it was included with. Paths no route matched are `unmatched`.
 
 ## Related ADRs
 
@@ -52,4 +57,4 @@ Metric names and labels are what `/api/v1/metrics` scrapers see. All are prefixe
 
 ## Validate
 
-`uv run pytest tests/test_manager.py tests/test_vault_api.py tests/test_app.py`
+`uv run pytest tests/test_metrics.py tests/test_manager.py tests/test_vault_api.py tests/test_app.py`

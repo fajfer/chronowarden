@@ -6,23 +6,31 @@
 
 from prometheus_client import Counter, Gauge, Histogram
 
-# Secret metrics
-SECRETS_TOTAL = Gauge(
-    "chronowarden_secrets_total",
-    "Total number of secrets managed",
-    ["engine_type"],
+# Secret metrics (#71): refreshed from the cache after every sync while metrics are enabled
+_SECRET_LABELS = ["vault", "engine", "secret_path", "severity"]
+
+SECRETS = Gauge(
+    "chronowarden_secrets",
+    "Secrets still in the backends, by vault and status (ok, warning, expired, no_ttl)",
+    ["vault", "status"],
 )
 
-SECRETS_EXPIRING_SOON = Gauge(
-    "chronowarden_secrets_expiring_soon",
-    "Number of secrets expiring within alert threshold",
-    ["engine_type"],
+SECRET_EXPIRY_TIMESTAMP = Gauge(
+    "chronowarden_secret_expiry_timestamp_seconds",
+    "When the secret's TTL ends, as Unix time; no series for secrets without a TTL",
+    _SECRET_LABELS,
 )
 
-SECRETS_EXPIRED = Gauge(
-    "chronowarden_secrets_expired",
-    "Number of expired secrets",
-    ["engine_type"],
+SECRET_LAST_ROTATION_TIMESTAMP = Gauge(
+    "chronowarden_secret_last_rotation_timestamp_seconds",
+    "The backend's last update (rotation) of the secret, as Unix time",
+    _SECRET_LABELS,
+)
+
+SECRET_CONFIRMATION_OVERDUE = Gauge(
+    "chronowarden_secret_confirmation_overdue",
+    "1 while the secret's newest version has waited for confirmation past its grace period (ADR-021), else 0",
+    _SECRET_LABELS,
 )
 
 # API metrics

@@ -40,7 +40,8 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 - **Secure** - Never reads actual secret values, only metadata
 - **Scheduled Sync** - Every vault is synced every `polling_interval` (default 6h) and on demand;
   `python -m chronowarden sync` runs one sync and exits, e.g. as a Kubernetes CronJob
-- **Prometheus Metrics** - Optional monitoring endpoint (`metrics.enabled: true`; off by default)
+- **Prometheus Metrics** - Optional (`metrics.enabled: true`): per-secret expiry and rotation series for alert
+  rules, API and Vault call metrics
 - **Modern Web UI** - SvelteKit frontend with dark mode
 
 ## How does it work?

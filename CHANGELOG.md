@@ -25,8 +25,14 @@ git history.
   of ~165 MB), signed and attested like the default image. `report.pdf` answers 501 there, other paths than `/api`
   are 404, and `GET /api/v1/info` lists the image's `features`. A Kubernetes CronJob example uses it.
 
+- Prometheus metrics (#71) when `metrics.enabled`: per-secret expiry, last-rotation and confirmation-overdue series
+  labelled with vault, engine, path and severity; secrets per vault and status; API requests by route template;
+  Vault calls by operation and outcome. Example alert rules are in the metrics guide.
+
 ### Changed
 
+- The never-set `chronowarden_secrets_total`, `_expiring_soon` and `_expired` gauges (label `engine_type`) are
+  replaced by `chronowarden_secrets{vault, status}`.
 - Typst is the optional `reports` extra (`pip install chronowarden[reports]`); the default and dev images include
   it.
 

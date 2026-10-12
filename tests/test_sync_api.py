@@ -46,7 +46,7 @@ class TestSyncApiReconnectLoop:
         with (
             patch(
                 "chronowarden.api.sync._get_app_dependencies",
-                return_value=(manager, MagicMock(), MagicMock()),
+                return_value=(manager, AppConfig(), MagicMock()),
             ),
             patch("chronowarden.metadata.detect_changes", return_value=synced),
         ):
@@ -78,7 +78,7 @@ class TestSyncReconnectFirst:
         manager, _ = _disconnected_vault(reconnect_ok=True)
         synced = [SimpleNamespace(engine_id="apps", secret_path="s", ttl=None, severity="default")]
         with (
-            patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, MagicMock(), MagicMock())),
+            patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())),
             patch("chronowarden.metadata.detect_changes", return_value=synced),
         ):
             response = _build_client().post("/api/v1/sync/vault/dev-vault")
@@ -90,7 +90,7 @@ class TestSyncReconnectFirst:
     def test_offline_vault_reports_scheduled_retry(self) -> None:
         """An offline vault returns 503 with the reason and a scheduled background retry."""
         manager, _ = _disconnected_vault(reconnect_ok=False, error_kind="offline")
-        with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, MagicMock(), MagicMock())):
+        with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())):
             response = _build_client().post("/api/v1/sync/vault/dev-vault")
 
         assert response.status_code == 503
@@ -103,7 +103,7 @@ class TestSyncReconnectFirst:
     def test_auth_failure_is_not_retried(self) -> None:
         """An authentication failure returns 503 without a scheduled retry."""
         manager, _ = _disconnected_vault(reconnect_ok=False, error_kind="auth")
-        with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, MagicMock(), MagicMock())):
+        with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())):
             response = _build_client().post("/api/v1/sync/vault/dev-vault")
 
         assert response.status_code == 503
@@ -114,7 +114,7 @@ class TestSyncReconnectFirst:
         """An unknown vault name returns 404 without a reconnect attempt."""
         manager = MagicMock()
         manager.get.return_value = None
-        with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, MagicMock(), MagicMock())):
+        with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())):
             response = _build_client().post("/api/v1/sync/vault/missing")
 
         assert response.status_code == 404
@@ -134,7 +134,7 @@ class TestSyncReconnectFirst:
             return []
 
         with patch("chronowarden.metadata.detect_changes", side_effect=_detect):
-            asyncio.run(sync_vault_now(manager, "v", MagicMock(), MagicMock()))
+            asyncio.run(sync_vault_now(manager, "v", AppConfig(), MagicMock()))
 
         assert seen_locked == [True]
         assert not manager.sync_lock("v").locked()

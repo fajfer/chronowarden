@@ -1,0 +1,130 @@
+# SPDX-FileCopyrightText: 2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+"""Tests for the Prometheus metrics (#71, ADR-022)."""
+
+from datetime import UTC, datetime
+from typing import Optional
+from unittest.mock import MagicMock, patch
+
+from hvac.exceptions import Forbidden, InvalidPath, VaultError
+from prometheus_client import REGISTRY
+
+from chronowarden.config import AppConfig
+from chronowarden.database import Database, SecretMetadataCache
+from chronowarden.integrations.vault import VaultIntegration
+from chronowarden.metrics.refresh import refresh_secret_metrics
+
+ENABLED = AppConfig.model_validate({"metrics": {"enabled": True}})
+
+
+def _sample(name: str, **labels: str) -> Optional[float]:
+    return REGISTRY.get_sample_value(name, labels)
+
+
+def _cache(db: Database, path: str, ttl: Optional[str], updated: Optional[str] = None) -> None:
+    db.upsert_secret_metadata(
+        SecretMetadataCache(
+            vault_name="prod", engine_id="apps", secret_path=path, ttl=ttl, updated_time=updated, severity="default"
+        )
+    )
+
+
+class TestSecretMetrics:
+    def test_values_after_a_sync(self, db: Database) -> None:
+        _cache(db, "db", "2030-01-01", "2026-01-01T00:00:00Z")
+        _cache(db, "old", "2020-01-01")
+        _cache(db, "none", None)
+        refresh_secret_metrics(db, ENABLED)
+        labels = {"vault": "prod", "engine": "apps", "secret_path": "db", "severity": "default"}
+        assert (
+            _sample("chronowarden_secret_expiry_timestamp_seconds", **labels)
+            == datetime(2030, 1, 1, tzinfo=UTC).timestamp()
+        )
+        assert (
+            _sample("chronowarden_secret_last_rotation_timestamp_seconds", **labels)
+            == datetime(2026, 1, 1, tzinfo=UTC).timestamp()
+        )
+        assert _sample("chronowarden_secret_confirmation_overdue", **labels) == 0
+        no_ttl = {**labels, "secret_path": "none"}
+        assert _sample("chronowarden_secret_expiry_timestamp_seconds", **no_ttl) is None, "no TTL, no series"
+        assert _sample("chronowarden_secrets", vault="prod", status="ok") == 1
+        assert _sample("chronowarden_secrets", vault="prod", status="expired") == 1
+        assert _sample("chronowarden_secrets", vault="prod", status="no_ttl") == 1
+
+    def test_removed_secrets_lose_their_series(self, db: Database) -> None:
+        _cache(db, "db", "2030-01-01")
+        refresh_secret_metrics(db, ENABLED)
+        labels = {"vault": "prod", "engine": "apps", "secret_path": "db", "severity": "default"}
+        assert _sample("chronowarden_secret_expiry_timestamp_seconds", **labels) is not None
+        db.reconcile_engine("prod", "apps", set(), "2026-10-12T00:00:00+00:00")
+        refresh_secret_metrics(db, ENABLED)
+        assert _sample("chronowarden_secret_expiry_timestamp_seconds", **labels) is None
+        assert _sample("chronowarden_secrets", vault="prod", status="ok") is None
+
+    def test_disabled_metrics_skip_the_work(self, db: Database) -> None:
+        _cache(db, "fresh", "2031-01-01")
+        refresh_secret_metrics(db, AppConfig())
+        labels = {"vault": "prod", "engine": "apps", "secret_path": "fresh", "severity": "default"}
+        assert _sample("chronowarden_secret_expiry_timestamp_seconds", **labels) is None
+
+
+class TestRequestMetrics:
+    def test_requests_are_labelled_with_the_route_template(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from chronowarden.app import app
+
+        labels = {"method": "GET", "endpoint": "/api/v1/compliance/snapshots/{snapshot_id}", "status": "404"}
+        before = _sample("chronowarden_api_requests_total", **labels) or 0
+        database = MagicMock(get_snapshot=MagicMock(return_value=None))
+        with patch("chronowarden.api.compliance._get_app_dependencies", return_value=(database, AppConfig())):
+            assert TestClient(app).get("/api/v1/compliance/snapshots/12345").status_code == 404
+        assert _sample("chronowarden_api_requests_total", **labels) == before + 1
+        assert (
+            _sample("chronowarden_api_requests_total", **{**labels, "endpoint": "/api/v1/compliance/snapshots/12345"})
+            is None
+        )
+
+    def test_guard_refusals_are_counted_too(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from chronowarden.app import app
+
+        config = AppConfig(allowed_hosts=["chronowarden.example.com"])
+        labels = {"method": "GET", "endpoint": "unmatched", "status": "400"}
+        before = _sample("chronowarden_api_requests_total", **labels) or 0
+        with patch("chronowarden.app.app_config", config):
+            assert TestClient(app).get("/api/v1/health").status_code == 400
+        assert _sample("chronowarden_api_requests_total", **labels) == before + 1
+
+
+class TestVaultOperationMetrics:
+    def _vault(self) -> VaultIntegration:
+        vault = VaultIntegration(address="http://v:8200", token="t")
+        vault._client = MagicMock()
+        return vault
+
+    def test_calls_are_counted_by_outcome_and_timed(self) -> None:
+        vault = self._vault()
+        kv = vault._client.secrets.kv.v2
+
+        def count(status: str) -> float:
+            return _sample("chronowarden_vault_operations_total", operation="read_metadata", status=status) or 0
+
+        def timed() -> float:
+            return _sample("chronowarden_vault_operation_duration_seconds_count", operation="read_metadata") or 0
+
+        before = {s: count(s) for s in ("success", "not_found", "forbidden", "error")}
+        samples = timed()
+        kv.read_secret_metadata.return_value = {"data": {}}
+        vault.get_secret_metadata("a")
+        kv.read_secret_metadata.side_effect = InvalidPath("gone")
+        vault.get_secret_metadata("b")
+        kv.read_secret_metadata.side_effect = Forbidden("no")
+        vault.get_secret_metadata("c")
+        kv.read_secret_metadata.side_effect = VaultError("boom")
+        vault.get_secret_metadata("d")
+        assert {s: count(s) - before[s] for s in before} == {"success": 1, "not_found": 1, "forbidden": 1, "error": 1}
+        assert timed() - samples == 4

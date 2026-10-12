@@ -32,6 +32,8 @@ from chronowarden.config import AppConfig, load_config
 from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
 from chronowarden.logging_config import configure_logging
+from chronowarden.metrics.http import observe_request
+from chronowarden.metrics.refresh import refresh_secret_metrics
 from chronowarden.request_guard import guard_requests
 from chronowarden.scheduler import SyncScheduler
 
@@ -92,6 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         db._db_path = db_path
         db.connect()
         record_config_change(db, app_config)
+        refresh_secret_metrics(db, app_config)  # series from the cache before the first sync
 
         logger.info("Chronowarden started with %d vault(s) configured", len(app_config.vaults))
         vault_manager.set_reconnect_callback(_sync_after_reconnect)
@@ -135,6 +138,14 @@ app = FastAPI(
 async def _guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     """Refuse cross-site writes and Hosts outside allowed_hosts (0.7.1)."""
     return await guard_requests(request, call_next, app_config.allowed_hosts)
+
+
+# Registered after the guard, so it wraps it (Starlette: the last registered middleware runs first) and also counts
+# the guard's refusals
+@app.middleware("http")
+async def _metrics(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """Count and time every request by route template (#71)."""
+    return await observe_request(request, call_next)
 
 
 app.include_router(health_router, prefix="/api/v1")
