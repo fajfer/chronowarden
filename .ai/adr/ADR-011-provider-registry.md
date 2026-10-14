@@ -5,9 +5,9 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-011: Generic provider registry
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-09
-- **Evidence:** Issue #72; spec `.ai/specs/2026-10-09-generic-provider-registry.md`; PR #26 gap analysis.
+- **Evidence:** maintainer decisions of 2026-10-14; issue #72; spec `.ai/specs/2026-10-09-generic-provider-registry.md`; PR #26 gap analysis.
 
 ## Context
 
@@ -15,12 +15,19 @@ ADR-003 introduced `BaseIntegration`, but nothing enforces it, and `VaultManager
 
 ## Decision
 
-**Not decided yet.** Options to settle in #72:
+Settled by the maintainer on 2026-10-14:
 
-- Interface: `abc.ABC` vs `typing.Protocol`, and which of `write_secret_metadata`, `discover_engines`, `check_health` and `last_error_kind` become part of it.
-- Config: a `type:` key on each backend entry (defaulting to `vault`) vs a separate top-level list per provider type.
-- API: keep `/api/v1/vault/*` or rename it to a provider-neutral path (breaking for the frontend; allowed before 1.0).
-- Metadata: how providers without custom metadata (e.g. some cloud vaults) store `chronowarden_*` fields.
+- **Interface:** `BaseIntegration` becomes an `abc.ABC`; `list_secrets`, `get_secret_metadata`,
+  `write_secret_metadata`, `discover_engines`, `check_health`, `is_connected`, `connect`, `disconnect`,
+  `last_error` and `last_error_kind` are abstract, so a provider missing one fails when it is instantiated.
+- **Config:** each backend entry in `vaults:` gets `type:` (`vault` by default, so existing configs load unchanged;
+  `openbao`, `azure-key-vault` and `gcp-secret-manager` later).
+- **API:** `/api/v1/vault/*` becomes `/api/v1/providers/*` and `/api/v1/sync/vault/{name}` becomes
+  `/api/v1/sync/provider/{name}`, with the frontend in the same change; breaking for API users, no shim before 1.0.
+- **Metadata:** only providers that can store key/value metadata on each secret are supported, so `chronowarden_*`
+  keys always live in the backend (ADR-006). Azure Key Vault (tags) and GCP Secret Manager (labels/annotations)
+  qualify; providers without per-secret metadata (e.g. GitLab CI variables) are out of scope.
+- The registry is proven with **Azure Key Vault and GCP Secret Manager**, each in its own spec after the refactor.
 
 ## Consequences
 

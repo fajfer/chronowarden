@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Generic provider registry
 
-- **Status:** draft
+- **Status:** approved
 - **Date:** 2026-10-09
 - **Issue:** #72
 
@@ -34,22 +34,23 @@ class plus its config model, without editing Vault-specific code in the manager,
 
 ## ADRs affected
 
-ADR-003: superseded once [ADR-011](../adr/ADR-011-provider-registry.md) (Proposed, options listed) is accepted.
+ADR-003 superseded by [ADR-011](../adr/ADR-011-provider-registry.md) (accepted 2026-10-14).
 
 ## Tasks
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | Settle the open options in ADR-011, set it Accepted, mark ADR-003 `Superseded by ADR-011` | integrations, [.ai/adr](../adr/README.md) | ADR approved by the user | todo | |
-| 2 | Make `BaseIntegration` an enforced interface (ABC or `Protocol`) that includes `write_secret_metadata`, `discover_engines`, `check_health`, `last_error_kind` | integrations | `VaultIntegration` passes; missing methods fail at definition/instantiation | todo | |
+| 1 | Settle the open options in ADR-011, set it Accepted, mark ADR-003 `Superseded by ADR-011` | integrations, [.ai/adr](../adr/README.md) | ADR approved by the user | done | DECISIONS |
+| 2 | Make `BaseIntegration` an `abc.ABC` (ADR-011) that includes `write_secret_metadata`, `discover_engines`, `check_health`, `last_error_kind` | integrations | `VaultIntegration` passes; missing methods fail at definition/instantiation | todo | |
 | 3 | Generalise `VaultManager` into a manager keyed by provider type, with config `type:` defaulting to `vault` for existing configs | integrations, core | Existing `config.example.yaml` loads unchanged; `tests/test_manager.py` green | todo | |
-| 4 | Make `metadata.py` and the `/vault`/`/sync` APIs depend on the interface, not `VaultIntegration` | core, [api](../../chronowarden/api/AGENTS.md) | No `VaultIntegration` imports outside `integrations/` | todo | |
+| 4 | Make `metadata.py` and the APIs depend on the interface, not `VaultIntegration`; rename `/vault/*` to `/providers/*` and `/sync/vault/{name}` to `/sync/provider/{name}`, frontend included | core, [api](../../chronowarden/api/AGENTS.md), [frontend](../../frontend/AGENTS.md) | No `VaultIntegration` imports outside `integrations/`; UI works against the new paths; CHANGELOG notes the break | todo | |
 | 5 | Model providers in `architecture/main.c4` | [architecture](../../architecture/AGENTS.md) | Element for the external backend(s) exists | todo | |
 
 ## Validation
 
 `uv run pytest`, `uv run black --check .`, `uv run ruff check .`
 
-## Open questions
+## Decisions (maintainer, 2026-10-14)
 
-- Should `/api/v1/vault/*` be renamed (e.g. `/providers`), which breaks the frontend and API users?
+See ADR-011: `abc.ABC`; `type:` per backend entry (default `vault`); `/providers` paths now; only providers with
+per-secret key/value metadata. Azure Key Vault and GCP Secret Manager follow as separate specs after this one.
