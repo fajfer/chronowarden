@@ -6,7 +6,7 @@
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class NotificationRouteBase(BaseModel):
@@ -27,12 +27,35 @@ class NotificationRoute(NotificationRouteBase):
     id: str
     owner_id: str
     created_at: Optional[str] = None
+    signed: bool = Field(default=False, description="Deliveries carry a Standard Webhooks signature (ADR-025)")
 
 
 class NotificationRouteCreate(NotificationRouteBase):
     """Schema for creating a notification route."""
 
-    pass
+    @field_validator("address")
+    @classmethod
+    def check_http(cls, value: str) -> str:
+        """Webhooks are POSTed over HTTP(S) only (no file:, gopher: or other schemes)."""
+        value = value.strip()
+        if not value.lower().startswith(("http://", "https://")):
+            raise ValueError("the webhook address must be an http:// or https:// URL")
+        return value
+
+
+class SigningSecret(BaseModel):
+    """A route's new signing secret, returned only by the request that creates it (ADR-025)."""
+
+    route_id: str
+    secret: str = Field(description="Standard Webhooks secret (whsec_...); store it in the receiver now")
+
+
+class RouteTestResult(BaseModel):
+    """The outcome of sending a test webhook to a route."""
+
+    success: bool
+    status_code: Optional[int] = None
+    message: str
 
 
 class OwnerBase(BaseModel):

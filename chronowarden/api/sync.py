@@ -5,10 +5,12 @@
 """API routes for metadata synchronization."""
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Path, status
 
+from chronowarden.alerting.engine import evaluate_inventory
 from chronowarden.api.cooldown import Cooldown, enforce
 from chronowarden.database import SecretMetadataCache
 from chronowarden.metrics.refresh import refresh_secret_metrics
@@ -35,7 +37,7 @@ async def sync_vault_now(manager: Any, vault_name: str, config: Any, database: A
     Sync one vault while holding its sync lock, running the blocking backend calls in a worker thread.
 
     Used by the sync endpoint, the schedule, the one-shot command and the sync that follows a background reconnect.
-    Refreshes the secret metrics afterwards (#71).
+    Refreshes the secret metrics (#71) and evaluates alerts (#99) afterwards.
 
     Args:
         manager: The VaultManager.
@@ -54,6 +56,7 @@ async def sync_vault_now(manager: Any, vault_name: str, config: Any, database: A
     async with manager.sync_lock(vault_name):
         updated = await asyncio.to_thread(metadata.detect_changes, vault, vault_name, config, database)
     await asyncio.to_thread(refresh_secret_metrics, database, config)
+    await asyncio.to_thread(evaluate_inventory, database, config, datetime.now(tz=timezone.utc))
     return updated
 
 

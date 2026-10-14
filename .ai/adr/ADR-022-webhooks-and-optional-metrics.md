@@ -35,6 +35,11 @@ Alertmanager, while Prometheus users can still scrape metrics if they want.
 - Existing scrapers of `/api/v1/metrics` must enable metrics after upgrading to 0.7 (breaking change).
 - Receivers that don't verify signatures ignore the extra headers; chat-tool webhooks work unchanged.
 
+## Later decisions
+
+- ADR-025: alert lifecycle (repeat, resolve), default routes for alerts without an owner, signing secrets
+  generated and stored by Chronowarden.
+
 ## Related files
 
 - `chronowarden/config.py`, `chronowarden/api/health.py`, `chronowarden/api/owners.py`, `chronowarden/models/owner.py`

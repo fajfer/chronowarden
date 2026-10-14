@@ -16,7 +16,9 @@ from fastapi.staticfiles import StaticFiles
 from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
 from starlette.responses import FileResponse, Response
 
+from chronowarden.alerting.delivery import DeliveryWorker
 from chronowarden.api import (
+    alerts_router,
     audit_router,
     compliance_router,
     health_router,
@@ -85,6 +87,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan handler for startup and shutdown events."""
     global app_config
     scheduler: Optional[SyncScheduler] = None
+    deliveries: Optional[DeliveryWorker] = None
     try:
         app_config = load_config()
         _configure_sentry(app_config)
@@ -101,6 +104,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         vault_manager.start_reconnect_loop()
         scheduler = SyncScheduler(vault_manager, app_config, db)
         scheduler.start()
+        deliveries = DeliveryWorker(db, app_config)
+        deliveries.start()
         yield
     except Exception:
         logger.exception("Chronowarden startup failed")
@@ -108,6 +113,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         if scheduler is not None:
             scheduler.stop()
+        if deliveries is not None:
+            deliveries.stop()
         db.close()
         vault_manager.disconnect_all()
         logger.info("Chronowarden shutdown complete")
@@ -128,6 +135,7 @@ app = FastAPI(
         {"name": "systems", "description": "Systems that secrets are assigned to"},
         {"name": "audit", "description": "Append-only, hash-chained audit log"},
         {"name": "compliance", "description": "Compliance evidence: summary, gaps, periods, snapshots"},
+        {"name": "alerts", "description": "Firing alerts and the webhook delivery log (ADR-025)"},
     ],
 )
 
@@ -156,6 +164,7 @@ app.include_router(owners_router, prefix="/api/v1")
 app.include_router(systems_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(compliance_router, prefix="/api/v1")
+app.include_router(alerts_router, prefix="/api/v1")
 
 
 @app.get("/api/v1", tags=["root"], summary="API endpoint")

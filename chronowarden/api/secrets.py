@@ -4,11 +4,13 @@
 
 """API routes for reading cached secret metadata."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
+from chronowarden.alerting.engine import evaluate_inventory
 from chronowarden.api.audit import request_source
 from chronowarden.assignments import AssignmentIndex
 from chronowarden.config import AppConfig
@@ -445,6 +447,8 @@ async def confirm_rotation(data: ConfirmationCreate, secret_id: int, request: Re
         after={k: confirmation[k] for k in ("id", "version", "applied_at", "confirmed_by")},
     )
     refresh_cached_ttl(database, config, identity)
+    # SecretRotationConfirmed goes out now and the unconfirmed alert resolves, without waiting for the next sync
+    await asyncio.to_thread(evaluate_inventory, database, config, datetime.now(tz=timezone.utc))
     return _enrich_secret(database.get_secret_by_id(secret_id), config, AssignmentIndex(database))
 
 

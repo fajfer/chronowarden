@@ -13,6 +13,7 @@ from typing import Any, Optional
 import yaml
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
+from chronowarden.alerting.engine import evaluate_inventory
 from chronowarden.api.audit import request_source
 from chronowarden.api.cooldown import Cooldown, enforce
 from chronowarden.compliance.evidence import (
@@ -277,6 +278,7 @@ async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInf
             "supersedes": data.supersedes,
         },
     )
+    await asyncio.to_thread(evaluate_inventory, database, config, now)  # ComplianceSnapshotCreated (#99)
     return SnapshotInfo(**{k: v for k, v in database.get_snapshot(snapshot_id).items() if k != "content"})
 
 

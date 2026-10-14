@@ -40,6 +40,9 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 - **Secure** - Never reads actual secret values, only metadata
 - **Scheduled Sync** - Every vault is synced every `polling_interval` (default 6h) and on demand;
   `python -m chronowarden sync` runs one sync and exits, e.g. as a Kubernetes CronJob
+- **Webhook Alerts** - Alertmanager-compatible webhooks to each secret's owners (expiring, expired, rotated,
+  unconfirmed) and to default routes (vault down, compliance), with retries, a delivery log and Standard Webhooks
+  signing
 - **Prometheus Metrics** - Optional (`metrics.enabled: true`): per-secret expiry and rotation series for alert
   rules, API and Vault call metrics
 - **Modern Web UI** - SvelteKit frontend with dark mode
@@ -255,6 +258,13 @@ configuration error.
   - A disconnected vault is reconnected first. If that fails, the response is `503` with the `reason`
     (`offline`, `auth`, ...) and whether a background retry is scheduled; the vault is then synced
     automatically as soon as the retry reconnects it
+
+### Alerts
+- `GET /api/v1/alerts` - Alerts firing now
+- `GET /api/v1/webhooks/deliveries` - Webhook delivery log (no payloads, no URLs)
+- `POST/DELETE /api/v1/owners/{id}/routes/{route_id}/signing` - Turn Standard Webhooks signing on (the secret is
+  returned once) or off
+- `POST /api/v1/owners/{id}/test-route/{route_id}` - Send a test webhook now
 
 ### Compliance
 - `PUT /api/v1/secrets/{id}/privileged` - Set `chronowarden_privileged` in the backend (`{"privileged": true}`)

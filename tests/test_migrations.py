@@ -67,6 +67,7 @@ class TestMigrate:
             tables = {r[0] for r in db._conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
             assert {"secret_metadata_cache", "owners", "notification_routes"} <= tables
             assert {"systems", "system_owners", "secret_systems", "secret_owners"} <= tables
+            assert {"alert_state", "webhook_deliveries"} <= tables
         finally:
             db.close()
 
@@ -85,6 +86,7 @@ class TestMigrate:
                 db.create_notification_route("r3", "o1", "email", "a@b.c", "x")
             columns = {r[1] for r in db._conn.execute("PRAGMA table_info(secret_metadata_cache)")}
             assert "removed_at" in columns and secret.removed_at is None
+            assert routes[0]["signed"] == 0, "existing routes stay unsigned (migration 10)"
         finally:
             db.close()
 

@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { apiGet, apiPost, apiPut, apiDelete } from './client';
-import type { Owner, OwnerCreate, OwnerUpdate, NotificationRoute, NotificationRouteCreate } from '#lib/types/index.js';
+import type {
+  Owner, OwnerCreate, OwnerUpdate, NotificationRoute, NotificationRouteCreate, RouteTestResult, SigningSecret,
+} from '#lib/types/index.js';
 
 /** GET /api/v1/owners — list all owners. */
 export function fetchOwners(): Promise<Owner[]> {
@@ -40,10 +42,17 @@ export function deleteNotificationRoute(ownerId: string, routeId: string): Promi
   return apiDelete(`/owners/${ownerId}/routes/${routeId}`);
 }
 
-/** POST /api/v1/owners/:ownerId/test-route/:routeId — test a route. */
-export function testNotificationRoute(
-  ownerId: string,
-  routeId: string,
-): Promise<{ success: boolean; message: string }> {
-  return apiPost<{ success: boolean; message: string }>(`/owners/${ownerId}/test-route/${routeId}`);
+/** POST /api/v1/owners/:ownerId/test-route/:routeId — send a real test webhook and report the answer. */
+export function testNotificationRoute(ownerId: string, routeId: string): Promise<RouteTestResult> {
+  return apiPost<RouteTestResult>(`/owners/${ownerId}/test-route/${routeId}`);
+}
+
+/** POST /api/v1/owners/:ownerId/routes/:routeId/signing — new signing secret, shown only in this answer. */
+export function enableRouteSigning(ownerId: string, routeId: string): Promise<SigningSecret> {
+  return apiPost<SigningSecret>(`/owners/${ownerId}/routes/${routeId}/signing`);
+}
+
+/** DELETE /api/v1/owners/:ownerId/routes/:routeId/signing — send unsigned webhooks again. */
+export function disableRouteSigning(ownerId: string, routeId: string): Promise<void> {
+  return apiDelete(`/owners/${ownerId}/routes/${routeId}/signing`);
 }

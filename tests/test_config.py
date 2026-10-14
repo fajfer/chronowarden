@@ -993,3 +993,56 @@ class TestPollingInterval:
     def test_invalid(self, value: str) -> None:
         with pytest.raises(ValidationError, match="polling_interval"):
             AppConfig(polling_interval=value)
+
+
+class TestAlertingConfig:
+    """alerting: default routes, repeat interval (ADR-025)."""
+
+    def test_defaults(self) -> None:
+        alerting = AppConfig().alerting
+        assert alerting.enabled and alerting.repeat_seconds == 86400 and alerting.max_attempts == 5
+        assert len(alerting.events) == 8 and alerting.default_routes == []
+
+    def test_default_routes_resolve_like_credentials(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        url_file = tmp_path / "url"
+        url_file.write_text("https://hooks.example.com/from-file\n")
+        monkeypatch.setenv("CW_HOOK", "https://hooks.example.com/from-env")
+        monkeypatch.setenv("CW_HOOK_SECRET", "whsec_abc")
+        routes = AppConfig.model_validate(
+            {
+                "alerting": {
+                    "default_routes": [
+                        {"name": "a", "url": "https://hooks.example.com/literal"},
+                        {"name": "b", "url_env": "CW_HOOK", "signing_secret_env": "CW_HOOK_SECRET"},
+                        {"name": "c", "url_file": str(url_file)},
+                    ]
+                }
+            }
+        ).alerting.default_routes
+        assert [r.resolve_url() for r in routes] == [
+            "https://hooks.example.com/literal",
+            "https://hooks.example.com/from-env",
+            "https://hooks.example.com/from-file",
+        ]
+        assert [r.resolve_signing_secret() for r in routes] == [None, "whsec_abc", None]
+
+    @pytest.mark.parametrize(
+        "alerting,message",
+        [
+            ({"default_routes": [{"name": "a"}]}, "exactly one of url"),
+            ({"default_routes": [{"name": "a", "url": "https://x", "url_env": "X"}]}, "exactly one of url"),
+            ({"default_routes": [{"name": "a", "url": "file:///etc/passwd"}]}, "http:// or https://"),
+            ({"default_routes": [{"name": "a", "url": "https://x"}, {"name": "a", "url": "https://y"}]}, "duplicate"),
+            ({"repeat_interval": "30s"}, "shorter than"),
+            ({"events": ["SecretStolen"]}, "SecretStolen"),
+            ({"max_attempts": 0}, "greater than or equal to 1"),
+        ],
+    )
+    def test_invalid(self, alerting: dict, message: str) -> None:
+        with pytest.raises(ValidationError, match=message):
+            AppConfig.model_validate({"alerting": alerting})
+
+    def test_repeat_off(self) -> None:
+        assert AppConfig.model_validate({"alerting": {"repeat_interval": "off"}}).alerting.repeat_seconds is None

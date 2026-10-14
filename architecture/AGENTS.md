@@ -13,8 +13,8 @@ The system architecture is kept as code in this directory, in the [LikeC4](https
 ## Files
 
 - `specification.c4`: element kinds `actor`, `system`, `component`; relationship kind `api`.
-- `main.c4`: model (`user`, `chronowarden` with `frontend`, `backend`, `metadata`, `database`) and the `index`
-  view.
+- `main.c4`: model (`user`, `receivers` (webhook receivers), `chronowarden` with `frontend`, `backend`, `metadata`,
+  `database`, `audit`, `compliance`, `alerting`) and the `index` view.
 - `integrations.c4`: comment-only notes on integration behaviour (custom metadata keys, auth methods, severity
   cascade, owners, `severity: none`).
 

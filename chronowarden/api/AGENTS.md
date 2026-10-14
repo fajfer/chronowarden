@@ -17,7 +17,8 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 | `secrets.py` | `/secrets` | `GET /` (filters `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id`, `unassigned`, `include_removed`), `GET /{id}`, `PUT /{id}/system`, `PUT /{id}/owners`, `POST /{id}/confirmations`, `PUT /{id}/privileged`, `GET /{id}/history`, `DELETE /{id}` and `DELETE /removed` (purge removed secrets only; 409 for one that still exists) |
 | `sync.py` | `/sync` | `POST /vault/{vault_name}` |
 | `vault.py` | `/vault` | `GET /instances`, `/health`, `/{name}/health` |
-| `owners.py` | `/owners` | CRUD for owners, `POST/DELETE` notification routes (responses mask the webhook address to scheme and host), `POST /{id}/test-route/{route_id}` |
+| `owners.py` | `/owners` | CRUD for owners, `POST/DELETE` webhook routes (addresses masked to scheme and host), `POST/DELETE /{id}/routes/{route_id}/signing` (secret returned once), `POST /{id}/test-route/{route_id}` (real send) |
+| `alerts.py` | none | `GET /alerts` (firing), `GET /webhooks/deliveries` (log); see [ADR-025](../../.ai/adr/ADR-025-alert-lifecycle-and-webhook-delivery.md) |
 | `audit.py` | `/audit` | `GET /events` (filters, `before_id` paging), `/events.jsonl` (export as stored), `/verify`, `POST /events/{id}/revert`; see [audit](../audit/AGENTS.md) |
 | `compliance.py` | `/compliance` | `GET /settings`, `/summary`, `/gaps`, `/periods`, `GET/POST /snapshots`, `/snapshots/{id}(.json/.csv)`; see [compliance](../compliance/AGENTS.md) |
 | `systems.py` | `/systems` | CRUD for systems, `PUT /{id}/owners`; `DELETE` is 409 (with the secret list) while secrets are assigned |
@@ -57,8 +58,6 @@ REST API used by the frontend and by operators. Every router is mounted under `/
   secret's expiry profile (`AppConfig.get_alert_days`, default 30d, #70).
 - `_get_app_dependencies()` returns a different tuple order per module: `secrets` → `(db, config, manager)`,
   `sync` → `(manager, config, db)`.
-- `POST /owners/{id}/test-route/{route_id}` only logs; no notification is sent. Alerts go through
-  Alertmanager ([ADR-012](../../.ai/adr/ADR-012-alertmanager-native-alerting.md)), so routes are redundant.
 - `POST /sync/vault/{name}` reconnects a disconnected vault first, then syncs via `sync_vault_now` (per-vault
   lock, blocking calls in a worker thread). On failure: 503 with a dict `detail` (`message`, `reason`, `error`,
   `retry_scheduled`); the frontend `stores/sync.ts` parses it (#59).

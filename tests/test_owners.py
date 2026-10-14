@@ -7,6 +7,7 @@
 import json
 import logging
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,7 +16,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from chronowarden.api.owners import mask_address, router
+from chronowarden.config import AppConfig
 from chronowarden.database import Database
+from tests.conftest import Receiver
 
 
 class TestOwnerDatabase:
@@ -346,18 +349,6 @@ class TestOwnersAPI:
             data = response.json()
             assert len(data) == 2
 
-    def test_test_route_says_nothing_was_sent(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Regression (0.7.1): the stub claimed success and logged the webhook URL, which is a credential."""
-        self.db.create_owner("owner-1", "Alice", "alice@example.com")
-        self.db.create_notification_route("route-1", "owner-1", "webhook", "https://hooks.example.com/alice", "Test")
-        client = self._build_client()
-        with patch("chronowarden.api.owners._get_db", return_value=self.db):
-            with caplog.at_level(logging.DEBUG):
-                response = client.post("/api/v1/owners/owner-1/test-route/route-1")
-            assert response.status_code == 200
-            assert response.json()["success"] is False
-            assert "hooks.example.com" not in caplog.text and "hooks.example.com" not in response.text
-
     def test_delete_route_of_another_owner_is_404(self) -> None:
         """Regression (0.7.1): deleting checked only the owner, so any owner's URL could delete any route."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
@@ -413,3 +404,62 @@ def test_routes_are_masked_and_audited(db: Database) -> None:
     expected = {"id": route["id"], "type": "webhook", "address": "https://hooks.slack.com/…"}
     assert json.loads(events[1]["after"]) == expected and json.loads(events[0]["before"]) == expected
     assert all("secret-token" not in text for text in [*responses, *(json.dumps(e) for e in events)])
+
+
+class TestRouteSigningAndTestSend:
+    """Signing secrets and real test sends (#99, ADR-025)."""
+
+    @pytest.fixture
+    def client(self, db: Database, receiver: Receiver) -> Iterator[TestClient]:
+        app = FastAPI()
+        app.include_router(router, prefix="/api/v1")
+        db.create_owner("alice", "Alice", "alice@example.com")
+        db.create_notification_route("r1", "alice", "webhook", receiver.url, "")
+        with (
+            patch("chronowarden.api.owners._get_db", return_value=db),
+            patch("chronowarden.app.app_config", AppConfig()),
+        ):
+            yield TestClient(app)
+
+    def test_test_send_reaches_the_receiver_without_leaking_the_url(
+        self, client: TestClient, receiver: Receiver, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.DEBUG):
+            response = client.post("/api/v1/owners/alice/test-route/r1")
+        assert response.json() == {"success": True, "status_code": 200, "message": "Delivered"}
+        assert json.loads(receiver.requests[0]["body"])["alerts"][0]["labels"]["alertname"] == "ChronowardenTest"
+        assert "secret-token" not in caplog.text and "secret-token" not in response.text
+
+    def test_failed_test_send_says_why(self, client: TestClient, receiver: Receiver) -> None:
+        receiver.answers = [410]
+        assert client.post("/api/v1/owners/alice/test-route/r1").json() == {
+            "success": False,
+            "status_code": 410,
+            "message": "The receiver answered: HTTP 410",
+        }
+
+    def test_signing_secret_is_shown_once_and_signs_test_sends(
+        self, client: TestClient, db: Database, receiver: Receiver
+    ) -> None:
+        created = client.post("/api/v1/owners/alice/routes/r1/signing")
+        assert created.status_code == 201
+        secret = created.json()["secret"]
+        assert secret.startswith("whsec_")
+        listed = client.get("/api/v1/owners/alice").text
+        assert secret not in listed and json.loads(listed)["notification_routes"][0]["signed"] is True
+        client.post("/api/v1/owners/alice/test-route/r1")
+        assert receiver.requests[0]["headers"]["webhook-signature"].startswith("v1,")
+        assert client.delete("/api/v1/owners/alice/routes/r1/signing").status_code == 204
+        assert client.get("/api/v1/owners/alice").json()["notification_routes"][0]["signed"] is False
+        events = [json.loads(e["after"]) for e in db.list_audit_events(event_type="owner.route_signing")]
+        assert events == [{"id": "r1", "signed": False}, {"id": "r1", "signed": True}]
+        assert all(secret not in json.dumps(e) for e in db.list_audit_events())
+
+    @pytest.mark.parametrize("address", ["file:///etc/passwd", "gopher://x", "javascript:alert(1)", "hooks.example"])
+    def test_route_address_must_be_http(self, client: TestClient, address: str) -> None:
+        response = client.post("/api/v1/owners/alice/routes", json={"type": "webhook", "address": address})
+        assert response.status_code == 422
+
+    def test_signing_unknown_route_is_404(self, client: TestClient) -> None:
+        assert client.post("/api/v1/owners/alice/routes/nope/signing").status_code == 404
+        assert client.delete("/api/v1/owners/bob/routes/r1/signing").status_code == 404

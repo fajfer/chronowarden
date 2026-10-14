@@ -35,7 +35,8 @@ def test_sync_exit_codes(
     with (
         patch("chronowarden.__main__.load_config", return_value=AppConfig()),
         patch("chronowarden.__main__.VaultManager", return_value=MagicMock()) as manager,
-        patch("chronowarden.__main__.sync_connected", new=AsyncMock(return_value=results)),
+        patch("chronowarden.__main__.sync_and_alert", new=AsyncMock(return_value=results)),
+        patch("chronowarden.__main__.deliver_due"),
     ):
         assert main(["sync"]) == code
     assert line in capsys.readouterr().out
