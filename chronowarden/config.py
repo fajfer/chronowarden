@@ -112,7 +112,8 @@ def _resolve_value(name: str, literal: Optional[str], env: Optional[str], path: 
     if env:
         value = os.environ.get(env)
         if value is None:
-            logger.warning("Environment variable '%s' not set for %s", env, name)
+            # Names the setting, not the variable: CodeQL treats anything read from a *secret* setting as sensitive
+            logger.warning("The environment variable configured for %s is not set", name)
         return value
     return literal
 
