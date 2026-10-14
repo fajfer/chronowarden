@@ -5,9 +5,9 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-015: Authentication for UI and API
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-09
-- **Evidence:** README roadmap (RBAC); `frontend/src/lib/stores/auth.ts` (placeholder, no auth backend); ADR-010.
+- **Evidence:** maintainer decisions of 2026-10-14; README roadmap (RBAC); `frontend/src/lib/stores/auth.ts` (placeholder, no auth backend); ADR-010.
 
 ## Context
 
@@ -15,11 +15,16 @@ The API is fully unauthenticated: anyone who reaches it can trigger syncs, write
 
 ## Decision
 
-**Not decided yet.** Options:
+Settled by the maintainer on 2026-10-14 (milestone 0.9):
 
-- OIDC in the app (login flow plus bearer tokens for API clients).
-- Authentication at a reverse proxy (oauth2-proxy and similar) that passes trusted identity headers.
-- Both: trust headers when they're configured, otherwise use OIDC.
+- **Login:** built-in OIDC (authorization code flow with PKCE against any OIDC provider) **or** trusted identity
+  headers from an authenticating reverse proxy (e.g. oauth2-proxy), chosen in config.
+- **API clients:** named API tokens issued in Chronowarden by admins, scoped to a role, with an expiry, stored
+  hashed, and attributed in the audit log.
+- **Roles:** `admin` (everything), `owner` (confirm rotations, set the privileged flag and manage routes for secrets
+  they effectively own, ADR-010) and `viewer` (read-only); roles come from IdP groups mapped in config.
+- **Default:** Chronowarden refuses to start unless authentication is configured or `auth.mode: none` is set
+  explicitly for trusted networks.
 
 ## Consequences
 
