@@ -70,7 +70,7 @@ OpenBao (KV v2) via `hvac`.
 
 ## Related ADRs
 
-[ADR-003](../../.ai/adr/ADR-003-pluggable-integrations-vault-first.md),
+[ADR-011](../../.ai/adr/ADR-011-provider-registry.md) (supersedes ADR-003),
 [ADR-004](../../.ai/adr/ADR-004-metadata-only-access.md),
 [ADR-009](../../.ai/adr/ADR-009-offline-tolerant-reconnect.md)
 
