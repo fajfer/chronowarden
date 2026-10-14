@@ -14,6 +14,21 @@ git history.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-14
+
+Alerting: Chronowarden syncs on its own schedule and sends webhooks, plus a headless image and Prometheus metrics.
+
+### Upgrade notes
+
+- **Sync now runs on a schedule.** `polling_interval` (default `6h`) was never used before; the server now syncs
+  every vault 10 seconds after startup and then on that interval. `m` means minutes there. Set `off` to keep syncing
+  by hand or from a CronJob.
+- **Webhook routes now receive real webhooks.** Owner routes created before 0.8 sent nothing; after the upgrade they
+  get alerts about their secrets. Review them in Settings → Owners → Webhook routes, or set `alerting.enabled: false`.
+- **Database migration 10** adds alert state and the delivery queue; the database now also holds route signing
+  secrets. Back up `chronowarden.db` before upgrading.
+- Metrics: the never-set `chronowarden_secrets_total`, `_expiring_soon` and `_expired` gauges are gone (see Changed).
+
 ### Added
 
 - Scheduled sync (#74, ADR-013): the server syncs every connected vault shortly after startup and then every
@@ -24,11 +39,9 @@ git history.
 - A `headless` image (`:<tag>-headless`, #48, ADR-024): API and sync only, without the UI and Typst (~82 MB instead
   of ~165 MB), signed and attested like the default image. `report.pdf` answers 501 there, other paths than `/api`
   are 404, and `GET /api/v1/info` lists the image's `features`. A Kubernetes CronJob example uses it.
-
 - Prometheus metrics (#71) when `metrics.enabled`: per-secret expiry, last-rotation and confirmation-overdue series
   labelled with vault, engine, path and severity; secrets per vault and status; API requests by route template;
   Vault calls by operation and outcome. Example alert rules are in the metrics guide.
-
 - Webhook alerting (#99, ADR-025): Alertmanager-compatible webhooks to the owners' routes and to
   `alerting.default_routes` for expiring, expired, rotated and unconfirmed secrets, unreachable vaults and compliance
   periods and snapshots; repeated every `alerting.repeat_interval`, resolved once; retries with backoff, a delivery
@@ -326,7 +339,8 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
-[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/fajfer/chronowarden/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/fajfer/chronowarden/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/fajfer/chronowarden/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/fajfer/chronowarden/compare/v0.7.0...v0.7.1

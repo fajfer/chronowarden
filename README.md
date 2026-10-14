@@ -68,7 +68,7 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 ```bash
 docker run --network=host --rm -p 8000:8000 \
     -v $(pwd)/config.yaml:/data/config.yaml \
-  ghcr.io/fajfer/chronowarden:v0.7.3
+  ghcr.io/fajfer/chronowarden:v0.8.0
 ```
 
 Add `-v $(pwd)/chronowarden.db:/app/chronowarden.db` to keep the database. From 0.7 it holds system and owner
@@ -88,13 +88,13 @@ The production and headless images are signed and carry SLSA provenance and SBOM
 
 #### Building image
 Production (default) \
-`docker build -t fajfer/chronowarden:0.7.3 .`
+`docker build -t fajfer/chronowarden:0.8.0 .`
 
 Headless \
-`docker build --target headless -t fajfer/chronowarden:0.7.3-headless .`
+`docker build --target headless -t fajfer/chronowarden:0.8.0-headless .`
 
 Development \
-`docker build --target dev -t fajfer/chronowarden:0.7.3-dev .`
+`docker build --target dev -t fajfer/chronowarden:0.8.0-dev .`
 
 ### Prerequisites
 
