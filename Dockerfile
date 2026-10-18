@@ -76,7 +76,7 @@ CMD ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--re
 # Stage 3b: Headless image  (--target headless)
 #   API and sync only: no frontend and no Typst, so no PDF reports (ADR-024)
 # ============================================================================
-FROM gcr.io/distroless/python3-debian13:nonroot@sha256:83aa8d4f74a4d7f7cf2d472054139bef71a927b76c680c0f2e1021d6b1d6d732 AS headless
+FROM gcr.io/distroless/python3-debian13:nonroot@sha256:f47f5807043391605425f2bd162b25f50cebdc90640bacc804e0177608fe5c65 AS headless
 
 WORKDIR /app
 
@@ -94,7 +94,7 @@ ENTRYPOINT ["python", "-m", "uvicorn", "chronowarden:app", "--host", "0.0.0.0", 
 # ============================================================================
 # Stage 3c: Production image  (default target, last so it stays the default)
 # ============================================================================
-FROM gcr.io/distroless/python3-debian13:nonroot@sha256:83aa8d4f74a4d7f7cf2d472054139bef71a927b76c680c0f2e1021d6b1d6d732 AS production
+FROM gcr.io/distroless/python3-debian13:nonroot@sha256:f47f5807043391605425f2bd162b25f50cebdc90640bacc804e0177608fe5c65 AS production
 
 WORKDIR /app
 
