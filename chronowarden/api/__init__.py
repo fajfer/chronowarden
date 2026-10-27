@@ -10,10 +10,10 @@ from chronowarden.api.auth import router as auth_router
 from chronowarden.api.compliance import router as compliance_router
 from chronowarden.api.health import router as health_router
 from chronowarden.api.owners import router as owners_router
+from chronowarden.api.providers import router as providers_router
 from chronowarden.api.secrets import router as secrets_router
 from chronowarden.api.sync import router as sync_router
 from chronowarden.api.systems import router as systems_router
-from chronowarden.api.vault import router as vault_router
 
 __all__ = [
     "alerts_router",
@@ -22,8 +22,8 @@ __all__ = [
     "compliance_router",
     "health_router",
     "owners_router",
+    "providers_router",
     "secrets_router",
     "sync_router",
     "systems_router",
-    "vault_router",
 ]

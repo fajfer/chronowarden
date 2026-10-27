@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-"""API routes for Vault integration."""
+"""API routes for the configured secret backends (ADR-011)."""
 
 from typing import Any, Optional
 
@@ -11,13 +11,14 @@ from pydantic import BaseModel
 
 from chronowarden.auth import authenticated
 
-router = APIRouter(prefix="/vault", tags=["vault"], dependencies=[Depends(authenticated)])
+router = APIRouter(prefix="/providers", tags=["providers"], dependencies=[Depends(authenticated)])
 
 
 class VaultInstanceHealth(BaseModel):
-    """Health status of a single Vault instance."""
+    """Health status of one configured backend."""
 
     name: str
+    type: str = "vault"
     address: str
     connected: bool
     healthy: bool
@@ -39,7 +40,7 @@ def _get_vault_manager() -> Any:
     return vault_manager
 
 
-@router.get("/instances", summary="List configured Vault instances")
+@router.get("/instances", summary="List configured backends")
 async def list_vault_instances() -> dict[str, list[str]]:
     """
     List all configured Vault instance names.
@@ -51,7 +52,7 @@ async def list_vault_instances() -> dict[str, list[str]]:
     return {"instances": manager.vault_names}
 
 
-@router.get("/health", response_model=list[VaultInstanceHealth], summary="Check all Vault instances health")
+@router.get("/health", response_model=list[VaultInstanceHealth], summary="Check the health of every backend")
 async def all_vault_health() -> list[VaultInstanceHealth]:
     """
     Check health of all configured Vault instances.
@@ -65,6 +66,7 @@ async def all_vault_health() -> list[VaultInstanceHealth]:
     return [
         VaultInstanceHealth(
             name=name,
+            type=health.get("type", "vault"),
             address=health.get("address", ""),
             connected=health.get("connected", False),
             healthy=health.get("healthy", False),
@@ -80,7 +82,7 @@ async def all_vault_health() -> list[VaultInstanceHealth]:
 @router.get(
     "/{vault_name}/health",
     response_model=VaultInstanceHealth,
-    summary="Check a specific Vault instance health",
+    summary="Check one backend's health",
 )
 async def vault_instance_health(
     vault_name: str = Path(description="Name of the vault instance"),
@@ -114,6 +116,7 @@ async def vault_instance_health(
 
     return VaultInstanceHealth(
         name=vault_name,
+        type=manager.provider_type(vault_name),
         address=vault.address,
         connected=connected,
         healthy=health.get("healthy", False),

@@ -62,7 +62,7 @@ async def sync_vault_now(manager: Any, vault_name: str, config: Any, database: A
 
 
 @router.post(
-    "/vault/{vault_name}",
+    "/provider/{vault_name}",
     dependencies=[Depends(owner_or_admin)],
     summary="Trigger immediate sync for a vault",
     status_code=status.HTTP_200_OK,

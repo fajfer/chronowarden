@@ -25,4 +25,4 @@ No endpoint returns secret values; `VaultIntegration.get_secret` stays unexposed
 
 - [`README.md`](../../README.md)
 - [`chronowarden/integrations/vault.py`](../../chronowarden/integrations/vault.py)
-- [`chronowarden/api/vault.py`](../../chronowarden/api/vault.py)
+- [`chronowarden/api/providers.py`](../../chronowarden/api/providers.py)

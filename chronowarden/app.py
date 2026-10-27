@@ -24,10 +24,10 @@ from chronowarden.api import (
     compliance_router,
     health_router,
     owners_router,
+    providers_router,
     secrets_router,
     sync_router,
     systems_router,
-    vault_router,
 )
 from chronowarden.api.sync import sync_vault_now
 from chronowarden.audit.config_events import record_config_change
@@ -133,7 +133,7 @@ app = FastAPI(
         {"name": "root", "description": "Root endpoint with API information"},
         {"name": "health", "description": "Health and metrics endpoints"},
         {"name": "secrets", "description": "Secret management operations"},
-        {"name": "vault", "description": "HashiCorp Vault integration"},
+        {"name": "providers", "description": "Configured secret backends and their health (ADR-011)"},
         {"name": "sync", "description": "Metadata synchronization"},
         {"name": "owners", "description": "Owner profile management"},
         {"name": "systems", "description": "Systems that secrets are assigned to"},
@@ -164,7 +164,7 @@ async def _metrics(request: Request, call_next: Callable[[Request], Awaitable[Re
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(secrets_router, prefix="/api/v1")
-app.include_router(vault_router, prefix="/api/v1")
+app.include_router(providers_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(owners_router, prefix="/api/v1")
 app.include_router(systems_router, prefix="/api/v1")

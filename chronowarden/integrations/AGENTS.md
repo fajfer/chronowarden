@@ -7,24 +7,28 @@ SPDX-License-Identifier: EUPL-1.2
 
 ## Purpose
 
-Connect to secret backends and read and write **metadata only**. Today the only provider is HashiCorp Vault /
-OpenBao (KV v2) via `hvac`.
+Connect to secret backends and read and write **metadata only**, through a provider registry
+([ADR-011](../../.ai/adr/ADR-011-provider-registry.md)). Today the only provider type is `vault` (HashiCorp Vault /
+OpenBao KV v2 via `hvac`).
 
 ## Files
 
-- `base.py`: `BaseIntegration`, the intended provider interface.
-- `vault.py`: `VaultIntegration` (token and AppRole auth, KV v2 metadata, engine discovery, health).
-- `manager.py`: `VaultManager`, which holds one `VaultIntegration` per configured vault, builds the CA bundle from
-  `ca_certs_dir`, and runs the background reconnect loop.
+- `base.py`: `BaseIntegration`, an `abc.ABC`: the whole provider interface and the metadata shape sync reads.
+- `registry.py`: `register_provider(type, builder)`, `build_provider(config, ca_bundle)`, `provider_types()`.
+- `vault.py`: `VaultIntegration` (token and AppRole auth, KV v2 metadata, engine discovery, health),
+  `from_config` (the `vault` builder, registered at import).
+- `manager.py`: `ProviderManager`, which builds one integration per `vaults:` entry by its `type`, builds the CA
+  bundle from `ca_certs_dir`, and runs the background reconnect loop.
 
 ## Contracts
 
-- `BaseIntegration` methods: `connect() -> bool`, `disconnect()`, `is_connected() -> bool`,
-  `list_secrets(path)`, `get_secret_metadata(path)`.
-- Used by sync and the API on top of the base: `VaultIntegration.write_secret_metadata`, `discover_engines`
-  (KV v2 only), `check_health`, `last_error`, `last_error_kind`. `mount_point=` overrides the engine per call.
+- `BaseIntegration` (all abstract): `address`, `last_error`, `last_error_kind`, `connect`, `disconnect`,
+  `is_connected`, `list_secrets(path, mount_point, strict)`, `get_secret_metadata(path, mount_point)`,
+  `write_secret_metadata(path, custom_metadata, mount_point)`, `discover_engines`, `check_health`. Outside
+  `integrations/`, code depends on `BaseIntegration` only, never on `VaultIntegration`.
 - `last_error_kind` is one of `auth` (not retried), `offline` / `vault` / `unexpected` (retried by the loop).
-- `VaultManager` API used elsewhere: `get(name)`, `vault_names`, `connect_all(config)`, `disconnect_all()`,
+- `ProviderManager` API used elsewhere (the app global keeps the name `vault_manager`): `get(name)`, `vault_names`,
+  `provider_type(name)`, `connect_all(config)`, `disconnect_all()`,
   `health()`, `start_reconnect_loop()`, `reconnect(name)` (one blocking attempt), `sync_lock(name)` (one
   `asyncio.Lock` per vault; every sync holds it) and `set_reconnect_callback(cb)` (`app.py` registers a sync that
   runs after the background loop reconnects a vault, #59).
@@ -38,11 +42,10 @@ OpenBao (KV v2) via `hvac`.
 
 ## How to
 
-- **Add a new provider** (e.g. GitLab): today `VaultManager`, `VaultConfig` and the API are hard-wired to Vault,
-  so a second provider first needs the
-  [generic provider registry spec](../../.ai/specs/2026-10-09-generic-provider-registry.md). After that: subclass
-  `BaseIntegration`, map backend failures to `last_error_kind`, add
-  `tests/test_<provider>.py` with a mocked client (see `tests/test_vault.py`).
+- **Add a new provider**: only backends with per-secret key/value metadata qualify (ADR-011). Add its config
+  model with `type: Literal["<type>"]` and make `AppConfig.vaults` a union discriminated by `type`; subclass
+  `BaseIntegration` (return the KV v2 metadata shape, map failures to `last_error_kind`); register a builder with
+  `register_provider`; add `tests/test_<provider>.py` with a mocked client (see `tests/test_vault.py`).
 - **Every new integration must also update the architecture model** ([architecture](../../architecture/AGENTS.md)):
   add the element and relations, and a note in `architecture/integrations.c4`.
 - **New Vault call**: wrap it in `if not self._client:` and catch `Forbidden` (log which policy capability is
@@ -50,8 +53,7 @@ OpenBao (KV v2) via `hvac`.
 
 ## Gotchas
 
-- `BaseIntegration` is a pydantic `BaseModel` whose methods just `pass`; it is not an ABC, so nothing enforces the
-  interface.
+- The `INTEGRATION_HEALTH` label is `<type>:<name>`; the `chronowarden_vault_connections_total` name stays as is.
 - There is no method that reads secret values (`get_secret` was removed in 0.7.1, ADR-004); never add one.
 - `get_secret_metadata` returns `None` for `InvalidPath`; `list_secrets` keys ending in `/` are folders (sync
   recurses). By default `list_secrets` returns `[]` on any error; sync calls it with `strict=True`, which raises
@@ -65,7 +67,6 @@ OpenBao (KV v2) via `hvac`.
 - `write_secret_metadata` reads, merges and writes the whole `custom_metadata`: Vault has no check-and-set for
   metadata, so a key another team changes between the read and the write is lost. A race-free `PATCH` needs the
   `patch` capability, which the maintainer chose not to require (2026-10-12); don't switch without asking.
-- `check_health` returns `initialized`/`sealed`, but the UI only shows healthy/offline (#44 follow-up).
 - OpenBao compatibility is a goal (README); test against both if you touch auth or KV calls (`dev-setup.py`).
 
 ## Related ADRs

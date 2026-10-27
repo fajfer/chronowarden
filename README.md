@@ -267,7 +267,7 @@ minimum `1m`; `off` turns it off). To sync from a CronJob instead, set `polling_
 same `chronowarden.db`. It exits 0 when every vault synced, 1 when one was unreachable or failed, and 2 on a
 configuration error.
 
-- `POST /api/v1/sync/vault/{vault_name}` - Trigger synchronization for a specific Vault instance
+- `POST /api/v1/sync/provider/{name}` - Trigger synchronization for one backend
   - Scans the specified vault instance and updates local cache
   - A disconnected vault is reconnected first. If that fails, the response is `503` with the `reason`
     (`offline`, `auth`, ...) and whether a background retry is scheduled; the vault is then synced
@@ -307,8 +307,10 @@ Snapshot exports list secret paths and owners; keep them as confidential as the 
   backend data, severity and TTL can't be reverted from Chronowarden
 - `GET /api/v1/secrets/{id}/history` - Changes to one secret
 
-### Vaults
-- `GET /api/v1/vault/instances` - List configured Vault instances with connection status
+### Providers
+- `GET /api/v1/providers/instances` - Names of the configured backends
+- `GET /api/v1/providers/health`, `GET /api/v1/providers/{name}/health` - Connection and health per backend, with its
+  provider `type`
 
 ### Health
 - `GET /api/v1/health` - Health check endpoint (used by Kubernetes probes)

@@ -175,5 +175,5 @@ class TestOwners:
         assert client.post(f"/api/v1/audit/events/{events['mine-direct']}/revert", headers=headers).status_code == 201
 
     def test_owner_may_sync(self, client: TestClient, db: Database) -> None:
-        response = client.post("/api/v1/sync/vault/nope", headers=_token(db, "owner", "o1"))
+        response = client.post("/api/v1/sync/provider/nope", headers=_token(db, "owner", "o1"))
         assert response.status_code not in (401, 403)

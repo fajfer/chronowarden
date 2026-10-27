@@ -57,6 +57,10 @@ class ProviderManager:
         """
         return self._vaults.get(name)
 
+    def provider_type(self, name: str) -> str:
+        """The provider type of a configured backend (`vault` unless its entry says otherwise)."""
+        return self._types.get(name, "vault")
+
     def sync_lock(self, name: str) -> asyncio.Lock:
         """
         Return the lock that serializes syncs of one vault.
@@ -143,6 +147,7 @@ class ProviderManager:
             connected = vault.is_connected()
             health["connected"] = connected
             health["address"] = vault.address
+            health["type"] = self.provider_type(name)
             if not connected and vault.last_error is not None:
                 health["error"] = vault.last_error
             result[name] = health
@@ -204,7 +209,7 @@ class ProviderManager:
 
     def _health_label(self, name: str) -> str:
         """The `integration` label of a backend's health gauge: `<type>:<name>`."""
-        return f"{self._types.get(name, 'vault')}:{name}"
+        return f"{self.provider_type(name)}:{name}"
 
     def _record_connection(self, name: str, connected: bool) -> None:
         """Count a connection attempt and set the backend's health gauge."""
