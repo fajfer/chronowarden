@@ -17,7 +17,8 @@ from pydantic import ValidationError
 
 from chronowarden.api.audit import router as audit_router
 from chronowarden.api.secrets import router as secrets_router
-from chronowarden.config import AppConfig, SecretConfig
+from chronowarden.auth.tokens import digest, new_api_token
+from chronowarden.config import AppConfig, AuthConfig, SecretConfig
 from chronowarden.confirmations import confirmation_status, rotation_base
 from chronowarden.database import Database, SecretMetadataCache
 
@@ -160,14 +161,22 @@ class TestConfirmEndpoint:
         )
 
     def test_historic_confirmation_moves_the_ttl(self, client: TestClient, db: Database) -> None:
-        response = client.post(
-            f"/api/v1/secrets/{_secret_id(db)}/confirmations",
-            json={"applied_at": "2026-03-01T12:00:00Z", "confirmed_by": "deploy-pipeline"},
+        token = new_api_token()
+        db.create_api_token(
+            "t1", "deploy-pipeline", digest(token), "admin", None, "2026-01-01T00:00:00Z", "2099-01-01T00:00:00Z"
         )
+        auth = AuthConfig.model_validate({"mode": "proxy", "proxy": {"trusted_proxies": ["127.0.0.1"]}})
+        with patch("chronowarden.auth.dependencies._get_auth_context", return_value=(auth, db)):
+            response = client.post(
+                f"/api/v1/secrets/{_secret_id(db)}/confirmations",
+                json={"applied_at": "2026-03-01T12:00:00Z", "confirmed_by": "ignored"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
         assert response.status_code == 201, response.text
         secret = response.json()
         assert not secret["awaiting_confirmation"]
-        assert secret["last_confirmation"]["confirmed_by"] == "deploy-pipeline"
+        assert secret["last_confirmation"]["confirmed_by"] == "token:deploy-pipeline", "the caller, not the body"
+        assert db.list_audit_events(event_type="secret.confirmed")[0]["actor"] == "token:deploy-pipeline"
         assert secret["ttl"] == "2027-03-01", "next rotation counts from the applied date, not the backend update"
         event = db.list_audit_events(event_type="secret.confirmed")[0]
         assert json.loads(event["after"])["applied_at"] == "2026-03-01T12:00:00.000000Z"

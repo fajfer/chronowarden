@@ -8,14 +8,15 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 
 from chronowarden.alerting.engine import evaluate_inventory
 from chronowarden.api.cooldown import Cooldown, enforce
+from chronowarden.auth import authenticated, owner_or_admin
 from chronowarden.database import SecretMetadataCache
 from chronowarden.metrics.refresh import refresh_secret_metrics
 
-router = APIRouter(prefix="/sync", tags=["sync"])
+router = APIRouter(prefix="/sync", tags=["sync"], dependencies=[Depends(authenticated)])
 
 _cooldown = Cooldown()
 
@@ -62,6 +63,7 @@ async def sync_vault_now(manager: Any, vault_name: str, config: Any, database: A
 
 @router.post(
     "/vault/{vault_name}",
+    dependencies=[Depends(owner_or_admin)],
     summary="Trigger immediate sync for a vault",
     status_code=status.HTTP_200_OK,
 )

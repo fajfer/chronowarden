@@ -74,6 +74,10 @@ def require_role(role: Role) -> Callable[..., Awaitable[Principal]]:
     return dependency
 
 
+admin_only = require_role("admin")
+owner_or_admin = require_role("owner")
+
+
 def check_acts_for(principal: Principal, owner_ids: Iterable[str], what: str = "this secret") -> None:
     """
     Refuse unless the caller acts for one of the owners (admins always do).

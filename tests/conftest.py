@@ -13,6 +13,8 @@ from typing import Any
 import pytest
 
 from chronowarden.api.cooldown import Cooldown
+from chronowarden.auth import dependencies
+from chronowarden.config import AuthConfig
 from chronowarden.database import Database
 
 
@@ -30,6 +32,12 @@ def no_cooldowns(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
     """Turn off the manual sync and snapshot cooldowns, except in tests marked `cooldowns`."""
     if request.node.get_closest_marker("cooldowns") is None:
         monkeypatch.setattr(Cooldown, "take", lambda self, key, seconds: 0)
+
+
+@pytest.fixture(autouse=True)
+def no_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run the routers with `auth.mode: none` (anonymous admin); auth tests patch their own settings over this."""
+    monkeypatch.setattr(dependencies, "_get_auth_context", lambda: (AuthConfig(mode="none"), None))
 
 
 class Receiver:

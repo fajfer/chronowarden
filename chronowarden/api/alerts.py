@@ -7,11 +7,12 @@
 import json
 from typing import Any, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from chronowarden.auth import authenticated
 from chronowarden.models.alert import Delivery, FiringAlert
 
-router = APIRouter(tags=["alerts"])
+router = APIRouter(tags=["alerts"], dependencies=[Depends(authenticated)])
 
 
 def _get_db() -> Any:

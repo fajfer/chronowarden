@@ -5,7 +5,7 @@
 """Revert an audit event by restoring its previous value (ADR-014): only Chronowarden's own data (ADR-004)."""
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 from chronowarden.assignments import AssignmentIndex
 from chronowarden.config import AppConfig
@@ -39,7 +39,7 @@ def _owners_value(index: AssignmentIndex, identity: tuple[str, str, str]) -> Any
     return {"owners": [owner.model_dump() for owner in index.owners_of(identity)]}
 
 
-def _revert_confirmation(db: Any, config: AppConfig, event: dict, source: str) -> dict:
+def _revert_confirmation(db: Any, config: AppConfig, event: dict, source: str, actor: Optional[str]) -> dict:
     """Revoke the confirmation an event recorded, so the secret awaits confirmation again (ADR-021)."""
     identity = (event["vault_name"], event["engine_id"], event["secret_path"])
     confirmed = json.loads(event["after"])
@@ -51,13 +51,14 @@ def _revert_confirmation(db: Any, config: AppConfig, event: dict, source: str) -
     return db.append_audit_event(
         "secret.confirmed",
         source,
+        actor=actor,
         identity=identity,
         before=confirmed,
         after={"revoked": latest["id"], "reverts": event["id"]},
     )
 
 
-def _revert_privileged(db: Any, manager: Any, event: dict, source: str) -> dict:
+def _revert_privileged(db: Any, manager: Any, event: dict, source: str, actor: Optional[str]) -> dict:
     """Write the previous privileged flag back to the backend (a chronowarden_* key, so ADR-004 allows it)."""
     from chronowarden.api.secrets import write_privileged
 
@@ -70,13 +71,15 @@ def _revert_privileged(db: Any, manager: Any, event: dict, source: str) -> dict:
         raise RevertError(
             409, f"Event {event['id']} can't be reverted: the value changed since; revert the newer event"
         )
-    written = write_privileged(db, manager, entry, before["privileged"], source, reverts=event["id"])
+    written = write_privileged(db, manager, entry, before["privileged"], source, actor, reverts=event["id"])
     if written is None:
         raise RevertError(409, f"Event {event['id']} can't be reverted: the value is already {before['privileged']}")
     return written
 
 
-def revert_event(db: Any, event: dict, source: str, config: AppConfig, manager: Any = None) -> dict:
+def revert_event(
+    db: Any, event: dict, source: str, config: AppConfig, manager: Any = None, actor: Optional[str] = None
+) -> dict:
     """
     Restore the value an event replaced, and record that as a new event of the same type.
 
@@ -86,6 +89,7 @@ def revert_event(db: Any, event: dict, source: str, config: AppConfig, manager: 
         source: Audit source of the request (`ui` or `api`).
         config: Application configuration (TTL recalculation when a confirmation is revoked).
         manager: Vault manager, for events whose revert writes to the backend (the privileged flag).
+        actor: Who reverts it (ADR-026); None without authentication.
 
     Returns:
         The new event.
@@ -96,9 +100,9 @@ def revert_event(db: Any, event: dict, source: str, config: AppConfig, manager: 
     """
     event_type = event["event_type"]
     if event_type == "secret.confirmed" and "revoked" not in json.loads(event["after"]):
-        return _revert_confirmation(db, config, event, source)
+        return _revert_confirmation(db, config, event, source, actor)
     if event_type == "secret.privileged" and "reverts" not in json.loads(event["after"]):
-        return _revert_privileged(db, manager, event, source)
+        return _revert_privileged(db, manager, event, source, actor)
     if event_type not in ("secret.system", "secret.owners"):
         reason = _NOT_REVERTIBLE.get(
             event_type,
@@ -131,6 +135,6 @@ def revert_event(db: Any, event: dict, source: str, config: AppConfig, manager: 
         restored = _owners_value(AssignmentIndex(db), identity)
 
     new_event = db.append_audit_event(
-        event_type, source, identity=identity, before=current, after={**restored, "reverts": event["id"]}
+        event_type, source, actor=actor, identity=identity, before=current, after={**restored, "reverts": event["id"]}
     )
     return new_event

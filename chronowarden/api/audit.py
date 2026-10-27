@@ -8,14 +8,16 @@ import json
 from collections.abc import Iterator
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Path, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from fastapi.responses import StreamingResponse
 
+from chronowarden.assignments import AssignmentIndex
 from chronowarden.audit import verify_chain
 from chronowarden.audit.revert import RevertError, revert_event
+from chronowarden.auth import Principal, authenticated, check_acts_for, owner_or_admin, request_actor
 from chronowarden.models.audit import AuditChainStatus, AuditEvent
 
-router = APIRouter(prefix="/audit", tags=["audit"])
+router = APIRouter(prefix="/audit", tags=["audit"], dependencies=[Depends(authenticated)])
 
 # Header the frontend sends so events can tell UI changes from other API clients until authentication exists
 CLIENT_HEADER = "X-Chronowarden-Client"
@@ -103,7 +105,11 @@ async def verify() -> AuditChainStatus:
     status_code=status.HTTP_201_CREATED,
     summary="Revert an event",
 )
-async def revert(request: Request, event_id: int = Path(description="Audit event ID")) -> AuditEvent:
+async def revert(
+    request: Request,
+    event_id: int = Path(description="Audit event ID"),
+    principal: Principal = Depends(owner_or_admin),
+) -> AuditEvent:
     """
     Restore the value an event replaced; the revert is recorded as a new event that names the reverted one.
 
@@ -114,16 +120,24 @@ async def revert(request: Request, event_id: int = Path(description="Audit event
         The new event.
 
     Raises:
-        HTTPException: 404 for an unknown event, 422 if the event can't be reverted, 409 if the value changed since or
-            what it refers to no longer exists.
+        HTTPException: 404 for an unknown event, 403 unless the caller is an admin or acts for the secret's effective
+            owners, 422 if the event can't be reverted, 409 if the value changed since or what it refers to no longer
+            exists.
     """
     db = _get_db()
     event = db.get_audit_event(event_id)
     if event is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Audit event {event_id} not found")
+    if event["vault_name"] is None:
+        check_acts_for(principal, [], "this")
+    else:
+        identity = (event["vault_name"], event["engine_id"], event["secret_path"])
+        check_acts_for(principal, [owner.id for owner in AssignmentIndex(db).effective_owners_of(identity)])
     try:
         from chronowarden.app import app_config, vault_manager
 
-        return AuditEvent.from_stored(revert_event(db, event, request_source(request), app_config, vault_manager))
+        return AuditEvent.from_stored(
+            revert_event(db, event, request_source(request), app_config, vault_manager, request_actor(request))
+        )
     except RevertError as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc)) from None

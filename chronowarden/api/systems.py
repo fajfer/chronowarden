@@ -8,13 +8,14 @@ import sqlite3
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Path, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
 
 from chronowarden.api.audit import request_source
 from chronowarden.assignments import AssignmentIndex
+from chronowarden.auth import admin_only, authenticated, request_actor
 from chronowarden.models.system import OwnerIds, System, SystemCreate, SystemUpdate
 
-router = APIRouter(prefix="/systems", tags=["systems"])
+router = APIRouter(prefix="/systems", tags=["systems"], dependencies=[Depends(authenticated)])
 
 
 def _get_db() -> Any:
@@ -81,7 +82,13 @@ async def list_systems() -> list[System]:
     return [_build_system(system, index) for system in db.list_systems()]
 
 
-@router.post("/", response_model=System, status_code=status.HTTP_201_CREATED, summary="Create a system")
+@router.post(
+    "/",
+    dependencies=[Depends(admin_only)],
+    response_model=System,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a system",
+)
 async def create_system(data: SystemCreate, request: Request) -> System:
     """
     Create a system, optionally with owners.
@@ -99,7 +106,11 @@ async def create_system(data: SystemCreate, request: Request) -> System:
     db.set_system_owners(system_id, data.owner_ids)
     system = _require_system(db, system_id)
     db.append_audit_event(
-        "system.created", request_source(request), subject=f"system:{system_id}", after=_audit_view(system)
+        "system.created",
+        request_source(request),
+        actor=request_actor(request),
+        subject=f"system:{system_id}",
+        after=_audit_view(system),
     )
     return _build_system(system, AssignmentIndex(db))
 
@@ -116,7 +127,7 @@ async def get_system(system_id: str = Path(description="System ID")) -> System:
     return _build_system(_require_system(db, system_id), AssignmentIndex(db))
 
 
-@router.put("/{system_id}", response_model=System, summary="Update a system")
+@router.put("/{system_id}", dependencies=[Depends(admin_only)], response_model=System, summary="Update a system")
 async def update_system(data: SystemUpdate, request: Request, system_id: str = Path(description="System ID")) -> System:
     """
     Update a system's fields; omitted fields stay unchanged.
@@ -137,6 +148,7 @@ async def update_system(data: SystemUpdate, request: Request, system_id: str = P
         db.append_audit_event(
             "system.updated",
             request_source(request),
+            actor=request_actor(request),
             subject=f"system:{system_id}",
             before={key: before[key] for key in changed},
             after={key: after[key] for key in changed},
@@ -144,7 +156,12 @@ async def update_system(data: SystemUpdate, request: Request, system_id: str = P
     return _build_system(after, AssignmentIndex(db))
 
 
-@router.put("/{system_id}/owners", response_model=System, summary="Replace a system's owners")
+@router.put(
+    "/{system_id}/owners",
+    dependencies=[Depends(admin_only)],
+    response_model=System,
+    summary="Replace a system's owners",
+)
 async def set_system_owners(data: OwnerIds, request: Request, system_id: str = Path(description="System ID")) -> System:
     """
     Replace the owners of a system.
@@ -161,6 +178,7 @@ async def set_system_owners(data: OwnerIds, request: Request, system_id: str = P
         db.append_audit_event(
             "system.owners",
             request_source(request),
+            actor=request_actor(request),
             subject=f"system:{system_id}",
             before={"owner_ids": previous},
             after={"owner_ids": system["owner_ids"]},
@@ -168,7 +186,12 @@ async def set_system_owners(data: OwnerIds, request: Request, system_id: str = P
     return _build_system(system, AssignmentIndex(db))
 
 
-@router.delete("/{system_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a system")
+@router.delete(
+    "/{system_id}",
+    dependencies=[Depends(admin_only)],
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a system",
+)
 async def delete_system(request: Request, system_id: str = Path(description="System ID")) -> None:
     """
     Delete a system that no secret is assigned to.
@@ -189,5 +212,9 @@ async def delete_system(request: Request, system_id: str = Path(description="Sys
         )
     db.delete_system(system_id)
     db.append_audit_event(
-        "system.deleted", request_source(request), subject=f"system:{system_id}", before=_audit_view(system)
+        "system.deleted",
+        request_source(request),
+        actor=request_actor(request),
+        subject=f"system:{system_id}",
+        before=_audit_view(system),
     )
