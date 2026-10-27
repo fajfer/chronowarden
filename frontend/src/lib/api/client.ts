@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
+export const BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
 
 /**
  * API error with HTTP status code, a readable message and the raw response body.
@@ -33,6 +33,13 @@ function errorDetail(text: string): string {
   return text;
 }
 
+let unauthorizedHandler: (() => void) | null = null;
+
+/** Called when the API answers 401 (session expired or never started); the auth store sends the user to log in. */
+export function onUnauthorized(handler: () => void): void {
+  unauthorizedHandler = handler;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const options: RequestInit = {
     method,
@@ -43,6 +50,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     options.body = JSON.stringify(body);
   }
   const response = await fetch(`${BASE_URL}${path}`, options);
+  if (response.status === 401 && path !== '/auth/me') {
+    unauthorizedHandler?.();
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => response.statusText);
     throw new ApiError(response.status, errorDetail(text), text);

@@ -7,7 +7,7 @@
   import Navbar from '#lib/components/Navbar.svelte';
   import Sidebar from '#lib/components/Sidebar.svelte';
   import Toast from '#lib/components/Toast.svelte';
-  import { isAuthenticated, initAuth } from '#lib/stores/auth.js';
+  import { authChecked, currentUser, isAuthenticated, initAuth, loginPath } from '#lib/stores/auth.js';
   import { initTheme } from '#lib/stores/theme.js';
   import { loadSecrets } from '#lib/stores/secrets.js';
   import { goto } from '$app/navigation';
@@ -42,14 +42,16 @@
   });
 
   $effect(() => {
-    initAuth();
     initTheme();
-    loadSecrets();
+    initAuth();
   });
 
   $effect(() => {
-    if (!$isAuthenticated && page.url.pathname !== '/login') {
-      goto('/login');
+    if (!$authChecked) return;
+    if ($isAuthenticated) {
+      loadSecrets();
+    } else if (page.url.pathname !== '/login') {
+      goto(loginPath());
     }
   });
 
@@ -61,6 +63,11 @@
 {:else if $isAuthenticated}
   <div class="min-h-screen bg-gray-900 text-gray-100">
     <Navbar onToggleSidebar={() => sidebarOpen = !sidebarOpen} />
+    {#if $currentUser?.auth_mode === 'none'}
+      <div class="bg-amber-500/10 border-b border-amber-500/30 text-amber-300 text-xs px-4 py-1.5">
+        Authentication is off (<code>auth.mode: none</code>): anyone who can reach Chronowarden is an admin.
+      </div>
+    {/if}
     <div class="flex">
       <Sidebar open={sidebarOpen} />
       <main class="flex-1 p-6 lg:ml-0 overflow-x-hidden">

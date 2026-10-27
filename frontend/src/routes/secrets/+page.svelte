@@ -6,6 +6,7 @@
   import { secrets, removedSecrets, secretsLoading, secretsError, loadSecrets } from '#lib/stores/secrets.js';
   import { purgeSecret, purgeRemovedSecrets } from '#lib/api/secrets.js';
   import { addToast } from '#lib/stores/sync.js';
+  import { isAdmin } from '#lib/stores/auth.js';
   import { formatDate } from '#lib/utils/dateFormat.js';
   import { filters } from '#lib/stores/filters.js';
   import Filters from '#lib/components/Filters.svelte';
@@ -176,7 +177,7 @@
           Show removed ({$removedSecrets.length})
         </button>
       {/if}
-      {#if showRemoved && visibleRemoved.length}
+      {#if $isAdmin && showRemoved && visibleRemoved.length}
         <button onclick={handlePurgeAll}
                 class="px-3 py-1.5 text-sm rounded-lg bg-red-900/50 border border-red-800 text-red-300 hover:bg-red-800/50 transition-colors">
           Purge removed ({visibleRemoved.length})
@@ -270,7 +271,7 @@
                   {/if}
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap">
-                  {#if secret.removed_at}
+                  {#if $isAdmin && secret.removed_at}
                     <button onclick={() => handlePurge(secret)} class="text-xs px-2 py-1 mr-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-300">Purge</button>
                   {/if}
                   <button onclick={() => (selectedSecret = secret)} class="text-gray-500 hover:text-white" title="View details">⋯</button>
