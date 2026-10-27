@@ -30,5 +30,6 @@ table, the dashboard and compliance snapshots show as responsible.
 - Assignments live only in Chronowarden's database, never in Vault. Back up `chronowarden.db`.
 - They follow the secret's path, so they survive a cache rebuild or a secret that is deleted and recreated.
 - A system that still has secrets can't be deleted; unassign them first. Deleting an owner removes it everywhere.
-- Until authentication arrives in 0.9, anyone who can reach Chronowarden can change assignments; every change is
-  recorded in the audit log.
+- A secret's owners (people whose email matches the owner's, or who are in its IdP group) and admins can change its
+  assignments; every change is recorded in the audit log with who made it. Unassigned secrets are assigned by
+  admins. See [Authentication](authentication.md).

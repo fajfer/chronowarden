@@ -21,6 +21,22 @@
 # One sync and exit, e.g. from cron: `docker compose run --rm --entrypoint python chronowarden -m chronowarden sync`
 # (set `polling_interval: off` below if nothing else should sync on a schedule).
 
+# Authentication (required). `none` makes everyone an admin: keep it for a local trial and switch to oidc or proxy
+# (see config.example.yaml and docs/guides/authentication.md) before anyone else can reach the port.
+auth:
+  mode: none
+# auth:
+#   mode: oidc
+#   oidc:
+#     issuer: https://idp.example.com/realms/main
+#     client_id: chronowarden
+#     client_secret_env: CHRONOWARDEN_OIDC_CLIENT_SECRET
+#     redirect_uri: https://chronowarden.example.com/api/v1/auth/callback
+#   roles:
+#     admin: [chronowarden-admins]
+#     owner: [platform-teams]
+#     viewer: [auditors]
+
 # Prometheus metrics at /api/v1/metrics (off by default; uncomment to let Prometheus scrape them)
 # metrics:
 #   enabled: true

@@ -31,7 +31,8 @@ vaults:
 
 When a new version appears, the secret shows **Awaiting confirmation**, and **Confirmation overdue** after the
 grace period. Open the secret and use **Confirm applied** with the date it was applied, which may lie in the past.
-Pipelines can call `POST /api/v1/secrets/{id}/confirmations` with `{"applied_at": "...", "confirmed_by": "deploy"}`.
+Pipelines can call `POST /api/v1/secrets/{id}/confirmations` with `{"applied_at": "..."}` and an owner or admin API
+token; the confirmation records the token's name as `token:<name>`.
 
 The next rotation is due one rotation period after the later of the Vault update and the applied date. A
 confirmation covers only the newest version, and a mistaken one can be reverted from the history.
