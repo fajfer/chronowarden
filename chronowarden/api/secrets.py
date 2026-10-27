@@ -38,7 +38,7 @@ def _get_app_dependencies() -> tuple[Any, Any, Any]:
     Get the database, config, and vault manager from the app module.
 
     Returns:
-        Tuple of (Database, AppConfig, VaultManager).
+        Tuple of (Database, AppConfig, ProviderManager).
     """
     from chronowarden.app import app_config, db, vault_manager
 

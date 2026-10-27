@@ -12,7 +12,9 @@ from hvac.exceptions import Forbidden, InvalidPath, InvalidRequest, VaultError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import RequestException
 
+from chronowarden.config import VaultConfig
 from chronowarden.integrations.base import BaseIntegration
+from chronowarden.integrations.registry import register_provider
 from chronowarden.metrics.backend import observe_vault_operation
 
 logger = logging.getLogger("uvicorn.error")
@@ -62,6 +64,33 @@ class VaultIntegration(BaseIntegration):
         self._client: Optional[hvac.Client] = None
         self._last_error: Optional[str] = None
         self._last_error_kind: Optional[str] = None
+
+    @classmethod
+    def from_config(cls, config: VaultConfig, ca_bundle: Optional[str]) -> Optional["VaultIntegration"]:
+        """
+        Build the integration for one `vaults:` entry, resolving its credentials (the `vault` provider builder).
+
+        Returns:
+            The integration, or None if a credential can't be resolved (logged).
+        """
+        common: dict[str, Any] = {
+            "address": config.address,
+            "namespace": config.namespace,
+            "mount_path": config.mount_path,
+            "verify_ssl": config.verify_ssl,
+            "ca_bundle": ca_bundle,
+        }
+        if config.auth_method == "approle":
+            credentials = {"role_id": config.resolve_role_id(), "secret_id": config.resolve_secret_id()}
+        else:
+            credentials = {"token": config.resolve_token()}
+        for name, value in credentials.items():
+            if value is None:
+                logger.error("Cannot resolve %s for vault '%s', skipping", name, config.name)
+                return None
+        if config.auth_method == "approle":
+            return cls(**common, auth_method="approle", approle_mount_point=config.approle_mount_point, **credentials)
+        return cls(**common, **credentials)
 
     @property
     def address(self) -> str:
@@ -481,3 +510,6 @@ class VaultIntegration(BaseIntegration):
         except VaultError:
             logger.exception("Error discovering secret engines")
             return []
+
+
+register_provider("vault", VaultIntegration.from_config)

@@ -33,7 +33,7 @@ from chronowarden.api.sync import sync_vault_now
 from chronowarden.audit.config_events import record_config_change
 from chronowarden.config import AppConfig, load_config, require_auth
 from chronowarden.database import Database
-from chronowarden.integrations import VaultManager
+from chronowarden.integrations import ProviderManager
 from chronowarden.logging_config import configure_logging
 from chronowarden.metrics.http import observe_request
 from chronowarden.metrics.refresh import refresh_secret_metrics
@@ -46,7 +46,7 @@ logger = logging.getLogger("uvicorn.error")
 # Runs when uvicorn imports the app, after it set up its log handlers
 configure_logging()
 
-vault_manager = VaultManager()
+vault_manager = ProviderManager()
 db = Database()
 app_config = AppConfig()
 

@@ -131,9 +131,9 @@ class TestSyncReconnectFirst:
     def test_sync_holds_the_vault_lock(self) -> None:
         """sync_vault_now runs detect_changes while holding the vault's sync lock."""
         from chronowarden.api.sync import sync_vault_now
-        from chronowarden.integrations.manager import VaultManager
+        from chronowarden.integrations.manager import ProviderManager
 
-        manager = VaultManager()
+        manager = ProviderManager()
         manager._vaults["v"] = MagicMock()
         seen_locked: list[bool] = []
 

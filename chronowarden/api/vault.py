@@ -32,7 +32,7 @@ def _get_vault_manager() -> Any:
     Get the vault manager from the app module.
 
     Returns:
-        The VaultManager instance.
+        The ProviderManager instance.
     """
     from chronowarden.app import vault_manager
 

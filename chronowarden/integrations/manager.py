@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-"""Vault connection manager for multiple Vault instances."""
+"""Connections to every configured secret backend, whatever its provider type (ADR-011)."""
 
 import asyncio
 import logging
@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from chronowarden.config import AppConfig, VaultConfig
-from chronowarden.integrations.vault import VaultIntegration
+from chronowarden.integrations.base import BaseIntegration
+from chronowarden.integrations.registry import build_provider
 from chronowarden.metrics import INTEGRATION_HEALTH, VAULT_CONNECTIONS_TOTAL
 
 logger = logging.getLogger("uvicorn.error")
@@ -23,12 +24,13 @@ _DEFAULT_RECONNECT_MAX_ATTEMPTS = 5
 ReconnectCallback = Callable[[str], Awaitable[None]]
 
 
-class VaultManager:
-    """Manages connections to multiple Vault instances defined by configuration."""
+class ProviderManager:
+    """Manages connections to the backends in `vaults:`, built by their provider type (ADR-011)."""
 
     def __init__(self) -> None:
-        """Initialize the Vault manager with empty connections."""
-        self._vaults: dict[str, VaultIntegration] = {}
+        """Initialize the manager with empty connections."""
+        self._vaults: dict[str, BaseIntegration] = {}
+        self._types: dict[str, str] = {}
         self._ca_bundle_path: Optional[str] = None
         self._pending_configs: dict[str, VaultConfig] = {}
         self._reconnect_task: Optional[asyncio.Task[None]] = None
@@ -43,15 +45,15 @@ class VaultManager:
         """Return names of all registered vault instances."""
         return list(self._vaults.keys())
 
-    def get(self, name: str) -> Optional[VaultIntegration]:
+    def get(self, name: str) -> Optional[BaseIntegration]:
         """
-        Get a vault integration by name.
+        Get a backend's integration by name.
 
         Args:
             name: The configured vault name.
 
         Returns:
-            The VaultIntegration instance, or None if not found.
+            The integration, or None if not found.
         """
         return self._vaults.get(name)
 
@@ -98,7 +100,7 @@ class VaultManager:
             self._record_connection(name, connected=True)
             return True
 
-        INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(0)
+        INTEGRATION_HEALTH.labels(integration=self._health_label(name)).set(0)
         if integration.last_error_kind == "auth":
             self._pending_configs.pop(name, None)
         return False
@@ -200,44 +202,14 @@ class VaultManager:
             logger.exception("Failed to create CA bundle file")
             return None
 
-    def _build_integration(self, vault_config: VaultConfig) -> Optional[VaultIntegration]:
-        """
-        Build the integration for one vault, resolving its credentials.
+    def _health_label(self, name: str) -> str:
+        """The `integration` label of a backend's health gauge: `<type>:<name>`."""
+        return f"{self._types.get(name, 'vault')}:{name}"
 
-        Returns:
-            The integration, or None if a credential can't be resolved (logged and counted as a failure).
-        """
-        common = {
-            "address": vault_config.address,
-            "namespace": vault_config.namespace,
-            "mount_path": vault_config.mount_path,
-            "verify_ssl": vault_config.verify_ssl,
-            "ca_bundle": self._ca_bundle_path,
-        }
-        if vault_config.auth_method == "approle":
-            credentials = {"role_id": vault_config.resolve_role_id(), "secret_id": vault_config.resolve_secret_id()}
-        else:
-            credentials = {"token": vault_config.resolve_token()}
-        for name, value in credentials.items():
-            if value is None:
-                logger.error("Cannot resolve %s for vault '%s', skipping", name, vault_config.name)
-                self._record_connection(vault_config.name, connected=False)
-                return None
-
-        if vault_config.auth_method == "approle":
-            return VaultIntegration(
-                **common,
-                auth_method="approle",
-                approle_mount_point=vault_config.approle_mount_point,
-                **credentials,
-            )
-        return VaultIntegration(**common, **credentials)
-
-    @staticmethod
-    def _record_connection(name: str, connected: bool) -> None:
-        """Count a connection attempt and set the vault's health gauge."""
+    def _record_connection(self, name: str, connected: bool) -> None:
+        """Count a connection attempt and set the backend's health gauge."""
         VAULT_CONNECTIONS_TOTAL.labels(status="success" if connected else "failure").inc()
-        INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(1 if connected else 0)
+        INTEGRATION_HEALTH.labels(integration=self._health_label(name)).set(1 if connected else 0)
 
     def _connect_vault(self, vault_config: VaultConfig) -> None:
         """
@@ -246,8 +218,10 @@ class VaultManager:
         Args:
             vault_config: Configuration for the vault instance.
         """
-        integration = self._build_integration(vault_config)
+        self._types[vault_config.name] = vault_config.type
+        integration = build_provider(vault_config, self._ca_bundle_path)
         if integration is None:
+            self._record_connection(vault_config.name, connected=False)
             return
 
         if integration.connect():
@@ -295,7 +269,7 @@ class VaultManager:
         vault = self._vaults.pop(name, None)
         if vault:
             vault.disconnect()
-            INTEGRATION_HEALTH.labels(integration=f"vault:{name}").set(0)
+            INTEGRATION_HEALTH.labels(integration=self._health_label(name)).set(0)
             logger.info("Disconnected from vault '%s'", name)
 
     def start_reconnect_loop(self) -> None:

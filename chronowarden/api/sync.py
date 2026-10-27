@@ -26,7 +26,7 @@ def _get_app_dependencies() -> tuple[Any, Any, Any]:
     Get the vault manager, config, and database from the app module.
 
     Returns:
-        Tuple of (VaultManager, AppConfig, Database).
+        Tuple of (ProviderManager, AppConfig, Database).
     """
     from chronowarden.app import app_config, db, vault_manager
 
@@ -41,7 +41,7 @@ async def sync_vault_now(manager: Any, vault_name: str, config: Any, database: A
     Refreshes the secret metrics (#71) and evaluates alerts (#99) afterwards.
 
     Args:
-        manager: The VaultManager.
+        manager: The ProviderManager.
         vault_name: Name of the vault instance.
         config: Application configuration.
         database: Database for internal state.
