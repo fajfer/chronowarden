@@ -68,6 +68,7 @@ class TestMigrate:
             assert {"secret_metadata_cache", "owners", "notification_routes"} <= tables
             assert {"systems", "system_owners", "secret_systems", "secret_owners"} <= tables
             assert {"alert_state", "webhook_deliveries"} <= tables
+            assert {"sessions", "oidc_pending", "api_tokens"} <= tables
         finally:
             db.close()
 
@@ -87,6 +88,7 @@ class TestMigrate:
             columns = {r[1] for r in db._conn.execute("PRAGMA table_info(secret_metadata_cache)")}
             assert "removed_at" in columns and secret.removed_at is None
             assert routes[0]["signed"] == 0, "existing routes stay unsigned (migration 10)"
+            assert db.get_owner("o1")["idp_group"] is None, "owners get no IdP group (migration 11)"  # type: ignore[index]
         finally:
             db.close()
 

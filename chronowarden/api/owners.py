@@ -56,7 +56,7 @@ def _require_owner(db: Any, owner_id: str) -> dict:
 
 def _owner_view(owner: dict) -> dict:
     """An owner's fields as recorded in audit events."""
-    return {"name": owner["name"], "email": owner["email"]}
+    return {"name": owner["name"], "email": owner["email"], "idp_group": owner.get("idp_group")}
 
 
 def mask_address(address: str) -> str:
@@ -96,6 +96,7 @@ def _build_owner(owner_dict: dict, routes: list[dict]) -> Owner:
         id=owner_dict["id"],
         name=owner_dict["name"],
         email=owner_dict["email"],
+        idp_group=owner_dict.get("idp_group"),
         created_at=owner_dict.get("created_at"),
         notification_routes=[_build_route(r) for r in routes],
     )
@@ -116,7 +117,7 @@ async def create_owner(data: OwnerCreate, request: Request) -> Owner:
     """Create a new owner profile."""
     db = _get_db()
     owner_id = str(uuid.uuid4())
-    db.create_owner(owner_id, data.name, data.email)
+    db.create_owner(owner_id, data.name, data.email, data.idp_group or None)
     owner_dict = db.get_owner(owner_id)
     if owner_dict is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create owner")
@@ -140,7 +141,7 @@ async def update_owner(data: OwnerUpdate, request: Request, owner_id: str = Path
     """Update an existing owner profile."""
     db = _get_db()
     existing = _require_owner(db, owner_id)
-    db.update_owner(owner_id, name=data.name, email=data.email)
+    db.update_owner(owner_id, name=data.name, email=data.email, idp_group=data.idp_group)
     owner_dict = db.get_owner(owner_id)
     if owner_dict is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update owner")

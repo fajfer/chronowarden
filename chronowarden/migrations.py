@@ -247,6 +247,45 @@ def _alerting(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX webhook_deliveries_due ON webhook_deliveries (status, next_attempt_at)")
 
 
+def _authentication(conn: sqlite3.Connection) -> None:
+    """Sessions, pending OIDC logins, API tokens and owners' IdP groups (ADR-026); only hashes of IDs and tokens."""
+    conn.execute("ALTER TABLE owners ADD COLUMN idp_group TEXT")
+    conn.execute("""
+        CREATE TABLE sessions (
+            id_hash TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT,
+            groups TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('admin', 'owner', 'viewer')),
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE oidc_pending (
+            state TEXT PRIMARY KEY,
+            code_verifier TEXT NOT NULL,
+            nonce TEXT NOT NULL,
+            next_path TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE api_tokens (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            token_hash TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL CHECK(role IN ('admin', 'owner', 'viewer')),
+            owner_id TEXT,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            last_used_at TEXT,
+            revoked_at TEXT,
+            CHECK((role = 'owner') = (owner_id IS NOT NULL))
+        )
+    """)
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "baseline 0.6 schema", _baseline),
     Migration(2, "webhook notification routes only", _webhook_routes_only),
@@ -258,6 +297,7 @@ MIGRATIONS: list[Migration] = [
     Migration(8, "privileged flag on cached secrets", _privileged),
     Migration(9, "compliance snapshots", _compliance_snapshots),
     Migration(10, "webhook alerting", _alerting),
+    Migration(11, "authentication", _authentication),
 ]
 
 

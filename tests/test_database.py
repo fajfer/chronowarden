@@ -4,8 +4,11 @@
 
 """Tests for SQLite database operations."""
 
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+import pytest
 
 from chronowarden.database import Database, SecretMetadataCache
 
@@ -212,3 +215,75 @@ class TestDatabaseConcurrency:
             assert len(db.list_all_secrets(vault_name="vault-1")) == total_entries
         finally:
             db.close()
+
+
+class TestAuthStorage:
+    """Owners' IdP groups, sessions, pending OIDC logins and API tokens (migration 11, ADR-026)."""
+
+    def test_owner_ids_for_email_and_groups(self, db: Database) -> None:
+        db.create_owner("o1", "Alice", "Alice@Example.com")
+        db.create_owner("o2", "Payments", "pay@example.com", idp_group="team-payments")
+        db.create_owner("o3", "Blank", "")
+        assert db.owner_ids_for("alice@example.com", []) == ["o1"]
+        assert db.owner_ids_for("alice@example.com", ["team-payments", "other"]) == ["o1", "o2"]
+        assert db.owner_ids_for(None, ["team-payments"]) == ["o2"]
+        assert db.owner_ids_for(None, []) == [] and db.owner_ids_for("", ["nobody"]) == []
+
+    def test_update_owner_sets_and_clears_idp_group(self, db: Database) -> None:
+        db.create_owner("o1", "Alice", "alice@example.com")
+        db.update_owner("o1", idp_group="team-a")
+        assert db.get_owner("o1")["idp_group"] == "team-a"  # type: ignore[index]
+        db.update_owner("o1", name="Alice B")
+        assert db.get_owner("o1")["idp_group"] == "team-a"  # type: ignore[index]
+        db.update_owner("o1", idp_group="")
+        assert db.get_owner("o1")["idp_group"] is None  # type: ignore[index]
+
+    def test_sessions_expire_and_end(self, db: Database) -> None:
+        db.create_session("h1", "alice", "a@x", ["g"], "owner", "2026-10-27T10:00:00Z", "2026-10-27T22:00:00Z")
+        session = db.get_session("h1", "2026-10-27T12:00:00Z")
+        assert session is not None and session["groups"] == ["g"] and session["role"] == "owner"
+        assert db.get_session("h1", "2026-10-27T22:00:00Z") is None
+        assert db.get_session("other", "2026-10-27T12:00:00Z") is None
+        db.delete_session("h1")
+        assert db.get_session("h1", "2026-10-27T12:00:00Z") is None
+
+    def test_delete_expired_logins(self, db: Database) -> None:
+        db.create_session("old", "a", None, [], "viewer", "2026-10-26T00:00:00Z", "2026-10-26T12:00:00Z")
+        db.create_session("new", "b", None, [], "viewer", "2026-10-27T00:00:00Z", "2026-10-28T00:00:00Z")
+        db.add_oidc_pending("s-old", "v", "n", "/", "2026-10-27T09:00:00Z")
+        db.add_oidc_pending("s-new", "v", "n", "/", "2026-10-27T09:55:00Z")
+        db.delete_expired_logins("2026-10-27T10:00:00Z", "2026-10-27T09:50:00Z")
+        assert db.get_session("old", "2026-10-26T01:00:00Z") is None
+        assert db.get_session("new", "2026-10-27T10:00:00Z") is not None
+        assert db.pop_oidc_pending("s-old", "2026-10-27T00:00:00Z") is None
+        assert db.pop_oidc_pending("s-new", "2026-10-27T09:50:00Z") is not None
+
+    def test_pending_login_is_used_once_and_only_while_fresh(self, db: Database) -> None:
+        db.add_oidc_pending("s1", "verifier", "nonce", "/secrets", "2026-10-27T10:00:00Z")
+        pending = db.pop_oidc_pending("s1", "2026-10-27T09:50:00Z")
+        assert pending is not None and (pending["code_verifier"], pending["next_path"]) == ("verifier", "/secrets")
+        assert db.pop_oidc_pending("s1", "2026-10-27T09:50:00Z") is None
+        db.add_oidc_pending("s2", "v", "n", "/", "2026-10-27T09:00:00Z")
+        assert db.pop_oidc_pending("s2", "2026-10-27T09:50:00Z") is None
+        assert db.pop_oidc_pending("s2", "2026-10-27T00:00:00Z") is None, "a stale state is gone, not kept"
+
+    def test_api_tokens(self, db: Database) -> None:
+        db.create_api_token("t1", "ci", "hash1", "viewer", None, "2026-10-27T10:00:00Z", "2027-10-27T10:00:00Z")
+        db.create_api_token("t2", "team", "hash2", "owner", "o1", "2026-10-27T11:00:00Z", "2026-11-27T10:00:00Z")
+        assert [t["id"] for t in db.list_api_tokens()] == ["t2", "t1"]
+        assert "token_hash" not in db.list_api_tokens()[0]
+        token = db.get_api_token("hash2", "2026-10-28T00:00:00Z")
+        assert token is not None and token["owner_id"] == "o1"
+        assert db.get_api_token("hash2", "2026-11-27T10:00:00Z") is None, "expired"
+        db.touch_api_token("t1", "2026-10-28T00:00:00Z")
+        assert db.get_api_token("hash1", "2026-10-28T00:00:00Z")["last_used_at"] == "2026-10-28T00:00:00Z"  # type: ignore[index]
+        revoked = db.revoke_api_token("t1", "2026-10-29T00:00:00Z")
+        assert revoked is not None and revoked["revoked_at"] == "2026-10-29T00:00:00Z"
+        assert db.get_api_token("hash1", "2026-10-29T01:00:00Z") is None
+        assert db.revoke_api_token("t1", "2026-10-30T00:00:00Z") is None, "already revoked"
+
+    def test_api_token_owner_binding_is_enforced(self, db: Database) -> None:
+        with pytest.raises(sqlite3.IntegrityError):
+            db.create_api_token("t1", "x", "h", "owner", None, "2026-10-27T10:00:00Z", "2027-10-27T10:00:00Z")
+        with pytest.raises(sqlite3.IntegrityError):
+            db.create_api_token("t2", "y", "h2", "admin", "o1", "2026-10-27T10:00:00Z", "2027-10-27T10:00:00Z")
