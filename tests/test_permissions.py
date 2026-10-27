@@ -36,6 +36,9 @@ OPEN = {
     ("POST", "/api/v1/auth/logout"),
 }
 
+# Reads that are admin-only: API tokens are managed by admins (ADR-026)
+ADMIN_READS = {("GET", "/api/v1/auth/tokens")}
+
 
 def _api_routes() -> list[tuple[str, str]]:
     """(method, path with every parameter set to 1) for each API route of the real app, from its OpenAPI schema."""
@@ -86,12 +89,14 @@ def test_viewers_change_nothing(client: TestClient, db: Database, method: str, p
     assert client.request(method, path, headers=_token(db, "viewer"), json={}).status_code == 403
 
 
-@pytest.mark.parametrize("method,path", [r for r in _api_routes() if r not in OPEN and r[0] == "GET"])
+@pytest.mark.parametrize("method,path", [r for r in _api_routes() if r not in OPEN | ADMIN_READS and r[0] == "GET"])
 def test_viewers_read_everything(client: TestClient, db: Database, method: str, path: str) -> None:
     assert client.request(method, path, headers=_token(db, "viewer")).status_code not in (401, 403)
 
 
 ADMIN_ONLY = [
+    ("GET", "/api/v1/auth/tokens", None),
+    ("POST", "/api/v1/auth/tokens", {"name": "x", "role": "viewer", "expires_in_days": 1}),
     ("POST", "/api/v1/owners/", {"name": "x", "email": "x@x"}),
     ("DELETE", "/api/v1/owners/o1", None),
     ("POST", "/api/v1/systems/", {"name": "x"}),

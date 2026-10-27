@@ -26,3 +26,31 @@ class LogoutResult(BaseModel):
     """Where the browser goes after logging out."""
 
     logout_url: Optional[str] = Field(default=None, description="The proxy's sign-out URL, when there is one")
+
+
+class ApiTokenCreate(BaseModel):
+    """Request body for a new API token."""
+
+    name: str = Field(min_length=1, max_length=100, description="Unique; recorded as token:<name> in the audit log")
+    role: Role
+    owner_id: Optional[str] = Field(default=None, description="Required for the owner role: the owner it acts for")
+    expires_in_days: int = Field(ge=1, description="Days until it expires; at most auth.token_max_lifetime")
+
+
+class ApiToken(BaseModel):
+    """An API token as listed; the token itself is never shown again."""
+
+    id: str
+    name: str
+    role: Role
+    owner_id: Optional[str] = None
+    created_at: str
+    expires_at: str
+    last_used_at: Optional[str] = None
+    revoked_at: Optional[str] = None
+
+
+class NewApiToken(ApiToken):
+    """A token just created, with its secret value, returned only by that request."""
+
+    token: str = Field(description="Send as 'Authorization: Bearer <token>'; store it now, it can't be shown again")
