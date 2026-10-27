@@ -44,3 +44,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-023](ADR-023-schema-migrations-with-user-version.md) | Schema migrations with PRAGMA user_version | Accepted | 2026-10-11 |
 | [ADR-024](ADR-024-headless-image.md) | Headless image without the UI or Typst | Accepted | 2026-10-12 |
 | [ADR-025](ADR-025-alert-lifecycle-and-webhook-delivery.md) | Alert lifecycle and webhook delivery | Accepted | 2026-10-12 |
+| [ADR-026](ADR-026-sessions-tokens-and-permissions.md) | Sessions, API tokens and the permission matrix | Accepted | 2026-10-27 |
