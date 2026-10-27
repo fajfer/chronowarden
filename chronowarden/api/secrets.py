@@ -8,11 +8,12 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 
 from chronowarden.alerting.engine import evaluate_inventory
 from chronowarden.api.audit import request_source
 from chronowarden.assignments import AssignmentIndex
+from chronowarden.auth import Principal, admin_only, authenticated, check_acts_for, owner_or_admin, request_actor
 from chronowarden.config import AppConfig
 from chronowarden.confirmations import current_version, refresh_cached_ttl
 from chronowarden.database import SecretIdentity, SecretMetadataCache
@@ -29,7 +30,7 @@ from chronowarden.models.secret import (
 from chronowarden.models.system import OwnerIds, SystemAssignment
 from chronowarden.timestamps import utc_timestamp
 
-router = APIRouter(prefix="/secrets", tags=["secrets"])
+router = APIRouter(prefix="/secrets", tags=["secrets"], dependencies=[Depends(authenticated)])
 
 
 def _get_app_dependencies() -> tuple[Any, Any, Any]:
@@ -173,11 +174,13 @@ def _assignment_state(index: AssignmentIndex, identity: SecretIdentity) -> dict[
     }
 
 
-def _record_purges(database: Any, index: AssignmentIndex, identities: list[SecretIdentity], source: str) -> None:
+def _record_purges(
+    database: Any, index: AssignmentIndex, identities: list[SecretIdentity], source: str, actor: Optional[str]
+) -> None:
     """Record a `secret.purged` event, with the assignments that went with it, for each purged secret."""
     for identity in identities:
         database.append_audit_event(
-            "secret.purged", source, identity=identity, before=_assignment_state(index, identity)
+            "secret.purged", source, actor=actor, identity=identity, before=_assignment_state(index, identity)
         )
 
 
@@ -195,6 +198,21 @@ def _require_secret(database: Any, secret_id: int) -> SecretMetadataCache:
             detail=f"Secret with id {secret_id} not found in cache",
         )
     return entry
+
+
+async def secret_access(
+    secret_id: int = Path(description="Secret metadata cache row ID"), principal: Principal = Depends(owner_or_admin)
+) -> Principal:
+    """
+    Let admins and the secret's effective owners change it (ADR-010, ADR-026).
+
+    Raises:
+        HTTPException: 404 if the secret isn't cached, 403 for anyone else.
+    """
+    database, _, _ = _get_app_dependencies()
+    identity = _identity(_require_secret(database, secret_id))
+    check_acts_for(principal, [owner.id for owner in AssignmentIndex(database).effective_owners_of(identity)])
+    return principal
 
 
 @router.get("/", response_model=list[SecretMetadataResponse], summary="List cached secret metadata")
@@ -241,7 +259,9 @@ async def list_secrets(
     ]
 
 
-@router.delete("/removed", response_model=PurgeResult, summary="Purge removed secrets")
+@router.delete(
+    "/removed", dependencies=[Depends(admin_only)], response_model=PurgeResult, summary="Purge removed secrets"
+)
 async def purge_removed_secrets(
     request: Request,
     vault_name: Optional[str] = Query(None, description="Only purge removed secrets of this vault"),
@@ -260,12 +280,17 @@ async def purge_removed_secrets(
     database, _, _ = _get_app_dependencies()
     index = AssignmentIndex(database)
     identities = database.purge_removed(vault_name=vault_name, engine_id=engine_id)
-    _record_purges(database, index, identities, request_source(request))
+    _record_purges(database, index, identities, request_source(request), request_actor(request))
     purged = ["/".join(identity) for identity in identities]
     return PurgeResult(purged=len(purged), secrets=purged)
 
 
-@router.delete("/{secret_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Purge a removed secret")
+@router.delete(
+    "/{secret_id}",
+    dependencies=[Depends(admin_only)],
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Purge a removed secret",
+)
 async def purge_secret(secret_id: int, request: Request) -> None:
     """
     Delete a secret that is no longer in its backend, with its system and owner assignments.
@@ -287,7 +312,9 @@ async def purge_secret(secret_id: int, request: Request) -> None:
             ),
         )
     index = AssignmentIndex(database)
-    _record_purges(database, index, database.purge_removed(secret_id=secret_id), request_source(request))
+    _record_purges(
+        database, index, database.purge_removed(secret_id=secret_id), request_source(request), request_actor(request)
+    )
 
 
 @router.get("/{secret_id}", response_model=SecretMetadataResponse, summary="Get cached secret metadata by ID")
@@ -309,7 +336,12 @@ async def get_secret(secret_id: int) -> SecretMetadataResponse:
     return _enrich_secret(entry, config, AssignmentIndex(database))
 
 
-@router.put("/{secret_id}/system", response_model=SecretMetadataResponse, summary="Assign a secret to a system")
+@router.put(
+    "/{secret_id}/system",
+    dependencies=[Depends(secret_access)],
+    response_model=SecretMetadataResponse,
+    summary="Assign a secret to a system",
+)
 async def set_secret_system(data: SystemAssignment, secret_id: int, request: Request) -> SecretMetadataResponse:
     """
     Assign a secret to a system, or unassign it with `null`; replaces the previous assignment.
@@ -336,6 +368,7 @@ async def set_secret_system(data: SystemAssignment, secret_id: int, request: Req
         database.append_audit_event(
             "secret.system",
             request_source(request),
+            actor=request_actor(request),
             identity=_identity(entry),
             before={"system": before.model_dump() if before else None},
             after={"system": after.model_dump() if after else None},
@@ -343,7 +376,12 @@ async def set_secret_system(data: SystemAssignment, secret_id: int, request: Req
     return _enrich_secret(entry, config, index)
 
 
-@router.put("/{secret_id}/owners", response_model=SecretMetadataResponse, summary="Replace a secret's owners")
+@router.put(
+    "/{secret_id}/owners",
+    dependencies=[Depends(secret_access)],
+    response_model=SecretMetadataResponse,
+    summary="Replace a secret's owners",
+)
 async def set_secret_owners(data: OwnerIds, secret_id: int, request: Request) -> SecretMetadataResponse:
     """
     Replace the owners assigned to a secret; `[]` removes them, so the system's owners apply.
@@ -371,6 +409,7 @@ async def set_secret_owners(data: OwnerIds, secret_id: int, request: Request) ->
         database.append_audit_event(
             "secret.owners",
             request_source(request),
+            actor=request_actor(request),
             identity=_identity(entry),
             before={"owners": before},
             after={"owners": after},
@@ -400,6 +439,7 @@ async def secret_history(secret_id: int) -> list[AuditEvent]:
 
 @router.post(
     "/{secret_id}/confirmations",
+    dependencies=[Depends(secret_access)],
     response_model=SecretMetadataResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Confirm a rotation was applied",
@@ -411,7 +451,7 @@ async def confirm_rotation(data: ConfirmationCreate, secret_id: int, request: Re
     The next rotation then counts from the applied date when that is later than the backend's update.
 
     Args:
-        data: When it was applied (may be in the past) and, for automation, who confirmed it.
+        data: When it was applied (may be in the past); who confirmed it is the caller.
         secret_id: The secret metadata cache row ID.
 
     Returns:
@@ -439,10 +479,11 @@ async def confirm_rotation(data: ConfirmationCreate, secret_id: int, request: Re
             detail=f"applied_at is before version {version['current']} was created ({version['created_time']})",
         )
     applied_text = utc_timestamp(applied)
-    confirmation = database.add_confirmation(identity, version["current"], applied_text, data.confirmed_by)
+    confirmation = database.add_confirmation(identity, version["current"], applied_text, request_actor(request))
     database.append_audit_event(
         "secret.confirmed",
         request_source(request),
+        actor=request_actor(request),
         identity=identity,
         after={k: confirmation[k] for k in ("id", "version", "applied_at", "confirmed_by")},
     )
@@ -452,7 +493,12 @@ async def confirm_rotation(data: ConfirmationCreate, secret_id: int, request: Re
     return _enrich_secret(database.get_secret_by_id(secret_id), config, AssignmentIndex(database))
 
 
-@router.put("/{secret_id}/privileged", response_model=SecretMetadataResponse, summary="Set the privileged flag")
+@router.put(
+    "/{secret_id}/privileged",
+    dependencies=[Depends(secret_access)],
+    response_model=SecretMetadataResponse,
+    summary="Set the privileged flag",
+)
 async def set_privileged(data: PrivilegedUpdate, secret_id: int, request: Request) -> SecretMetadataResponse:
     """
     Write `chronowarden_privileged` to the backend (merged with the other metadata, ADR-004) and cache it.
@@ -469,12 +515,18 @@ async def set_privileged(data: PrivilegedUpdate, secret_id: int, request: Reques
     """
     database, config, manager = _get_app_dependencies()
     entry = _require_secret(database, secret_id)
-    write_privileged(database, manager, entry, data.privileged, request_source(request))
+    write_privileged(database, manager, entry, data.privileged, request_source(request), request_actor(request))
     return _enrich_secret(database.get_secret_by_id(secret_id), config, AssignmentIndex(database))
 
 
 def write_privileged(
-    database: Any, manager: Any, entry: SecretMetadataCache, value: bool, source: str, reverts: Optional[int] = None
+    database: Any,
+    manager: Any,
+    entry: SecretMetadataCache,
+    value: bool,
+    source: str,
+    actor: Optional[str],
+    reverts: Optional[int] = None,
 ) -> Optional[dict]:
     """
     Write the privileged flag to the backend, cache it and record the change (also used by revert, with `reverts`).
@@ -503,6 +555,7 @@ def write_privileged(
     return database.append_audit_event(
         "secret.privileged",
         source,
+        actor=actor,
         identity=_identity(entry),
         before={"privileged": entry.privileged},
         after={"privileged": value, **({"reverts": reverts} if reverts is not None else {})},

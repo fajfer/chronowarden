@@ -10,13 +10,15 @@
   import OwnerModal from '#lib/components/OwnerModal.svelte';
   import RoutesModal from '#lib/components/RoutesModal.svelte';
   import SystemModal from '#lib/components/SystemModal.svelte';
+  import ApiTokensPanel from '#lib/components/ApiTokensPanel.svelte';
+  import { actsFor, currentUser, isAdmin } from '#lib/stores/auth.js';
   import { safeHttpUrl } from '#lib/utils/safeUrl.js';
   import { availableThemes, currentTheme, setTheme } from '#lib/stores/theme.js';
   import { addToast } from '#lib/stores/sync.js';
   import { formatDate } from '#lib/utils/dateFormat.js';
   import type { Owner, ApiInfo, System, SystemFormData, Delivery, FiringAlert } from '#lib/types/index.js';
 
-  let activeTab = $state<'general' | 'owners' | 'systems' | 'webhooks'>('general');
+  let activeTab = $state<'general' | 'owners' | 'systems' | 'webhooks' | 'tokens'>('general');
 
   // General settings
   let apiInfo = $state<ApiInfo | null>(null);
@@ -76,10 +78,11 @@
     }
   }
 
-  async function handleSaveOwner(data: { name: string; email: string }) {
+  async function handleSaveOwner(data: { name: string; email: string; idp_group: string }) {
     try {
       if (editingOwner) {
-        await updateOwner(editingOwner.id, data);
+        // Owners rename themselves; only admins change who acts for an owner (ADR-026)
+        await updateOwner(editingOwner.id, $isAdmin ? data : { name: data.name });
         addToast(`Updated owner "${data.name}"`, 'success');
       } else {
         await createOwner(data);
@@ -199,6 +202,15 @@
     >
       Systems
     </button>
+    {#if $isAdmin}
+      <button
+        onclick={() => activeTab = 'tokens'}
+        class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
+          {activeTab === 'tokens' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-300'}"
+      >
+        API tokens
+      </button>
+    {/if}
   </div>
 
   {#if activeTab === 'general'}
@@ -297,6 +309,8 @@
         {/if}
       </div>
     </div>
+  {:else if activeTab === 'tokens' && $isAdmin}
+    <ApiTokensPanel {owners} />
   {:else if activeTab === 'systems'}
     <div class="space-y-4">
       <div class="flex items-center justify-between">
@@ -304,10 +318,12 @@
           <h2 class="text-lg font-semibold text-white">Systems</h2>
           <p class="text-xs text-gray-500">Business systems secrets belong to. A secret without its own owners is the responsibility of its system's owners.</p>
         </div>
-        <button onclick={() => openSystemModal(null)}
-                class="px-4 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors whitespace-nowrap">
-          Create System
-        </button>
+        {#if $isAdmin}
+          <button onclick={() => openSystemModal(null)}
+                  class="px-4 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors whitespace-nowrap">
+            Create System
+          </button>
+        {/if}
       </div>
 
       {#if systemsLoading}
@@ -345,8 +361,10 @@
                     {system.owners.length ? system.owners.map((o) => o.name).join(', ') : 'No owners'}
                   </td>
                   <td class="px-4 py-3 flex gap-2">
-                    <button onclick={() => openSystemModal(system)} class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Edit</button>
-                    <button onclick={() => handleDeleteSystem(system)} class="text-xs px-2 py-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-300">Delete</button>
+                    {#if $isAdmin}
+                      <button onclick={() => openSystemModal(system)} class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Edit</button>
+                      <button onclick={() => handleDeleteSystem(system)} class="text-xs px-2 py-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-300">Delete</button>
+                    {/if}
                   </td>
                 </tr>
               {/each}
@@ -360,10 +378,12 @@
     <div class="space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold text-white">Owner Profiles</h2>
-        <button onclick={openCreateModal}
-                class="px-4 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors">
-          Create Owner
-        </button>
+        {#if $isAdmin}
+          <button onclick={openCreateModal}
+                  class="px-4 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors">
+            Create Owner
+          </button>
+        {/if}
       </div>
 
       {#if ownersLoading}
@@ -379,6 +399,7 @@
               <tr class="text-gray-400 text-xs uppercase border-b border-gray-700">
                 <th class="px-4 py-3 text-left">Name</th>
                 <th class="px-4 py-3 text-left">Email</th>
+                <th class="px-4 py-3 text-left">IdP group</th>
                 <th class="px-4 py-3 text-left">Routes</th>
                 <th class="px-4 py-3 text-left">Actions</th>
               </tr>
@@ -388,6 +409,7 @@
                 <tr class="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                   <td class="px-4 py-3 text-gray-200">{owner.name}</td>
                   <td class="px-4 py-3 text-gray-400">{owner.email}</td>
+                  <td class="px-4 py-3 text-gray-400">{owner.idp_group ?? '—'}</td>
                   <td class="px-4 py-3 text-gray-400">
                     {owner.notification_routes.length}
                     {#each owner.notification_routes as route}
@@ -395,9 +417,13 @@
                     {/each}
                   </td>
                   <td class="px-4 py-3 flex gap-2">
-                    <button onclick={() => openEditModal(owner)} class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Edit</button>
-                    <button onclick={() => (routesOwnerId = owner.id)} class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Webhook routes</button>
-                    <button onclick={() => handleDeleteOwner(owner)} class="text-xs px-2 py-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-300">Delete</button>
+                    {#if actsFor($currentUser, [owner.id])}
+                      <button onclick={() => openEditModal(owner)} class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Edit</button>
+                      <button onclick={() => (routesOwnerId = owner.id)} class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Webhook routes</button>
+                    {/if}
+                    {#if $isAdmin}
+                      <button onclick={() => handleDeleteOwner(owner)} class="text-xs px-2 py-1 rounded bg-red-900/50 hover:bg-red-800/50 text-red-300">Delete</button>
+                    {/if}
                   </td>
                 </tr>
               {/each}
@@ -414,6 +440,7 @@
 <OwnerModal
   owner={editingOwner}
   open={modalOpen}
+  canEditIdentity={$isAdmin}
   onClose={() => modalOpen = false}
   onSave={handleSaveOwner}
 />

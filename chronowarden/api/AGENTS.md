@@ -13,7 +13,8 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 
 | File | Prefix | Endpoints |
 |---|---|---|
-| `health.py` | none | `GET /health`, `/info`, `/ready`, `/metrics` (Prometheus) |
+| `health.py` | none | `GET /health`, `/info`, `/ready`, `/metrics` (Prometheus); open, no login |
+| `auth.py` | `/auth` | `GET /login`, `/callback` (OIDC), `POST /logout`, `GET /me`, `GET/POST/DELETE /tokens` (admin); see [auth](../auth/AGENTS.md) |
 | `secrets.py` | `/secrets` | `GET /` (filters `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id`, `unassigned`, `include_removed`), `GET /{id}`, `PUT /{id}/system`, `PUT /{id}/owners`, `POST /{id}/confirmations`, `PUT /{id}/privileged`, `GET /{id}/history`, `DELETE /{id}` and `DELETE /removed` (purge removed secrets only; 409 for one that still exists) |
 | `sync.py` | `/sync` | `POST /vault/{vault_name}` |
 | `vault.py` | `/vault` | `GET /instances`, `/health`, `/{name}/health` |
@@ -27,6 +28,8 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 ## Contracts
 
 - Full paths are `/api/v1/<prefix>/...`. Kubernetes probes use `/api/v1/health`.
+- Every router but health needs a caller; each write route declares its role or ownership check (ADR-026 matrix,
+  [auth](../auth/AGENTS.md)), and audit events get `actor=request_actor(request)`.
 - Response shapes come from `chronowarden/models` (`SecretMetadataResponse`, `Owner`, …); the frontend mirror
   rule is in [models](../models/AGENTS.md).
 - Status mapping used across routers: unknown vault/secret/owner → 404; vault not connected or backend write failed

@@ -32,6 +32,8 @@ export interface Owner {
   id: string;
   name: string;
   email: string;
+  /** IdP group whose members act for this owner (ADR-026). */
+  idp_group: string | null;
   notification_routes: NotificationRoute[];
   created_at: string | null;
 }
@@ -42,6 +44,7 @@ export interface Owner {
 export interface OwnerCreate {
   name: string;
   email: string;
+  idp_group?: string | null;
 }
 
 /**
@@ -50,4 +53,6 @@ export interface OwnerCreate {
 export interface OwnerUpdate {
   name?: string;
   email?: string;
+  /** An empty string clears it. */
+  idp_group?: string;
 }

@@ -18,6 +18,7 @@
   import { safeHttpUrl } from '#lib/utils/safeUrl.js';
   import type { AuditEvent } from '#lib/types/index.js';
   import { addToast } from '#lib/stores/sync.js';
+  import { canEditSecret, currentUser } from '#lib/stores/auth.js';
 
   let { secret, onClose }: {
     secret: Secret | null;
@@ -32,6 +33,8 @@
   let history = $state<AuditEvent[]>([]);
   let appliedAt = $state('');
   let confirming = $state(false);
+  // Admins and the secret's effective owners (ADR-026); the server checks again
+  const canEdit = $derived(secret !== null && canEditSecret($currentUser, secret));
 
   /** Now, as a value for a datetime-local input (local time, minutes). */
   function nowLocal(): string {
@@ -191,7 +194,7 @@
         </div>
         <div class="col-span-2">
           <label class="flex items-center gap-2 text-gray-200">
-            <input type="checkbox" checked={secret.privileged} onchange={togglePrivileged} class="accent-rose-500" />
+            <input type="checkbox" checked={secret.privileged} onchange={togglePrivileged} disabled={!canEdit} class="accent-rose-500" />
             Privileged
             <span class="text-xs text-gray-500">(written to the backend as chronowarden_privileged)</span>
           </label>
@@ -209,7 +212,7 @@
             {/if}
             {#if secret.awaiting_confirmation}The newest version waits for confirmation that it is applied where it's used.{/if}
           </p>
-          {#if secret.awaiting_confirmation || !secret.confirmation_required}
+          {#if canEdit && (secret.awaiting_confirmation || !secret.confirmation_required)}
             <div class="flex items-end gap-2">
               <div>
                 <label for="applied-at" class="block text-gray-500 text-xs mb-1">Applied at (your local time)</label>
@@ -225,7 +228,7 @@
         </div>
       {/if}
 
-      <div class="border-t border-gray-700 pt-4 space-y-3">
+      <fieldset disabled={!canEdit} class="border-t border-gray-700 pt-4 space-y-3">
         <h3 class="text-xs text-gray-500 uppercase">Assignment</h3>
         <div>
           <label for="secret-system" class="block text-gray-500 text-xs mb-1">System</label>
@@ -263,21 +266,26 @@
             <span class="text-yellow-400">nobody (unassigned)</span>
           {/if}
         </p>
-      </div>
+        {#if !canEdit}
+          <p class="text-xs text-gray-500">Only its owners or an admin can change this secret.</p>
+        {/if}
+      </fieldset>
 
       <details class="border-t border-gray-700 pt-4">
         <summary class="cursor-pointer text-xs text-gray-500 uppercase">History ({history.length})</summary>
         <div class="mt-2 -mx-4 max-h-64 overflow-y-auto">
-          <AuditEventList events={history} showTarget={false} onRevert={handleRevert} />
+          <AuditEventList events={history} showTarget={false} onRevert={canEdit ? handleRevert : undefined} />
         </div>
       </details>
     </div>
 
     <div class="px-6 py-4 border-t border-gray-700 flex justify-end gap-2">
+      {#if canEdit}
       <button onclick={saveAssignment} disabled={!dirty || saving}
               class="px-4 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-50">
         {saving ? 'Saving…' : 'Save assignment'}
       </button>
+      {/if}
       <button
         onclick={onClose}
         class="px-4 py-2 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 transition-colors"

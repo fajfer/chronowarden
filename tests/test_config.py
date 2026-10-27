@@ -21,6 +21,7 @@ from chronowarden.config import (
     VaultConfig,
     load_config,
     parse_duration_to_days,
+    require_auth,
 )
 
 
@@ -1046,3 +1047,77 @@ class TestAlertingConfig:
 
     def test_repeat_off(self) -> None:
         assert AppConfig.model_validate({"alerting": {"repeat_interval": "off"}}).alerting.repeat_seconds is None
+
+
+_OIDC = {
+    "issuer": "https://idp.example.com/realms/main",
+    "client_id": "chronowarden",
+    "redirect_uri": "https://cw.example.com/api/v1/auth/callback",
+}
+
+
+class TestAuthConfig:
+    """auth: modes, roles, lifetimes (ADR-015, ADR-026)."""
+
+    def test_absent_by_default(self) -> None:
+        assert AppConfig().auth is None
+
+    def test_require_auth_refuses_a_missing_section(self) -> None:
+        with pytest.raises(ConfigError, match="auth.mode"):
+            require_auth(AppConfig())
+
+    def test_none_mode_warns(self, caplog: pytest.LogCaptureFixture) -> None:
+        config = AppConfig.model_validate({"auth": {"mode": "none"}})
+        with caplog.at_level(logging.WARNING, logger="uvicorn.error"):
+            assert require_auth(config).mode == "none"
+        assert "Authentication is off" in caplog.text
+
+    def test_oidc_defaults(self) -> None:
+        auth = AppConfig.model_validate({"auth": {"mode": "oidc", "oidc": _OIDC}}).auth
+        assert auth is not None and auth.oidc is not None
+        assert auth.oidc.scopes == ["openid", "profile", "email"]
+        assert (auth.oidc.groups_claim, auth.oidc.username_claim) == ("groups", "preferred_username")
+        assert auth.default_role is None and auth.session_seconds == 12 * 3600 and auth.token_max_days == 365
+
+    def test_client_secret_resolves_like_credentials(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        secret_file = tmp_path / "secret"
+        secret_file.write_text("from-file\n")
+        monkeypatch.setenv("CW_OIDC_SECRET", "from-env")
+        oidc = {**_OIDC, "client_secret": "literal", "client_secret_env": "CW_OIDC_SECRET"}
+        auth = AppConfig.model_validate({"auth": {"mode": "oidc", "oidc": oidc}}).auth
+        assert auth is not None and auth.oidc is not None
+        assert auth.oidc.resolve_client_secret() == "from-env"
+        auth.oidc.client_secret_file = str(secret_file)
+        assert auth.oidc.resolve_client_secret() == "from-file"
+
+    def test_proxy(self) -> None:
+        auth = AppConfig.model_validate(
+            {"auth": {"mode": "proxy", "proxy": {"trusted_proxies": ["10.0.0.0/8", "127.0.0.1"]}}}
+        ).auth
+        assert auth is not None and auth.proxy is not None
+        assert [str(n) for n in auth.proxy.trusted_proxies] == ["10.0.0.0/8", "127.0.0.1/32"]
+        assert auth.proxy.user_header == "X-Forwarded-User"
+
+    @pytest.mark.parametrize(
+        "auth,message",
+        [
+            ({}, "mode"),
+            ({"mode": "ldap"}, "mode"),
+            ({"mode": "oidc"}, "needs an oidc section"),
+            ({"mode": "proxy"}, "needs a proxy section"),
+            ({"mode": "proxy", "proxy": {"trusted_proxies": []}}, "at least 1"),
+            ({"mode": "proxy", "proxy": {"trusted_proxies": ["not-an-ip"]}}, "trusted_proxies"),
+            ({"mode": "oidc", "oidc": {**_OIDC, "issuer": "idp.example.com"}}, "http:// or https://"),
+            ({"mode": "oidc", "oidc": {**_OIDC, "scopes": ["email"]}}, "openid"),
+            ({"mode": "none", "default_role": "superuser"}, "default_role"),
+            ({"mode": "none", "roles": {"auditor": ["x"]}}, "auditor"),
+            ({"mode": "none", "session_lifetime": "off"}, "must expire"),
+            ({"mode": "none", "session_lifetime": "10s"}, "shorter than"),
+            ({"mode": "none", "token_max_lifetime": "1w"}, "Invalid duration"),
+        ],
+    )
+    def test_invalid(self, auth: dict, message: str) -> None:
+        with pytest.raises(ValidationError, match=message):
+            AppConfig.model_validate({"auth": auth})

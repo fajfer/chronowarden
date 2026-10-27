@@ -8,6 +8,7 @@
   import { loadSecrets } from '#lib/stores/secrets.js';
   import { fetchVaultInstances } from '#lib/api/vaults.js';
   import { formatDate } from '#lib/utils/dateFormat.js';
+  import { canSync } from '#lib/stores/auth.js';
 
   let vaultNames = $state<string[]>([]);
   let syncing = $state(false);
@@ -48,7 +49,7 @@
         {#each vaultNames as vault}
           <button
             onclick={() => handleSync(vault)}
-            disabled={syncing}
+            disabled={syncing || !$canSync}
             class="px-4 py-2 text-sm rounded-lg transition-colors
                    {syncing ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}"
           >

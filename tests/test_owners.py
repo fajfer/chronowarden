@@ -217,6 +217,19 @@ class TestOwnersAPI:
             assert "id" in data
             assert data["notification_routes"] == []
 
+    def test_idp_group_is_set_cleared_and_audited(self) -> None:
+        """Members of an owner's IdP group act for it (ADR-026); an empty string clears the group."""
+        client = self._build_client()
+        with patch("chronowarden.api.owners._get_db", return_value=self.db):
+            created = client.post(
+                "/api/v1/owners/", json={"name": "Payments", "email": "pay@example.com", "idp_group": "team-pay"}
+            ).json()
+            assert created["idp_group"] == "team-pay"
+            updated = client.put(f"/api/v1/owners/{created['id']}", json={"idp_group": ""}).json()
+            assert updated["idp_group"] is None
+        event = self.db.list_audit_events(event_type="owner.updated")[0]
+        assert (json.loads(event["before"])["idp_group"], json.loads(event["after"])["idp_group"]) == ("team-pay", None)
+
     def test_get_owner(self) -> None:
         """Test getting an owner by ID via API."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")

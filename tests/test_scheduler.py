@@ -13,7 +13,7 @@ import pytest
 from fastapi import FastAPI
 
 from chronowarden.app import lifespan
-from chronowarden.config import AppConfig
+from chronowarden.config import AppConfig, AuthConfig
 from chronowarden.scheduler import SyncScheduler, sync_connected
 
 
@@ -72,7 +72,7 @@ async def test_off_starts_nothing() -> None:
 @pytest.mark.asyncio
 async def test_lifespan_starts_and_stops_the_scheduler() -> None:
     with (
-        patch("chronowarden.app.load_config", return_value=AppConfig()),
+        patch("chronowarden.app.load_config", return_value=AppConfig(auth=AuthConfig(mode="none"))),
         patch("chronowarden.app._configure_sentry"),
         patch("chronowarden.app.vault_manager.connect_all"),
         patch("chronowarden.app.vault_manager.start_reconnect_loop"),

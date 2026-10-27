@@ -16,6 +16,7 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
   `SecretMetadataUpdate` (trims severity, rejects blank).
 - `owner.py`: `Owner*`, `NotificationRoute*` (webhook only, http(s) addresses, `signed`), `SigningSecret`,
   `RouteTestResult`. `alert.py`: `FiringAlert`, `Delivery` (ADR-025).
+- `auth.py`: `Me`, `LogoutResult`, `ApiToken`, `ApiTokenCreate`, `NewApiToken` (ADR-026); `Owner.idp_group`.
 - `system.py`: `System*`, `OwnerRef`/`SystemRef` (used in `SecretMetadataResponse.system`, `owners`,
   `effective_owners`), `OwnerIds`, `SystemAssignment`.
 - `engine.py`, `entity.py`, `router.py`: **reserved for the roadmap, not wired.** Engine kinds (Azure Key Vault,
@@ -31,7 +32,8 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
   `notification_routes` (`type = 'webhook'`), `systems` (unique `name`), `system_owners`, and the assignments
   `secret_systems` / `secret_owners` keyed by `vault_name, engine_id, secret_path`, never the cache `id` (ADR-017).
   `audit_events` (append-only, [audit](../audit/AGENTS.md)), `audit_state`, `observed_state`,
-  `rotation_confirmations` (revoked, never deleted, except by purge), `compliance_snapshots` (append-only).
+  `rotation_confirmations` (revoked, never deleted, except by purge), `compliance_snapshots` (append-only),
+  `sessions` / `oidc_pending` / `api_tokens` (migration 11; hashes only, never the session ID or token).
   `secret_metadata_cache.privileged` is read from `chronowarden_privileged` by sync. `PRAGMA user_version` is the
   number of the last migration applied.
 - `SecretMetadataResponse` fields are mirrored in `frontend/src/lib/types/Secret.ts`, `Owner` in `Owner.ts`:

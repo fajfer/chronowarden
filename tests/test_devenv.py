@@ -45,7 +45,9 @@ class TestConfig:
         write_dev_config(path, CREDENTIALS)
         text = path.read_text()
         assert text.startswith(HEADER)
-        vaults = yaml.safe_load(text)["vaults"]
+        data = yaml.safe_load(text)
+        assert data["auth"] == {"mode": "none"}
+        vaults = data["vaults"]
         assert [(v["name"], v["address"], v["role_id"]) for v in vaults] == [
             ("dev-openbao", "http://localhost:8200", "role-a"),
             ("dev-vault", "http://localhost:8201", "role-b"),

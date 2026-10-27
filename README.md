@@ -14,12 +14,12 @@ Chronowarden is a secret lifecycle observability service that syncs with your se
 
 This is very early work being built with focus on compliance for financial institutions ([PCI DSS 4.0](https://www.pcisecuritystandards.org/document_library/), [DORA](https://www.eiopa.europa.eu/digital-operational-resilience-act-dora_en)) and best practices ([NIST SP 800-63B-4](https://csrc.nist.gov/pubs/sp/800/63/b/4/final)) regarding credential rotation.
 
-> [!WARNING]
-> **The API and UI have no authentication yet** (planned for a later release). Anyone who can reach the HTTP port
-> can read all tracked metadata (including other teams' custom metadata values kept in the audit log) and trigger
-> syncs. Run Chronowarden only on a trusted network or behind an authenticating reverse proxy, and never expose it
-> directly to the internet. Set `allowed_hosts` in `config.yaml` to the names you serve it under: other web pages
-> then can't reach it through DNS rebinding (cross-site writes are refused either way).
+> [!IMPORTANT]
+> **Chronowarden needs an `auth` section in `config.yaml` to start** (since 0.9): log in through any OIDC provider
+> (`mode: oidc`) or an authenticating reverse proxy such as oauth2-proxy (`mode: proxy`); pipelines use API tokens.
+> `mode: none` turns login off and makes everyone an admin: use it only on a trusted network. See the
+> [authentication guide](docs/guides/authentication.md). Set `allowed_hosts` to the names you serve Chronowarden
+> under, so other web pages can't reach it through DNS rebinding (cross-site writes are refused either way).
 
 Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and troubleshoot!
 
@@ -118,6 +118,9 @@ Development \
 
    Edit `config.yaml`:
    ```yaml
+   auth:
+     mode: none  # local only; use oidc or proxy anywhere else (see the authentication guide)
+
    vaults:
      - name: production
        address: https://vault.example.com:8200
@@ -224,6 +227,17 @@ write is lost (Vault has no check-and-set for metadata).
 
 ## API Endpoints
 
+Everything except the health endpoints and the login flow needs a caller: a browser session (OIDC), identity headers
+from a trusted proxy, or `Authorization: Bearer <token>`. Viewers read everything; owners change the secrets they
+effectively own, their owner's name and webhook routes, and trigger syncs; admins do everything else
+([ADR-026](.ai/adr/ADR-026-sessions-tokens-and-permissions.md)).
+
+### Authentication
+- `GET /api/v1/auth/login`, `GET /api/v1/auth/callback` - OIDC login (authorization code flow with PKCE)
+- `POST /api/v1/auth/logout` - End the session (returns the proxy's `logout_url`, if configured)
+- `GET /api/v1/auth/me` - The caller: name, role, the owners they act for, and the auth mode
+- `GET/POST /api/v1/auth/tokens`, `DELETE /api/v1/auth/tokens/{id}` - API tokens (admin); the token is returned once
+
 ### Secrets
 - `GET /api/v1/secrets` - List all tracked secrets with metadata
   - Query params: `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id` (effective owner), `unassigned`,
@@ -231,8 +245,8 @@ write is lost (Vault has no check-and-set for metadata).
 - `GET /api/v1/secrets/{id}` - Get secret metadata by ID, including its system, owners and effective owners
 - `PUT /api/v1/secrets/{id}/system` - Assign the secret to a system (`{"system_id": "..."}`, or `null` to unassign)
 - `PUT /api/v1/secrets/{id}/owners` - Replace the secret's owners (`{"owner_ids": [...]}`)
-- `POST /api/v1/secrets/{id}/confirmations` - Confirm the newest version is applied (`{"applied_at": "...",
-  "confirmed_by": "pipeline"}`); the next rotation counts from that date if it is later than the backend update
+- `POST /api/v1/secrets/{id}/confirmations` - Confirm the newest version is applied (`{"applied_at": "..."}`, recorded
+  with the caller); the next rotation counts from that date if it is later than the backend update
 - `DELETE /api/v1/secrets/{id}`, `DELETE /api/v1/secrets/removed` - Purge secrets that sync no longer finds in their
   backend, with their assignments (`removed` takes `vault_name`/`engine_id`); a secret that still exists gives `409`
 
@@ -299,7 +313,7 @@ Snapshot exports list secret paths and owners; keep them as confidential as the 
 ### Health
 - `GET /api/v1/health` - Health check endpoint (used by Kubernetes probes)
 - `GET /api/v1/ready` - Readiness check endpoint
-- `GET /api/v1/info` - API name and version
+- `GET /api/v1/info` - API name, version, default theme and auth mode
 - `GET /api/v1/metrics` - Prometheus metrics, when `metrics.enabled: true` is set (otherwise `404`)
 
 ## Secret Status
@@ -402,7 +416,7 @@ as ADRs in [`.ai/adr/`](.ai/adr/README.md).
 | **0.7 Compliance evidence** | Systems and owners, hash-chained audit log with change history and revert, rotation confirmation, privileged flag, frozen snapshots and reporting periods, removed secrets, DB migrations, optional metrics, signed releases with SLSA provenance and SBOMs, fuzzing, dev-setup rework, SvelteKit 3 | #61, #24, #76, #78, #79, #86, #87-#96 | [ADR-010](.ai/adr/ADR-010-owners-systems-and-permissions.md), [ADR-014](.ai/adr/ADR-014-rotation-confirmation-and-audit-log.md), [ADR-017](.ai/adr/ADR-017-sqlite-holds-assignments.md), [ADR-018](.ai/adr/ADR-018-release-integrity.md), [ADR-021](.ai/adr/ADR-021-rotation-handover.md), [ADR-023](.ai/adr/ADR-023-schema-migrations-with-user-version.md) |
 | **0.7.x Policies and reports** | Compliance policies in config (example YAML for KNF KRI ICT, PCI DSS 4.0, DORA in the docs), PDF reports with Typst | #97, #98 | [ADR-019](.ai/adr/ADR-019-compliance-policies-as-config.md), [ADR-020](.ai/adr/ADR-020-pdf-reports-with-typst.md) |
 | **0.8 Alerting** | Built-in webhook alerting to owners, scheduled and headless sync, grace-period escalation | #48, #71, #74, #99 | [ADR-022](.ai/adr/ADR-022-webhooks-and-optional-metrics.md), [ADR-013](.ai/adr/ADR-013-in-process-and-headless-sync.md) |
-| **0.9 Access control** | Authentication for UI and API (only owners edit their secrets), then RBAC | n/a | [ADR-015](.ai/adr/ADR-015-authentication.md) |
+| **0.9 Access control** | Authentication for UI and API (OIDC or proxy headers, API tokens), admin/owner/viewer roles: only owners edit their secrets | #75 | [ADR-015](.ai/adr/ADR-015-authentication.md), [ADR-026](.ai/adr/ADR-026-sessions-tokens-and-permissions.md) |
 | **1.0** | Stability promise for config, API, metrics and DB schema | n/a | [ADR-016](.ai/adr/ADR-016-stability-policy-for-1-0.md) |
 | **1.x Backends** | Generic provider registry, then public cloud vaults | #72 | [ADR-011](.ai/adr/ADR-011-provider-registry.md) |
 

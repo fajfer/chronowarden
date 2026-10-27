@@ -32,6 +32,8 @@ was applied where it is used (#18), and changes made in Vault by other teams wer
 - The database holds history that can't be rebuilt (ADR-017: back it up).
 - The log grows with every observed change; metadata is small, so no retention limit is set.
 - Other teams' custom metadata values are stored in Chronowarden and visible to anyone who reaches it until 0.9.
+- *Update 2026-10-27:* since 0.9 ([ADR-026](ADR-026-sessions-tokens-and-permissions.md)) API changes record the
+  actor (`user:<email or name>`, `token:<name>`), and `confirmed_by` is the actor instead of a request field.
 
 ## Related files
 

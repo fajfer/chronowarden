@@ -26,14 +26,15 @@ class TestInfoEndpoint:
 
     def test_info_returns_default_theme(self) -> None:
         """The instance default theme is exposed for the frontend (#57)."""
-        config = AppConfig.model_validate({"ui": {"default_theme": "bison"}})
+        config = AppConfig.model_validate({"ui": {"default_theme": "bison"}, "auth": {"mode": "none"}})
         with patch("chronowarden.app.app_config", config):
             response = _build_client().get("/api/v1/info")
 
         assert response.status_code == 200
         body = response.json()
         assert body["default_theme"] == "bison"
-        assert set(body) == {"name", "version", "docs", "default_theme", "features"}
+        assert body["auth_mode"] == "none", "the login page needs the mode before anyone logs in"
+        assert set(body) == {"name", "version", "docs", "default_theme", "auth_mode", "features"}
 
     def test_features_say_what_this_image_has(self, tmp_path: Path) -> None:
         """ADR-024: the headless image has neither the UI nor PDF reports."""

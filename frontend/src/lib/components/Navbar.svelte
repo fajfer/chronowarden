@@ -3,10 +3,9 @@
 <!-- SPDX-License-Identifier: EUPL-1.2                              -->
 
 <script lang="ts">
-  import { currentUser, logout } from '#lib/stores/auth.js';
+  import { canSync, currentUser, logout } from '#lib/stores/auth.js';
   import { currentTheme } from '#lib/stores/theme.js';
   import { fetchVaultInstances, fetchApiInfo } from '#lib/api/vaults.js';
-  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import SyncButton from './SyncButton.svelte';
 
@@ -33,7 +32,6 @@
 
   function handleLogout() {
     logout();
-    goto('/login');
   }
 </script>
 
@@ -62,15 +60,18 @@
         </div>
       {/if}
 
-<SyncButton />
+      {#if $canSync}<SyncButton />{/if}
 
-      <span class="hidden lg:inline text-sm text-gray-400">{$currentUser?.name ?? ''}</span>
-      <button
-        onclick={handleLogout}
-        class="px-3 py-1.5 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
-      >
-        Logout
-      </button>
+      {#if $currentUser && $currentUser.auth_mode !== 'none'}
+        <span class="hidden lg:inline text-sm text-gray-400" title={$currentUser.email ?? ''}>{$currentUser.name}</span>
+        <span class="hidden lg:inline text-[11px] uppercase tracking-wide text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">{$currentUser.role}</span>
+        <button
+          onclick={handleLogout}
+          class="px-3 py-1.5 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
+        >
+          Logout
+        </button>
+      {/if}
     </div>
   </div>
 </nav>

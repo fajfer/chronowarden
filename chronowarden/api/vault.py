@@ -6,10 +6,12 @@
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/vault", tags=["vault"])
+from chronowarden.auth import authenticated
+
+router = APIRouter(prefix="/vault", tags=["vault"], dependencies=[Depends(authenticated)])
 
 
 class VaultInstanceHealth(BaseModel):

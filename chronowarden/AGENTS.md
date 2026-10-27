@@ -15,7 +15,7 @@ turns backend metadata into cached TTLs (`metadata.py`). The SQLite layer (`data
 
 - `_configure_sentry`: PII and frame locals off (they hold the Vault token, 0.7.1). `request_guard.py`: cross-site
   writes → 403, Hosts outside `allowed_hosts` → 400.
-- `app.py`: singletons `vault_manager`, `db`, `app_config`; `lifespan` (config → Sentry → `connect_all` → DB →
+- `app.py`: singletons `vault_manager`, `db`, `app_config`; `lifespan` (config → `require_auth` → Sentry → `connect_all` → DB →
   `record_config_change` → reconnect loop → `SyncScheduler`); routers under `/api/v1`; SPA serving.
 - `scheduler.py`: `sync_connected`, `SyncScheduler`. `__main__.py`: `python -m chronowarden sync` (exit 0/1/2).
 - `config.py`: `AppConfig`, `VaultConfig`, `EngineConfigNested`, `SecretConfig`, `ExpiryProfile`, `load_config`.

@@ -90,7 +90,8 @@ unsigned webhooks again. Both are recorded in the audit log, without the secret.
 
 ## Security
 
-- Until authentication arrives (0.9), anyone who can reach Chronowarden can add webhook routes, so it can be made to
-  POST to addresses on your network. Run it on a trusted network or behind an authenticating proxy.
+- Webhook routes are managed by admins and by the people who act for that owner
+  ([Authentication](authentication.md)). Anyone who can do that can make Chronowarden POST to addresses on your
+  network, so keep those roles to people you trust with that.
 - Webhook URLs usually carry a token. Chronowarden shows only their scheme and host and never logs them; the
   database holds them and the signing secrets, so protect and back up `chronowarden.db` like the config.

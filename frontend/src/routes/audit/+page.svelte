@@ -7,6 +7,7 @@
   import { auditExportUrl, fetchAuditEvents, revertAuditEvent, verifyAuditLog } from '#lib/api/audit.js';
   import { loadSecrets } from '#lib/stores/secrets.js';
   import { addToast } from '#lib/stores/sync.js';
+  import { currentUser } from '#lib/stores/auth.js';
   import type { AuditChainStatus, AuditEvent } from '#lib/types/index.js';
 
   const PAGE = 100;
@@ -109,7 +110,8 @@
     <div class="rounded-lg border border-red-700 bg-red-900/30 px-4 py-3 text-red-300">{error}</div>
   {:else}
     <div class="overflow-hidden rounded-lg border border-gray-700 bg-gray-800">
-      <AuditEventList {events} onRevert={handleRevert} />
+      <!-- Owners may revert events on their own secrets; the server checks which -->
+      <AuditEventList {events} onRevert={$currentUser?.role === 'viewer' ? undefined : handleRevert} />
       {#if hasMore}
         <div class="border-t border-gray-700 px-4 py-3 text-center">
           <button onclick={() => load(true)} disabled={loading} class="text-sm text-indigo-400 hover:text-indigo-300">

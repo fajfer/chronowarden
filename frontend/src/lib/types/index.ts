@@ -18,5 +18,6 @@ export type {
   ApiInfo, HealthStatus,
 } from './Vault';
 export type { System, SystemCreate, SystemUpdate, SystemFormData, SystemRef, OwnerRef } from './System';
+export type { AuthMode, Role, Me, LogoutResult, ApiToken, ApiTokenCreate, NewApiToken } from './Auth';
 export type { FilterState } from './Filter';
 export { DEFAULT_FILTERS, UNASSIGNED_SYSTEM } from './Filter';

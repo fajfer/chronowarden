@@ -65,7 +65,7 @@ jobs:
 
       - name: Smoke test production image
         run: |
-          printf 'vaults: []\n' > "$RUNNER_TEMP/config.yaml"
+          printf 'vaults: []\nauth:\n  mode: none\n' > "$RUNNER_TEMP/config.yaml"
           docker run -d --name smoke -p 127.0.0.1:8000:8000 \
             -v "$RUNNER_TEMP/config.yaml:/data/config.yaml:ro" chronowarden:smoke-test
           for _ in $(seq 1 30); do

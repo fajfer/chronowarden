@@ -67,7 +67,7 @@ class Confirmation(BaseModel):
     id: int
     version: int
     applied_at: str
-    confirmed_by: Optional[str] = None
+    confirmed_by: Optional[str] = Field(default=None, description="The actor who confirmed it (ADR-026)")
     recorded_at: str
 
 
@@ -75,9 +75,6 @@ class ConfirmationCreate(BaseModel):
     """Request body confirming the newest version of a secret."""
 
     applied_at: datetime = Field(description="When it was applied; may be in the past, never before the version")
-    confirmed_by: Optional[str] = Field(
-        default=None, max_length=200, description="Who or what confirmed it, e.g. a pipeline name"
-    )
 
 
 class PrivilegedUpdate(BaseModel):

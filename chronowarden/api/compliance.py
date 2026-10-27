@@ -11,11 +11,12 @@ from importlib.metadata import version
 from typing import Any, Optional
 
 import yaml
-from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from chronowarden.alerting.engine import evaluate_inventory
 from chronowarden.api.audit import request_source
 from chronowarden.api.cooldown import Cooldown, enforce
+from chronowarden.auth import admin_only, authenticated, request_actor
 from chronowarden.compliance.evidence import (
     GAP_TYPES,
     build_document,
@@ -43,7 +44,7 @@ from chronowarden.models.compliance import (
 )
 from chronowarden.timestamps import utc_timestamp
 
-router = APIRouter(prefix="/compliance", tags=["compliance"])
+router = APIRouter(prefix="/compliance", tags=["compliance"], dependencies=[Depends(authenticated)])
 
 _snapshot_cooldown = Cooldown()
 
@@ -196,7 +197,13 @@ async def list_snapshots() -> list[SnapshotInfo]:
     return [SnapshotInfo(**row) for row in database.list_snapshots()]
 
 
-@router.post("/snapshots", response_model=SnapshotInfo, status_code=status.HTTP_201_CREATED, summary="Take a snapshot")
+@router.post(
+    "/snapshots",
+    dependencies=[Depends(admin_only)],
+    response_model=SnapshotInfo,
+    status_code=status.HTTP_201_CREATED,
+    summary="Take a snapshot",
+)
 async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInfo:
     """
     Freeze the inventory of a scope: ad hoc (label + scope) or for an ended reporting period (scope from config).
@@ -268,6 +275,7 @@ async def create_snapshot(data: SnapshotCreate, request: Request) -> SnapshotInf
     database.append_audit_event(
         "compliance.snapshot",
         request_source(request),
+        actor=request_actor(request),
         subject=f"snapshot:{snapshot_id}",
         after={
             "label": data.label,

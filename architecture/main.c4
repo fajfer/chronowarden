@@ -6,6 +6,18 @@ model {
     description 'Authenticated Chronowarden user'
   }
 
+  pipelines = actor 'API client' {
+    description 'Pipeline or script calling the API with a named API token (ADR-026)'
+  }
+
+  idp = system 'Identity provider' {
+    description 'Any OIDC provider (Keycloak, Entra ID, Okta, Dex); its groups map to Chronowarden roles'
+  }
+
+  authproxy = system 'Authenticating proxy' {
+    description 'Optional reverse proxy such as oauth2-proxy that logs users in and passes identity headers (auth.mode: proxy)'
+  }
+
   receivers = system 'Webhook receivers' {
     description 'Chat tools, incident tools or Alertmanager-compatible endpoints that get Chronowarden alerts'
   }
@@ -46,6 +58,11 @@ model {
       description 'Webhook alerting: alert rules, state with repeat and resolve, Alertmanager-compatible payloads, Standard Webhooks signing, a delivery queue with retries and a log (ADR-025)'
     }
 
+    component auth {
+      technology 'Python, Authlib'
+      description 'Authentication and permissions (ADR-015, ADR-026): OIDC login with PKCE, trusted proxy headers or hashed API tokens resolve a caller with a role (admin, owner, viewer) and the owners they act for; server-side sessions'
+    }
+
     component compliance {
       technology 'Python, Typst'
       description 'Compliance evidence: summaries, gaps, reporting periods, policies from config evaluated per control (green/amber/red), frozen SHA-256 hashed snapshots with their policy results, and PDF/A reports of snapshots rendered with Typst'
@@ -53,6 +70,13 @@ model {
 
     // User uses the UI
     user -> chronowarden.frontend 'Views secret metadata, manages owners and systems, assigns secrets, triggers sync'
+    user -> idp 'Logs in (auth.mode: oidc)'
+    user -> authproxy 'Logs in (auth.mode: proxy)'
+    authproxy -[api]-> chronowarden.backend 'Forwards requests with X-Forwarded-User/Email/Groups'
+    pipelines -[api]-> chronowarden.backend 'Calls the API with Authorization: Bearer cwt_...'
+    chronowarden.backend -[api]-> chronowarden.auth 'Resolves the caller of every request and checks the permission matrix'
+    chronowarden.auth -[api]-> idp 'Discovery, code exchange and ID token keys'
+    chronowarden.auth -[api]-> chronowarden.database 'Sessions, pending logins and API tokens, stored as hashes'
     // Frontend interacts with the database
     chronowarden.frontend -[api]-> chronowarden.backend 'Triggers API through frontend'
     // Backend interacts with the database

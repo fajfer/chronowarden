@@ -12,6 +12,7 @@
   import { fetchSystems } from '#lib/api/systems.js';
   import { secrets } from '#lib/stores/secrets.js';
   import { addToast } from '#lib/stores/sync.js';
+  import { isAdmin } from '#lib/stores/auth.js';
   import { formatDate } from '#lib/utils/dateFormat.js';
   import type {
     ComplianceScope, ComplianceSummary, ControlResult, GapReport, PeriodStatus, PolicyDefinition, PolicyEvaluation,
@@ -243,7 +244,7 @@
     {#each openPeriods as period (period.cadence + period.period)}
       <div class="flex items-center justify-between rounded-lg border border-amber-700 bg-amber-900/20 px-4 py-3 text-sm text-amber-200">
         <span>{period.period} ({period.cadence}) ended {formatDate(period.end)}: close it to freeze its snapshot.</span>
-        <button onclick={() => prepareClose(period)} class="rounded-lg bg-amber-600 px-3 py-1.5 text-white hover:bg-amber-500">Close {period.period}</button>
+        {#if $isAdmin}<button onclick={() => prepareClose(period)} class="rounded-lg bg-amber-600 px-3 py-1.5 text-white hover:bg-amber-500">Close {period.period}</button>{/if}
       </div>
     {/each}
     {#if policies.length === 0}
@@ -319,7 +320,7 @@
       </div>
     {/if}
   {:else if tab === 'policies'}
-    <p class="text-sm text-gray-400">Policies are set in <code class="text-gray-300">config.yaml</code> (<code class="text-gray-300">compliance.policies</code>); editing here comes with authentication (0.9). Example policies for regulations are in the docs and are a starting point, not legal advice.</p>
+    <p class="text-sm text-gray-400">Policies are set in <code class="text-gray-300">config.yaml</code> (<code class="text-gray-300">compliance.policies</code>). Example policies for regulations are in the docs and are a starting point, not legal advice.</p>
     {#each policies as policy (policy.id)}
       <div class="space-y-2 rounded-lg border border-gray-700 bg-gray-800 p-5">
         <div class="flex items-baseline gap-3">
@@ -351,7 +352,7 @@
           </select>
         </label>
         <label class="flex items-center gap-2 pb-2 text-sm text-gray-300"><input type="checkbox" bind:checked={privilegedOnly} class="accent-rose-500" /> Privileged only</label>
-        <button onclick={prepareAdhoc} disabled={!label.trim()}
+        <button onclick={prepareAdhoc} disabled={!label.trim() || !$isAdmin} title={$isAdmin ? '' : 'Snapshots are taken by admins'}
                 class="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50">Check gaps and freeze</button>
       </div>
     </div>
@@ -408,7 +409,7 @@
     </div>
   {:else}
     <div class="space-y-2 rounded-lg border border-gray-700 bg-gray-800 p-5 text-sm">
-      <p class="text-gray-400">Set in <code class="text-gray-300">config.yaml</code>; editing here comes with authentication (0.9).</p>
+      <p class="text-gray-400">Set in <code class="text-gray-300">config.yaml</code>.</p>
       <pre class="overflow-x-auto rounded bg-gray-900 p-4 text-xs text-gray-300">{JSON.stringify(settings, null, 2)}</pre>
     </div>
   {/if}

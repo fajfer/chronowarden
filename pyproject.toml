@@ -22,6 +22,7 @@ dependencies = [
     "requests>=2.32.0",
     "urllib3>=2.8.0",  # pinned above requests' floor for PYSEC-2026-4175/4176/4177
     "sentry-sdk>=2.63.0",
+    "authlib>=1.6.0",
 ]
 
 [project.optional-dependencies]

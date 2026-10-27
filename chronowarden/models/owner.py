@@ -62,7 +62,10 @@ class OwnerBase(BaseModel):
     """Base owner model."""
 
     name: str = Field(max_length=200, description="Owner display name")
-    email: str = Field(max_length=320, description="Owner email address")
+    email: str = Field(max_length=320, description="Owner email address; a user with this email acts for the owner")
+    idp_group: Optional[str] = Field(
+        default=None, max_length=256, description="IdP group whose members act for the owner (ADR-026)"
+    )
 
 
 class Owner(OwnerBase):
@@ -84,3 +87,4 @@ class OwnerUpdate(BaseModel):
 
     name: Optional[str] = Field(default=None, max_length=200)
     email: Optional[str] = Field(default=None, max_length=320)
+    idp_group: Optional[str] = Field(default=None, max_length=256, description="An empty string clears it")

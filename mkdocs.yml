@@ -49,6 +49,7 @@ nav:
       - Configuration: getting-started/configuration.md
   - Guides:
       - Upgrading to 0.7: guides/upgrading-to-0.7.md
+      - Authentication: guides/authentication.md
       - Systems and owners: guides/systems-and-owners.md
       - Secrets deleted in Vault: guides/removed-secrets.md
       - Audit log: guides/audit-log.md

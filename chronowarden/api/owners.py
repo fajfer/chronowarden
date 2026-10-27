@@ -12,12 +12,13 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, HTTPException, Path, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
 
 from chronowarden.alerting.delivery import post
 from chronowarden.alerting.payload import build_payload
 from chronowarden.alerting.signing import generate_secret
 from chronowarden.api.audit import request_source
+from chronowarden.auth import Principal, admin_only, authenticated, check_acts_for, owner_or_admin, request_actor
 from chronowarden.models.owner import (
     NotificationRoute,
     NotificationRouteCreate,
@@ -29,7 +30,7 @@ from chronowarden.models.owner import (
 )
 from chronowarden.timestamps import utc_timestamp
 
-router = APIRouter(prefix="/owners", tags=["owners"])
+router = APIRouter(prefix="/owners", tags=["owners"], dependencies=[Depends(authenticated)])
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -54,9 +55,22 @@ def _require_owner(db: Any, owner_id: str) -> dict:
     return owner
 
 
+async def owner_record_access(
+    owner_id: str = Path(description="Owner ID"), principal: Principal = Depends(owner_or_admin)
+) -> Principal:
+    """
+    Let admins and the people who act for an owner manage its name and webhook routes (ADR-026).
+
+    Raises:
+        HTTPException: 403 for anyone else.
+    """
+    check_acts_for(principal, [owner_id], "this owner")
+    return principal
+
+
 def _owner_view(owner: dict) -> dict:
     """An owner's fields as recorded in audit events."""
-    return {"name": owner["name"], "email": owner["email"]}
+    return {"name": owner["name"], "email": owner["email"], "idp_group": owner.get("idp_group")}
 
 
 def mask_address(address: str) -> str:
@@ -96,6 +110,7 @@ def _build_owner(owner_dict: dict, routes: list[dict]) -> Owner:
         id=owner_dict["id"],
         name=owner_dict["name"],
         email=owner_dict["email"],
+        idp_group=owner_dict.get("idp_group"),
         created_at=owner_dict.get("created_at"),
         notification_routes=[_build_route(r) for r in routes],
     )
@@ -111,17 +126,27 @@ async def list_owners() -> list[Owner]:
     return [_build_owner(owner, routes_by_owner.get(owner["id"], [])) for owner in db.list_owners()]
 
 
-@router.post("/", response_model=Owner, status_code=status.HTTP_201_CREATED, summary="Create an owner profile")
+@router.post(
+    "/",
+    dependencies=[Depends(admin_only)],
+    response_model=Owner,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create an owner profile",
+)
 async def create_owner(data: OwnerCreate, request: Request) -> Owner:
     """Create a new owner profile."""
     db = _get_db()
     owner_id = str(uuid.uuid4())
-    db.create_owner(owner_id, data.name, data.email)
+    db.create_owner(owner_id, data.name, data.email, data.idp_group or None)
     owner_dict = db.get_owner(owner_id)
     if owner_dict is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create owner")
     db.append_audit_event(
-        "owner.created", request_source(request), subject=f"owner:{owner_id}", after=_owner_view(owner_dict)
+        "owner.created",
+        request_source(request),
+        actor=request_actor(request),
+        subject=f"owner:{owner_id}",
+        after=_owner_view(owner_dict),
     )
     return _build_owner(owner_dict, [])
 
@@ -136,11 +161,25 @@ async def get_owner(owner_id: str = Path(description="Owner ID")) -> Owner:
 
 
 @router.put("/{owner_id}", response_model=Owner, summary="Update an owner profile")
-async def update_owner(data: OwnerUpdate, request: Request, owner_id: str = Path(description="Owner ID")) -> Owner:
-    """Update an existing owner profile."""
+async def update_owner(
+    data: OwnerUpdate,
+    request: Request,
+    owner_id: str = Path(description="Owner ID"),
+    principal: Principal = Depends(owner_record_access),
+) -> Owner:
+    """
+    Update an existing owner profile; only admins change the email or IdP group, which decide who acts for it.
+
+    Raises:
+        HTTPException: 404 for an unknown owner, 403 when a non-admin changes the email or IdP group.
+    """
     db = _get_db()
     existing = _require_owner(db, owner_id)
-    db.update_owner(owner_id, name=data.name, email=data.email)
+    if not principal.at_least("admin") and (data.email is not None or data.idp_group is not None):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Only an admin can change the email or IdP group"
+        )
+    db.update_owner(owner_id, name=data.name, email=data.email, idp_group=data.idp_group)
     owner_dict = db.get_owner(owner_id)
     if owner_dict is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update owner")
@@ -148,6 +187,7 @@ async def update_owner(data: OwnerUpdate, request: Request, owner_id: str = Path
         db.append_audit_event(
             "owner.updated",
             request_source(request),
+            actor=request_actor(request),
             subject=f"owner:{owner_id}",
             before=_owner_view(existing),
             after=_owner_view(owner_dict),
@@ -156,23 +196,31 @@ async def update_owner(data: OwnerUpdate, request: Request, owner_id: str = Path
     return _build_owner(owner_dict, routes)
 
 
-@router.delete("/{owner_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete an owner profile")
+@router.delete(
+    "/{owner_id}",
+    dependencies=[Depends(admin_only)],
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an owner profile",
+)
 async def delete_owner(request: Request, owner_id: str = Path(description="Owner ID")) -> None:
     """Delete an owner profile and all its notification routes."""
     db = _get_db()
     existing = _require_owner(db, owner_id)
-    source = request_source(request)
+    source, actor = request_source(request), request_actor(request)
     _, secret_owners = db.get_assignments()
     systems_before = {system["id"]: system["owner_ids"] for system in db.list_systems()}
     names = {owner["id"]: owner["name"] for owner in db.list_owners()}
     db.delete_owner(owner_id)
-    db.append_audit_event("owner.deleted", source, subject=f"owner:{owner_id}", before=_owner_view(existing))
+    db.append_audit_event(
+        "owner.deleted", source, actor=actor, subject=f"owner:{owner_id}", before=_owner_view(existing)
+    )
     # The owner disappears from every secret and system it was assigned to; record those changes too
     for identity, owner_ids in secret_owners.items():
         if owner_id in owner_ids:
             db.append_audit_event(
                 "secret.owners",
                 source,
+                actor=actor,
                 identity=identity,
                 before={"owners": [{"id": oid, "name": names.get(oid)} for oid in owner_ids]},
                 after={"owners": [{"id": oid, "name": names.get(oid)} for oid in owner_ids if oid != owner_id]},
@@ -182,6 +230,7 @@ async def delete_owner(request: Request, owner_id: str = Path(description="Owner
             db.append_audit_event(
                 "system.owners",
                 source,
+                actor=actor,
                 subject=f"system:{system_id}",
                 before={"owner_ids": owner_ids},
                 after={"owner_ids": [oid for oid in owner_ids if oid != owner_id]},
@@ -190,6 +239,7 @@ async def delete_owner(request: Request, owner_id: str = Path(description="Owner
 
 @router.post(
     "/{owner_id}/routes",
+    dependencies=[Depends(owner_record_access)],
     response_model=NotificationRoute,
     status_code=status.HTTP_201_CREATED,
     summary="Add a notification route",
@@ -207,7 +257,11 @@ async def add_route(
     route = next((r for r in db.list_notification_routes(owner_id) if r["id"] == route_id), None)
     if route is not None:
         db.append_audit_event(
-            "owner.route_added", request_source(request), subject=f"owner:{owner_id}", after=_route_view(route)
+            "owner.route_added",
+            request_source(request),
+            actor=request_actor(request),
+            subject=f"owner:{owner_id}",
+            after=_route_view(route),
         )
         return _build_route(route)
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create route")
@@ -215,6 +269,7 @@ async def add_route(
 
 @router.delete(
     "/{owner_id}/routes/{route_id}",
+    dependencies=[Depends(owner_record_access)],
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove a notification route",
 )
@@ -233,7 +288,11 @@ async def delete_route(
     route = _require_route(db, owner_id, route_id)
     db.delete_notification_route(route_id)
     db.append_audit_event(
-        "owner.route_deleted", request_source(request), subject=f"owner:{owner_id}", before=_route_view(route)
+        "owner.route_deleted",
+        request_source(request),
+        actor=request_actor(request),
+        subject=f"owner:{owner_id}",
+        before=_route_view(route),
     )
 
 
@@ -253,6 +312,7 @@ def _require_route(db: Any, owner_id: str, route_id: str) -> dict:
 
 @router.post(
     "/{owner_id}/routes/{route_id}/signing",
+    dependencies=[Depends(owner_record_access)],
     response_model=SigningSecret,
     status_code=status.HTTP_201_CREATED,
     summary="Turn on signing for a route",
@@ -275,6 +335,7 @@ async def enable_signing(
     db.append_audit_event(
         "owner.route_signing",
         request_source(request),
+        actor=request_actor(request),
         subject=f"owner:{owner_id}",
         before={"id": route_id, "signed": bool(route["signed"])},
         after={"id": route_id, "signed": True},
@@ -284,6 +345,7 @@ async def enable_signing(
 
 @router.delete(
     "/{owner_id}/routes/{route_id}/signing",
+    dependencies=[Depends(owner_record_access)],
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Turn off signing for a route",
 )
@@ -303,6 +365,7 @@ async def disable_signing(
         db.append_audit_event(
             "owner.route_signing",
             request_source(request),
+            actor=request_actor(request),
             subject=f"owner:{owner_id}",
             before={"id": route_id, "signed": True},
             after={"id": route_id, "signed": False},
@@ -311,6 +374,7 @@ async def disable_signing(
 
 @router.post(
     "/{owner_id}/test-route/{route_id}",
+    dependencies=[Depends(owner_record_access)],
     response_model=RouteTestResult,
     summary="Send a test webhook to a route",
 )

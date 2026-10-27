@@ -364,15 +364,15 @@ class Database:
             conn.commit()
             return identities
 
-    def create_owner(self, owner_id: str, name: str, email: str) -> None:
-        """Create a new owner profile."""
+    def create_owner(self, owner_id: str, name: str, email: str, idp_group: Optional[str] = None) -> None:
+        """Create a new owner profile; members of `idp_group` act for the owner (ADR-026)."""
         with self._conn_lock:
             conn = self._require_connection()
             if conn is None:
                 return
             conn.execute(
-                "INSERT INTO owners (id, name, email) VALUES (?, ?, ?)",
-                (owner_id, name, email),
+                "INSERT INTO owners (id, name, email, idp_group) VALUES (?, ?, ?, ?)",
+                (owner_id, name, email, idp_group),
             )
             conn.commit()
 
@@ -382,7 +382,7 @@ class Database:
             conn = self._require_connection()
             if conn is None:
                 return None
-            cursor = conn.execute("SELECT id, name, email, created_at FROM owners WHERE id = ?", (owner_id,))
+            cursor = conn.execute("SELECT id, name, email, idp_group, created_at FROM owners WHERE id = ?", (owner_id,))
             row = cursor.fetchone()
             if row is None:
                 return None
@@ -394,11 +394,13 @@ class Database:
             conn = self._require_connection()
             if conn is None:
                 return []
-            cursor = conn.execute("SELECT id, name, email, created_at FROM owners ORDER BY name")
+            cursor = conn.execute("SELECT id, name, email, idp_group, created_at FROM owners ORDER BY name")
             return [dict(row) for row in cursor.fetchall()]
 
-    def update_owner(self, owner_id: str, name: Optional[str] = None, email: Optional[str] = None) -> None:
-        """Update an owner profile."""
+    def update_owner(
+        self, owner_id: str, name: Optional[str] = None, email: Optional[str] = None, idp_group: Optional[str] = None
+    ) -> None:
+        """Update an owner profile; None leaves a field as it is, an empty `idp_group` clears it."""
         with self._conn_lock:
             conn = self._require_connection()
             if conn is None:
@@ -411,12 +413,42 @@ class Database:
             if email is not None:
                 updates.append("email = ?")
                 params.append(email)
+            if idp_group is not None:
+                updates.append("idp_group = NULLIF(?, '')")
+                params.append(idp_group)
             if not updates:
                 return
             params.append(owner_id)
             query = "UPDATE owners SET " + ", ".join(updates) + " WHERE id = ?"
             conn.execute(query, params)
             conn.commit()
+
+    def owner_ids_for(self, email: Optional[str], groups: list[str]) -> list[str]:
+        """
+        The owners a user acts for: their email matches (case-insensitive) or `idp_group` is one of their groups.
+
+        Args:
+            email: The user's verified email, if any.
+            groups: The user's IdP groups.
+
+        Returns:
+            Owner IDs, sorted.
+        """
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            clauses, params = [], []
+            if email:
+                clauses.append("lower(email) = lower(?)")
+                params.append(email)
+            if groups:
+                clauses.append(f"idp_group IN ({', '.join('?' for _ in groups)})")
+                params.extend(groups)
+            if not clauses:
+                return []
+            rows = conn.execute(f"SELECT id FROM owners WHERE {' OR '.join(clauses)} ORDER BY id", params)
+            return [row["id"] for row in rows]
 
     def delete_owner(self, owner_id: str) -> None:
         """Delete an owner, their notification routes, and their assignments to secrets and systems."""
@@ -1129,3 +1161,145 @@ class Database:
                 for row in rows
                 if row["version"] is not None
             }
+
+    def create_session(
+        self,
+        id_hash: str,
+        name: str,
+        email: Optional[str],
+        groups: list[str],
+        role: str,
+        created_at: str,
+        expires_at: str,
+    ) -> None:
+        """Store a login; the cookie holds the session ID, the table only its hash (ADR-026)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "INSERT INTO sessions (id_hash, name, email, groups, role, created_at, expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (id_hash, name, email, json.dumps(groups), role, created_at, expires_at),
+            )
+            conn.commit()
+
+    def get_session(self, id_hash: str, now: str) -> Optional[dict]:
+        """A session that hasn't expired, with `groups` parsed; None otherwise."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute("SELECT * FROM sessions WHERE id_hash = ? AND expires_at > ?", (id_hash, now)).fetchone()
+            return {**dict(row), "groups": json.loads(row["groups"])} if row else None
+
+    def delete_session(self, id_hash: str) -> None:
+        """End a session (logout)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute("DELETE FROM sessions WHERE id_hash = ?", (id_hash,))
+            conn.commit()
+
+    def delete_expired_logins(self, now: str, pending_before: str) -> None:
+        """Drop expired sessions and OIDC logins started before `pending_before`."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
+            conn.execute("DELETE FROM oidc_pending WHERE created_at < ?", (pending_before,))
+            conn.commit()
+
+    def add_oidc_pending(self, state: str, code_verifier: str, nonce: str, next_path: str, created_at: str) -> None:
+        """Remember a login sent to the IdP until its callback."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "INSERT INTO oidc_pending (state, code_verifier, nonce, next_path, created_at) VALUES (?, ?, ?, ?, ?)",
+                (state, code_verifier, nonce, next_path, created_at),
+            )
+            conn.commit()
+
+    def pop_oidc_pending(self, state: str, not_before: str) -> Optional[dict]:
+        """Take a pending login out (each state is used once); None if unknown or started before `not_before`."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute("DELETE FROM oidc_pending WHERE state = ? RETURNING *", (state,)).fetchone()
+            conn.commit()
+            return dict(row) if row and row["created_at"] >= not_before else None
+
+    def create_api_token(
+        self,
+        token_id: str,
+        name: str,
+        token_hash: str,
+        role: str,
+        owner_id: Optional[str],
+        created_at: str,
+        expires_at: str,
+    ) -> None:
+        """Store an API token by its hash (ADR-026)."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute(
+                "INSERT INTO api_tokens (id, name, token_hash, role, owner_id, created_at, expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (token_id, name, token_hash, role, owner_id, created_at, expires_at),
+            )
+            conn.commit()
+
+    def list_api_tokens(self) -> list[dict]:
+        """Every API token, newest first, without hashes."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return []
+            rows = conn.execute(
+                "SELECT id, name, role, owner_id, created_at, expires_at, last_used_at, revoked_at "
+                "FROM api_tokens ORDER BY created_at DESC"
+            )
+            return [dict(row) for row in rows]
+
+    def get_api_token(self, token_hash: str, now: str) -> Optional[dict]:
+        """A token that is neither expired nor revoked, by hash; None otherwise."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute(
+                "SELECT id, name, role, owner_id, created_at, expires_at, last_used_at, revoked_at FROM api_tokens "
+                "WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?",
+                (token_hash, now),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def touch_api_token(self, token_id: str, used_at: str) -> None:
+        """Record when a token was last used."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return
+            conn.execute("UPDATE api_tokens SET last_used_at = ? WHERE id = ?", (used_at, token_id))
+            conn.commit()
+
+    def revoke_api_token(self, token_id: str, revoked_at: str) -> Optional[dict]:
+        """Revoke a token; returns it, or None if unknown or already revoked."""
+        with self._conn_lock:
+            conn = self._require_connection()
+            if conn is None:
+                return None
+            row = conn.execute(
+                "UPDATE api_tokens SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL "
+                "RETURNING id, name, role, owner_id, created_at, expires_at, last_used_at, revoked_at",
+                (revoked_at, token_id),
+            ).fetchone()
+            conn.commit()
+            return dict(row) if row else None

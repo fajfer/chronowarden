@@ -6,23 +6,27 @@
   import Modal from './Modal.svelte';
   import type { Owner } from '#lib/types/index.js';
 
-  let { owner = null, open = false, onClose, onSave }: {
+  let { owner = null, open = false, canEditIdentity = true, onClose, onSave }: {
     owner?: Owner | null;
     open?: boolean;
+    /** Email and IdP group decide who acts for the owner, so only admins change them (ADR-026). */
+    canEditIdentity?: boolean;
     onClose: () => void;
-    onSave?: (data: { name: string; email: string }) => void;
+    onSave?: (data: { name: string; email: string; idp_group: string }) => void;
   } = $props();
 
-  let name = $state(owner?.name ?? '');
-  let email = $state(owner?.email ?? '');
+  let name = $state('');
+  let email = $state('');
+  let idpGroup = $state('');
 
   $effect(() => {
     name = owner?.name ?? '';
     email = owner?.email ?? '';
+    idpGroup = owner?.idp_group ?? '';
   });
 
   function handleSave() {
-    onSave?.({ name, email });
+    onSave?.({ name, email, idp_group: idpGroup.trim() });
     onClose();
   }
 </script>
@@ -51,9 +55,24 @@
           id="owner-email"
           type="email"
           bind:value={email}
+          disabled={!canEditIdentity}
           class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-gray-200
-                 focus:outline-none focus:border-indigo-500"
+                 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
         />
+        <p class="mt-1 text-xs text-gray-500">A user signing in with this email acts for the owner.</p>
+      </div>
+      <div>
+        <label for="owner-idp-group" class="block text-xs text-gray-500 uppercase mb-1">IdP group (optional)</label>
+        <input
+          id="owner-idp-group"
+          type="text"
+          bind:value={idpGroup}
+          disabled={!canEditIdentity}
+          placeholder="e.g. team-payments"
+          class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-gray-200 placeholder-gray-600
+                 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+        />
+        <p class="mt-1 text-xs text-gray-500">Members of this group act for the owner too (team owners).</p>
       </div>
     </div>
 

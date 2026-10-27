@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: EUPL-1.2
 
+import type { AuthMode } from './Auth';
+
 /**
  * Vault instance health matching the backend VaultInstanceHealth model.
  */
@@ -44,6 +46,8 @@ export interface ApiInfo {
   docs: string;
   /** Instance default UI theme (`ui.default_theme`, then CHRONOWARDEN_THEME). */
   default_theme: string;
+  /** How users log in (ADR-015); null only on a server that would not have started. */
+  auth_mode: AuthMode | null;
 }
 
 /**
