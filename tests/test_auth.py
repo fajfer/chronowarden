@@ -5,6 +5,7 @@
 """Tests for principals, roles, credential resolution and the auth dependencies (ADR-015, ADR-026)."""
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 from unittest.mock import patch
 
@@ -186,6 +187,13 @@ class TestResolve:
             _request({"Authorization": f"Bearer {token}"}, peer="192.168.1.5"), PROXY, db, NOW
         )
         assert principal is not None and principal.role == "admin"
+
+
+def test_images_keep_the_tcp_peer() -> None:
+    """Uvicorn must not replace the peer from X-Forwarded-For, or anyone could pose as a trusted proxy (ADR-026)."""
+    dockerfile = (Path(__file__).parent.parent / "Dockerfile").read_text()
+    starts = [line for line in dockerfile.splitlines() if line.startswith(("CMD", "ENTRYPOINT")) and "uvicorn" in line]
+    assert len(starts) == 3 and all("--no-proxy-headers" in line for line in starts)
 
 
 class TestDependencies:

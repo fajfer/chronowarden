@@ -96,6 +96,10 @@ auth:
     admin: [chronowarden-admins]
 ```
 
+`trusted_proxies` is checked against the TCP peer. The images start uvicorn with `--no-proxy-headers` for that; if
+you start uvicorn yourself, pass it too. Otherwise uvicorn takes the client address from `X-Forwarded-For` for peers
+in `FORWARDED_ALLOW_IPS`, and with `FORWARDED_ALLOW_IPS=*` anyone could claim to be your proxy.
+
 With oauth2-proxy as a reverse proxy, `--pass-user-headers` (the default) sends these headers; include the groups
 with your provider's groups scope or claim. Pipelines with an API token can't log in at the proxy: let them reach
 Chronowarden on a path that bypasses it, such as the internal Kubernetes Service. Requests on that path come from

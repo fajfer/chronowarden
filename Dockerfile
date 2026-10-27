@@ -70,7 +70,7 @@ EXPOSE 8000
 
 USER chronowarden
 
-CMD ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--no-proxy-headers"]
 
 # ============================================================================
 # Stage 3b: Headless image  (--target headless)
@@ -89,7 +89,8 @@ ENV PYTHONPATH="/app/.venv/lib/python3.13/site-packages:/app" \
 
 EXPOSE 8000
 
-ENTRYPOINT ["python", "-m", "uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-proxy-headers: request.client stays the TCP peer, which auth.proxy.trusted_proxies is checked against (ADR-026)
+ENTRYPOINT ["python", "-m", "uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
 
 # ============================================================================
 # Stage 3c: Production image  (default target, last so it stays the default)
@@ -108,4 +109,5 @@ ENV PYTHONPATH="/app/.venv/lib/python3.13/site-packages:/app" \
 
 EXPOSE 8000
 
-ENTRYPOINT ["python", "-m", "uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-proxy-headers: request.client stays the TCP peer, which auth.proxy.trusted_proxies is checked against (ADR-026)
+ENTRYPOINT ["python", "-m", "uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

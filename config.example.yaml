@@ -99,6 +99,7 @@ auth:
     # username_claim: preferred_username
   # proxy:                    # for mode: proxy, e.g. behind oauth2-proxy
   #   trusted_proxies: [10.0.0.0/8]              # required; identity headers from any other peer are ignored
+  #                                              # (the TCP peer: start uvicorn with --no-proxy-headers, as the images do)
   #   user_header: X-Forwarded-User
   #   email_header: X-Forwarded-Email
   #   groups_header: X-Forwarded-Groups          # comma-separated

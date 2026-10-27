@@ -667,7 +667,9 @@ class ProxyConfig(BaseModel):
     model_config = _STRICT
 
     trusted_proxies: list[IPvAnyNetwork] = Field(
-        min_length=1, description="Addresses or CIDRs of the proxy; headers from any other peer are ignored"
+        min_length=1,
+        description="Addresses or CIDRs of the proxy; headers from any other peer are ignored. Checked against the TCP "
+        "peer: run uvicorn with --no-proxy-headers (the images do), or X-Forwarded-For could stand in for it",
     )
     user_header: str = Field(default="X-Forwarded-User", description="Header with the user name")
     email_header: str = Field(default="X-Forwarded-Email", description="Header with the email address")
