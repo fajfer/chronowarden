@@ -30,7 +30,7 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
   separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()`. `before`/`after` are the **stored JSON
   text**, not parsed objects. The first event's `prev_hash` is 64 zeros.
 - `source`: `sync`, `config`, `ui` (requests with header `X-Chronowarden-Client: ui`, set by the frontend client) or
-  `api`. `actor` stays null until authentication (0.9).
+  `api`. `actor`: `user:<email or name>` or `token:<name>` for API changes, null for sync, config and `auth.mode: none`.
 - Event types: `secret.system`, `secret.owners` (`{"owners": [{id, name}]}`), `secret.removed`, `secret.reappeared`,
   `secret.purged` (with the assignments that went), `system.created|updated|owners|deleted` (subject `system:<id>`),
   `owner.created|updated|deleted|route_added|route_deleted|route_signing` (subject `owner:<id>`; route events hold
@@ -38,7 +38,8 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
   `secret.baseline` (first sight), `secret.metadata` (custom keys, values included), `secret.settings`,
   `secret.version` (rotation; values never read), `secret.config_applied` (Chronowarden's own severity/TTL write).
   `secret.confirmed` (rotation confirmed as applied, ADR-021), `secret.privileged` (revertible; written to the
-  backend), `compliance.snapshot` (subject `snapshot:<id>`).
+  backend), `compliance.snapshot` (subject `snapshot:<id>`), `token.created|revoked` (subject `token:<id>`; name,
+  role, owner, expiry; never the token).
 - Secret events are keyed by identity (`vault_name`, `engine_id`, `secret_path`), so history survives a rebuilt
   cache (ADR-017). Unchanged values record nothing.
 - Config events store only expiry profiles, the severity cascade and compliance policies (key left out when there
@@ -57,8 +58,7 @@ removed/reappeared/purged secrets, and config changes that affect secrets. Kept 
 
 - `verify_chain` can't see the newest events being cut off; snapshots record the head hash for that (#94).
 - The change and its event are separate commits; a crash between them loses the event, not the change.
-- Other teams' metadata values are stored here and readable by anyone who reaches the API until 0.9; accepted and
-  documented next to the README "unauthenticated" warning.
+- Other teams' metadata values are stored here and readable by every role, viewers included (ADR-026).
 - Every write of Chronowarden's own keys must go through `record_config_applied`, or the next sync reports it as a
   backend change.
 

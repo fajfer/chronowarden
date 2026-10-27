@@ -40,6 +40,8 @@ to anything. There is no authentication or RBAC (`frontend/src/lib/stores/auth.t
   ADR-006).
 - The audit log (ADR-014) records assignment changes, with free-text identity until ADR-015.
 - When ADR-015 lands, editing is restricted to effective owners. RBAC beyond that stays on the roadmap.
+  *Update 2026-10-27:* done in 0.9 ([ADR-026](ADR-026-sessions-tokens-and-permissions.md)): users act for owners
+  matched by email or IdP group; unowned secrets are assigned by admins.
 - The frontend `Secret.owner` field (PR #60) and the mockups (`mockup-secret-modal.html`,
   `mockup-secrets-table.html`) already reserve space for owner and system.
 

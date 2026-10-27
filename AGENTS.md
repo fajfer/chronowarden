@@ -60,7 +60,8 @@ Shorthand: `<area>` means `<area>/AGENTS.md`. Read root + the listed files, noth
 |---|---|
 | Add a new secret provider (Azure Key Vault, GCP Secret Manager, …) | [integrations](chronowarden/integrations/AGENTS.md), [architecture](architecture/AGENTS.md), [ADR-011](.ai/adr/ADR-011-provider-registry.md), [generic registry spec](.ai/specs/2026-10-09-generic-provider-registry.md) |
 | Vault connection, auth, TLS or reconnect issue | [integrations](chronowarden/integrations/AGENTS.md), [ADR-009](.ai/adr/ADR-009-offline-tolerant-reconnect.md) |
-| Add or change a REST endpoint | [api](chronowarden/api/AGENTS.md), [models](chronowarden/models/AGENTS.md) |
+| Add or change a REST endpoint | [api](chronowarden/api/AGENTS.md), [models](chronowarden/models/AGENTS.md), [auth](chronowarden/auth/AGENTS.md) |
+| Login, roles, API tokens, who may do what | [auth](chronowarden/auth/AGENTS.md), [ADR-026](.ai/adr/ADR-026-sessions-tokens-and-permissions.md) |
 | Secret status, TTL, severity cascade, sync | [core](chronowarden/AGENTS.md), [ADR-006](.ai/adr/ADR-006-config-source-of-truth.md) |
 | Add or change a config option | [core](chronowarden/AGENTS.md), [deploy](deploy/AGENTS.md) |
 | DB schema or query change | [models](chronowarden/models/AGENTS.md), [ADR-017](.ai/adr/ADR-017-sqlite-holds-assignments.md) |

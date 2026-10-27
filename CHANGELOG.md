@@ -14,6 +14,33 @@ git history.
 
 ## [Unreleased]
 
+Access control: people log in through OIDC or an authenticating proxy, pipelines use API tokens, and admin, owner
+and viewer roles decide who may change what (#75, ADR-015, ADR-026).
+
+### Upgrade notes
+
+- **Breaking: the server needs an `auth` section to start.** Choose `mode: oidc` or `mode: proxy` and map your IdP
+  groups to `roles`; `mode: none` keeps the old open behaviour for trusted networks. See
+  `docs/guides/authentication.md`. The one-shot `python -m chronowarden sync` doesn't need it.
+- **Breaking: every API call needs a caller** except `/api/v1/health`, `/ready`, `/metrics` and `/info`. Give
+  scripts an API token (Settings → API tokens) and send `Authorization: Bearer <token>`.
+- **Breaking: `confirmed_by` is no longer read from `POST /secrets/{id}/confirmations`**; the caller is recorded.
+- **Database migration 11** adds sessions, pending logins, API tokens (all hashed) and `owners.idp_group`. Back up
+  `chronowarden.db` before upgrading.
+- Owners act for the secrets they effectively own when their email matches an owner's or they are in its new
+  **IdP group**; set the groups for team owners after upgrading.
+
+### Added
+
+- Built-in OIDC login (authorization code flow with PKCE, Authlib) with server-side sessions, or identity headers
+  from `auth.proxy.trusted_proxies`.
+- Roles `admin`, `owner`, `viewer` from IdP groups (`auth.roles`, optional `auth.default_role`), enforced on every
+  route; the UI shows only the controls a role may use.
+- API tokens (`cwt_…`): named, with a role, an expiry (at most `auth.token_max_lifetime`) and, for owners, one owner;
+  stored hashed, revocable, audited as `token.created` / `token.revoked`.
+- `GET /api/v1/auth/me`; `/api/v1/info` reports `auth_mode`.
+- The audit log records who made each API change (`actor`).
+
 ## [0.8.0] - 2026-10-14
 
 Alerting: Chronowarden syncs on its own schedule and sends webhooks, plus a headless image and Prometheus metrics.

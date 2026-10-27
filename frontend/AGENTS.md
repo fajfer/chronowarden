@@ -22,7 +22,8 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
   (string, `{ message }` or the 422 list), ready for a toast.
 - `src/lib/stores/`: `secrets` (secrets that exist; stats and dashboard use it), `removedSecrets` (gone from the
   backend, shown with "Show removed"), loading, error, `secretStats`, `updateSecret`; `filters` (incl. `systemId`,
-  `UNASSIGNED_SYSTEM`), `sync` (+ toasts), `theme`, `auth`.
+  `UNASSIGNED_SYSTEM`), `sync` (+ toasts), `theme`, `auth` (`currentUser` from `/auth/me`, `isAdmin`, `canSync`,
+  `actsFor`, `canEditSecret`; a 401 from any call sends the user to `/login?next=`).
 - `src/lib/types/`: TypeScript mirrors of backend models, re-exported from `types/index.ts`.
 - `src/lib/components/`: `Filters`, `SecretModal` (details + system/owner assignment), `OwnerModal`, `SystemModal`,
   `StatusBadge`, `ExpiryHorizon`, `Navbar`,
@@ -60,16 +61,15 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
 - The secrets table filters **client-side** in `routes/secrets/+page.svelte` (`filteredSecrets`) over the full
   `secrets` store. `loadSecrets()` calls `fetchSecrets()` with no params, so the backend query filters are unused
   here. A filter bug is usually in that `$derived.by` block or in `stores/filters.ts`.
-- `stores/auth.ts` is a placeholder: there is no auth backend, and it defaults to authenticated.
-- Svelte 5 runes (`$derived`, `$state`) are used in pages; stores use `svelte/store`.
-- `npm run check` currently reports 0 errors and 2 warnings (OwnerModal); don't add new ones.
+- Role-based hiding is convenience only (the server enforces ADR-026); put new edit controls under an `auth` helper.
+- Svelte 5 runes in pages, `svelte/store` in stores; a function named `state` shadows `$state`.
+- `npm run check` currently reports 0 errors and 0 warnings; don't add new ones.
 - Don't edit `build/` or `.svelte-kit/`; they are generated.
 - Regenerate `package-lock.json` with the npm the build uses (Node 22, see `Dockerfile` and `ci.yaml`), e.g.
   `docker run --rm -v $PWD:/w -w /w node:22-alpine npm install --package-lock-only`. A lockfile written by a newer npm
   can drop optional entries and make `npm ci` fail in Docker and CI.
-- Open UI items: PR #60 TODOs:
-  ExpiryHorizon stacks secrets over 90 days (hide them past 100), remove the navbar theme switcher, larger mascot,
-  clickable severities; hat insignia vs hamburger icon (#47).
+- Open UI items (PR #60): ExpiryHorizon stacks secrets over 90 days (hide past 100), remove the navbar theme
+  switcher, larger mascot, clickable severities; hat insignia vs hamburger icon (#47).
 
 ## Related ADRs
 
