@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Access control: authentication, roles and API tokens
 
-- **Status:** approved
+- **Status:** in progress
 - **Date:** 2026-10-27
 - **Issue:** #75
 
@@ -95,23 +95,29 @@ New **ADR-026 Sessions, API tokens and the permission matrix** extends ADR-015 w
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | ADR-026 and this spec | ADR-015, ADR-010 | Both merged, indexes updated | done | |
-| 2 | `AuthConfig` and the `lifespan` refusal | core, `chronowarden/config.py`, `config.example.yaml`, `chronowarden/app.py`, `tests/test_config.py` | Every key validated and documented; server without `auth` fails with a clear `ConfigError`; one-shot sync unaffected; tests | todo | |
-| 3 | Migration 11 and DB methods (sessions, pending logins, tokens, `owners.idp_group`) | models, `chronowarden/migrations.py`, `chronowarden/database.py`, `chronowarden/models/owner.py`, `tests/test_migrations.py`, `tests/test_database.py` | Upgrade test from schema 10; CRUD and expiry tests | todo | |
-| 4 | `chronowarden/auth/`: principal, role resolution, owner matching, token hashing, session lookup, dependencies | ADR-026, `chronowarden/assignments.py`, `chronowarden/database.py` | Unit tests for every role/matching rule, expired and revoked tokens | todo | |
-| 5 | Proxy and `none` modes in the resolver | task 4 files, `chronowarden/request_guard.py` | Untrusted peer → 401; header parsing tests; `none` → anonymous admin with warning | todo | |
-| 6 | OIDC login with Authlib: `/auth/login`, `/callback`, `/logout`, `/me` | task 4 files, `pyproject.toml` | Fake-IdP tests: happy path, bad state, bad nonce, wrong issuer/audience, expired token, open redirect refused | todo | |
-| 7 | Enforce the matrix on every router; audit actor; `confirmed_by` from the principal | api, audit, every `chronowarden/api/*.py`, their tests, `tests/conftest.py` | Route-coverage test passes; per-role tests for each write endpoint; actor in events | todo | |
-| 8 | API token endpoints and audit events | api, audit, task 4 files | Create (shown once), list, revoke; owner tokens need an Owner; expiry cap; tests | todo | |
-| 9 | Frontend: auth store, login page, 401 handling, navbar, permission-aware controls, API tokens tab, `idp_group`, `none` banner | frontend, `frontend/src/lib/stores/auth.ts`, `frontend/src/lib/api/client.ts`, `frontend/src/routes/login/+page.svelte`, `frontend/src/routes/settings/+page.svelte` | `npm run check` with no new warnings; manual run in all three modes | todo | |
-| 10 | Docs: guide `docs/guides/authentication.md` (AI draft notice), README warning and roadmap, deploy examples, `config.example.yaml` | deploy, `README.md`, `deploy/compose/config.yaml`, `deploy/kubernetes/` | Every mode documented with an example; the "no authentication" warnings are gone | todo | |
-| 11 | Architecture model, AGENTS (new `chronowarden/auth/AGENTS.md` + router row), ADR-010/014 update notes, CHANGELOG with upgrade notes | architecture, `CHANGELOG.md` | `python3 scripts/check_agents_docs.py` and LikeC4 validation pass | todo | |
+| 1 | ADR-026 and this spec | ADR-015, ADR-010 | Both merged, indexes updated | done | 4567365 |
+| 2 | `AuthConfig` and the `lifespan` refusal | core, `chronowarden/config.py`, `config.example.yaml`, `chronowarden/app.py`, `tests/test_config.py` | Every key validated and documented; server without `auth` fails with a clear `ConfigError`; one-shot sync unaffected; tests | done | d58d848 |
+| 3 | Migration 11 and DB methods (sessions, pending logins, tokens, `owners.idp_group`) | models, `chronowarden/migrations.py`, `chronowarden/database.py`, `chronowarden/models/owner.py`, `tests/test_migrations.py`, `tests/test_database.py` | Upgrade test from schema 10; CRUD and expiry tests | done | bd61474 |
+| 4 | `chronowarden/auth/`: principal, role resolution, owner matching, token hashing, session lookup, dependencies | ADR-026, `chronowarden/assignments.py`, `chronowarden/database.py` | Unit tests for every role/matching rule, expired and revoked tokens | done | e4d6177 |
+| 5 | Proxy and `none` modes in the resolver | task 4 files, `chronowarden/request_guard.py` | Untrusted peer → 401; header parsing tests; `none` → anonymous admin with warning | done | e4d6177 |
+| 6 | OIDC login with Authlib: `/auth/login`, `/callback`, `/logout`, `/me` | task 4 files, `pyproject.toml` | Fake-IdP tests: happy path, bad state, bad nonce, wrong issuer/audience, expired token, open redirect refused | done | 720f5b1 |
+| 7 | Enforce the matrix on every router; audit actor; `confirmed_by` from the principal | api, audit, every `chronowarden/api/*.py`, their tests, `tests/conftest.py` | Route-coverage test passes; per-role tests for each write endpoint; actor in events | done | fa3e137 |
+| 8 | API token endpoints and audit events | api, audit, task 4 files | Create (shown once), list, revoke; owner tokens need an Owner; expiry cap; tests | done | 7a5cb98 |
+| 9 | Frontend: auth store, login page, 401 handling, navbar, permission-aware controls, API tokens tab, `idp_group`, `none` banner | frontend, `frontend/src/lib/stores/auth.ts`, `frontend/src/lib/api/client.ts`, `frontend/src/routes/login/+page.svelte`, `frontend/src/routes/settings/+page.svelte` | `npm run check` with no new warnings; manual run in all three modes | done | 3255dea |
+| 10 | Docs: guide `docs/guides/authentication.md` (AI draft notice), README warning and roadmap, deploy examples, `config.example.yaml` | deploy, `README.md`, `deploy/compose/config.yaml`, `deploy/kubernetes/` | Every mode documented with an example; the "no authentication" warnings are gone | done | 7ee83a5, df80421 |
+| 11 | Architecture model, AGENTS (new `chronowarden/auth/AGENTS.md` + router row), ADR-010/014 update notes, CHANGELOG with upgrade notes | architecture, `CHANGELOG.md` | `python3 scripts/check_agents_docs.py` and LikeC4 validation pass | done | 47e101f |
 | 12 | Release 0.9.0: version and changelog | deploy | Release PR merged; the tag waits for the maintainer's go | todo | |
 
 ## Validation
 
 `uv run black --check . && uv run ruff check . && uv run pytest`, `cd frontend && npm run check`,
 `python3 scripts/check_agents_docs.py`, `docker build -t chronowarden:test .` (and `--target headless`).
+
+## Notes
+
+- Found while implementing: uvicorn's default `--proxy-headers` let `X-Forwarded-For` stand in for the TCP peer, so
+  with `FORWARDED_ALLOW_IPS=*` anyone could pose as a trusted proxy. The images run `--no-proxy-headers` (df80421).
+- The OIDC flow is tested against a fake IdP only (non-goal: a Dex/Keycloak container test).
 
 ## Open questions
 
