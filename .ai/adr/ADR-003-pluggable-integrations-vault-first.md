@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-003: Pluggable secret-backend integrations, Vault first
 
-- **Status:** Accepted (retroactive)
+- **Status:** Superseded by ADR-011
 - **Date:** 2026-02-07
 - **Evidence:** `28a5a44` (hvac), `ff683ba` (`integrations/base.py`, `vault.py`), README Features/Roadmap; PR #26 gap analysis ("no provider abstraction").
 
