@@ -20,6 +20,7 @@ from chronowarden.alerting.delivery import DeliveryWorker
 from chronowarden.api import (
     alerts_router,
     audit_router,
+    auth_router,
     compliance_router,
     health_router,
     owners_router,
@@ -38,6 +39,7 @@ from chronowarden.metrics.http import observe_request
 from chronowarden.metrics.refresh import refresh_secret_metrics
 from chronowarden.request_guard import guard_requests
 from chronowarden.scheduler import SyncScheduler
+from chronowarden.timestamps import utc_timestamp
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -97,6 +99,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         db_path = Path("chronowarden.db")
         db._db_path = db_path
         db.connect()
+        db.delete_expired_logins(utc_timestamp(), utc_timestamp())
         record_config_change(db, app_config)
         refresh_secret_metrics(db, app_config)  # series from the cache before the first sync
 
@@ -137,6 +140,7 @@ app = FastAPI(
         {"name": "audit", "description": "Append-only, hash-chained audit log"},
         {"name": "compliance", "description": "Compliance evidence: summary, gaps, periods, snapshots"},
         {"name": "alerts", "description": "Firing alerts and the webhook delivery log (ADR-025)"},
+        {"name": "auth", "description": "Login, logout, the caller's identity and API tokens (ADR-026)"},
     ],
 )
 
@@ -158,6 +162,7 @@ async def _metrics(request: Request, call_next: Callable[[Request], Awaitable[Re
 
 
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(secrets_router, prefix="/api/v1")
 app.include_router(vault_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")

@@ -29,7 +29,8 @@ async def health_check() -> dict[str, str]:
 @router.get("/info", summary="API information endpoint")
 async def api_info() -> dict[str, Any]:
     """
-    Return API name, version, documentation link, the instance default UI theme and the features of this image.
+    Return API name, version, documentation link, the instance default UI theme, the auth mode and the features
+    of this image.
 
     Returns:
         API information dictionary; `features` says whether the UI and PDF reports are there (ADR-024).
@@ -41,6 +42,7 @@ async def api_info() -> dict[str, Any]:
         "version": version("chronowarden"),
         "docs": "/docs",
         "default_theme": app_config.resolve_default_theme(),
+        "auth_mode": app_config.auth.mode if app_config.auth is not None else None,
         "features": {"ui": _FRONTEND_DIR.is_dir(), "pdf_reports": reports_available()},
     }
 
