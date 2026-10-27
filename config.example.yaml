@@ -84,6 +84,33 @@ compliance:
 allowed_hosts: ["*"]
 # allowed_hosts: [chronowarden.example.com, "*.internal.example.com"]
 
+# Authentication (ADR-015, ADR-026). Required: the server refuses to start without it. /api/v1/health, /ready,
+# /metrics and /info stay open for probes. Roles: admin (everything), owner (acts on the secrets they own: their
+# email matches an owner's, or they are in the owner's IdP group), viewer (read-only).
+auth:
+  mode: oidc                  # 'oidc' (built-in login), 'proxy' (identity headers), or 'none' (trusted networks only)
+  oidc:
+    issuer: https://idp.example.com/realms/main   # discovery: <issuer>/.well-known/openid-configuration
+    client_id: chronowarden
+    client_secret_env: CHRONOWARDEN_OIDC_CLIENT_SECRET   # or client_secret_file / client_secret; omit for public clients
+    redirect_uri: https://chronowarden.example.com/api/v1/auth/callback   # register exactly this at the IdP
+    # scopes: [openid, profile, email]           # must include openid
+    # groups_claim: groups                       # ID token claim with the user's groups
+    # username_claim: preferred_username
+  # proxy:                    # for mode: proxy, e.g. behind oauth2-proxy
+  #   trusted_proxies: [10.0.0.0/8]              # required; identity headers from any other peer are ignored
+  #   user_header: X-Forwarded-User
+  #   email_header: X-Forwarded-Email
+  #   groups_header: X-Forwarded-Groups          # comma-separated
+  #   logout_url: /oauth2/sign_out
+  roles:                      # IdP groups per role; the highest matching role wins
+    admin: [chronowarden-admins]
+    owner: [platform-teams]
+    viewer: [auditors]
+  # default_role: viewer      # for users in none of the groups above; unset = 403
+  # session_lifetime: 12h     # how long a login lasts
+  # token_max_lifetime: 1y    # longest expiry of an API token (Settings -> API tokens)
+
 # Webhook alerting (ADR-025). Owners get their secrets' alerts through their webhook routes (Settings -> Owners);
 # default_routes get vault-health and compliance alerts and those of secrets without an owner. Payloads are
 # Alertmanager-compatible JSON with paths, owners and dates only, never secret values.

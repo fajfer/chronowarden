@@ -30,7 +30,7 @@ from chronowarden.api import (
 )
 from chronowarden.api.sync import sync_vault_now
 from chronowarden.audit.config_events import record_config_change
-from chronowarden.config import AppConfig, load_config
+from chronowarden.config import AppConfig, load_config, require_auth
 from chronowarden.database import Database
 from chronowarden.integrations import VaultManager
 from chronowarden.logging_config import configure_logging
@@ -90,6 +90,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     deliveries: Optional[DeliveryWorker] = None
     try:
         app_config = load_config()
+        require_auth(app_config)
         _configure_sentry(app_config)
         vault_manager.connect_all(app_config)
 

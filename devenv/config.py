@@ -18,8 +18,9 @@ class ConfigExistsError(Exception):
 
 
 def dev_config(credentials: dict[Backend, tuple[str, str]]) -> dict:
-    """The config for the dev backends, authenticating with their AppRoles."""
+    """The config for the dev backends, authenticating with their AppRoles; no login on the local machine."""
     return {
+        "auth": {"mode": "none"},
         "vaults": [
             {
                 "name": backend.config_name,

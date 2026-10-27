@@ -11,7 +11,15 @@ import re
 from typing import Annotated, Literal, Optional, Union
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    IPvAnyNetwork,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -605,6 +613,130 @@ class UiConfig(BaseModel):
         return v
 
 
+AuthMode = Literal["oidc", "proxy", "none"]
+Role = Literal["admin", "owner", "viewer"]
+
+# Highest first: a user in groups of several roles gets the first one that matches
+ROLES: tuple[Role, ...] = ("admin", "owner", "viewer")
+
+
+class OidcConfig(BaseModel):
+    """Built-in login against an OIDC provider: authorization code flow with PKCE (ADR-015)."""
+
+    model_config = _STRICT
+
+    issuer: str = Field(description="Issuer URL; discovery is read from <issuer>/.well-known/openid-configuration")
+    client_id: str = Field(min_length=1, description="Client ID registered at the provider")
+    client_secret: Optional[str] = Field(default=None, description="Client secret (prefer client_secret_env/_file)")
+    client_secret_env: Optional[str] = Field(default=None, description="Environment variable holding the secret")
+    client_secret_file: Optional[str] = Field(default=None, description="File holding the client secret")
+    redirect_uri: str = Field(
+        description="Callback URL registered at the provider, ending in /api/v1/auth/callback "
+        "(e.g. https://chronowarden.example.com/api/v1/auth/callback)"
+    )
+    scopes: list[str] = Field(default_factory=lambda: ["openid", "profile", "email"], description="Requested scopes")
+    groups_claim: str = Field(default="groups", description="ID token claim with the user's groups")
+    username_claim: str = Field(default="preferred_username", description="ID token claim with the user name")
+
+    @field_validator("issuer", "redirect_uri")
+    @classmethod
+    def check_http(cls, v: str) -> str:
+        """Both are URLs the browser or the server calls; kept as written, the issuer must match the token's."""
+        if not v.lower().startswith(("http://", "https://")):
+            raise ValueError("must be an http:// or https:// URL")
+        return v
+
+    @field_validator("scopes")
+    @classmethod
+    def check_openid_scope(cls, v: list[str]) -> list[str]:
+        """Without `openid` there is no ID token."""
+        if "openid" not in v:
+            raise ValueError("must include 'openid'")
+        return v
+
+    def resolve_client_secret(self) -> Optional[str]:
+        """The client secret from client_secret_file, client_secret_env or client_secret; None for public clients."""
+        return _resolve_value(
+            "the OIDC client secret", self.client_secret, self.client_secret_env, self.client_secret_file
+        )
+
+
+class ProxyConfig(BaseModel):
+    """Identity headers set by an authenticating reverse proxy such as oauth2-proxy (ADR-015)."""
+
+    model_config = _STRICT
+
+    trusted_proxies: list[IPvAnyNetwork] = Field(
+        min_length=1, description="Addresses or CIDRs of the proxy; headers from any other peer are ignored"
+    )
+    user_header: str = Field(default="X-Forwarded-User", description="Header with the user name")
+    email_header: str = Field(default="X-Forwarded-Email", description="Header with the email address")
+    groups_header: str = Field(default="X-Forwarded-Groups", description="Header with comma-separated groups")
+    logout_url: Optional[str] = Field(
+        default=None, description="Where the UI sends users to log out (e.g. /oauth2/sign_out)"
+    )
+
+
+class RoleGroups(BaseModel):
+    """IdP groups per role; the highest matching role wins (ADR-015)."""
+
+    model_config = _STRICT
+
+    admin: list[str] = Field(default_factory=list, description="Groups whose members can do everything")
+    owner: list[str] = Field(default_factory=list, description="Groups whose members act on secrets they own")
+    viewer: list[str] = Field(default_factory=list, description="Groups whose members can only read")
+
+
+class AuthConfig(BaseModel):
+    """Authentication for the UI and API (ADR-015, ADR-026)."""
+
+    model_config = _STRICT
+
+    mode: AuthMode = Field(description="'oidc', 'proxy', or 'none' (no login: only on trusted networks)")
+    oidc: Optional[OidcConfig] = Field(default=None, description="Required when mode is 'oidc'")
+    proxy: Optional[ProxyConfig] = Field(default=None, description="Required when mode is 'proxy'")
+    roles: RoleGroups = Field(default_factory=RoleGroups, description="IdP groups mapped to roles")
+    default_role: Optional[Role] = Field(
+        default=None, description="Role for users in none of the role groups; unset means they get 403"
+    )
+    session_lifetime: str = Field(default="12h", description="How long a login lasts (e.g. '8h', '1d')")
+    token_max_lifetime: str = Field(default="1y", description="Longest expiry an API token may have (e.g. '90d')")
+
+    @field_validator("session_lifetime")
+    @classmethod
+    def validate_session_lifetime(cls, v: str) -> str:
+        """Same format as polling_interval, but never 'off'."""
+        if parse_interval_seconds(v) is None:
+            raise ValueError("sessions must expire; use a duration such as '12h'")
+        return v
+
+    @field_validator("token_max_lifetime")
+    @classmethod
+    def validate_token_max_lifetime(cls, v: str) -> str:
+        """Same format as expiry profiles."""
+        parse_duration_to_days(v)
+        return v
+
+    @model_validator(mode="after")
+    def check_mode_section(self) -> "AuthConfig":
+        """The section of the chosen mode must be there."""
+        if self.mode == "oidc" and self.oidc is None:
+            raise ValueError("mode 'oidc' needs an oidc section")
+        if self.mode == "proxy" and self.proxy is None:
+            raise ValueError("mode 'proxy' needs a proxy section")
+        return self
+
+    @property
+    def session_seconds(self) -> int:
+        """The session lifetime in seconds."""
+        return parse_interval_seconds(self.session_lifetime) or 0
+
+    @property
+    def token_max_days(self) -> int:
+        """The longest API token expiry in days."""
+        return parse_duration_to_days(self.token_max_lifetime)
+
+
 class AppConfig(BaseModel):
     """Root application configuration."""
 
@@ -652,6 +784,9 @@ class AppConfig(BaseModel):
     metrics: MetricsConfig = Field(default_factory=MetricsConfig, description="Prometheus metrics (off by default)")
     alerting: AlertingConfig = Field(default_factory=AlertingConfig, description="Webhook alerting (ADR-025)")
     compliance: ComplianceConfig = Field(default_factory=ComplianceConfig, description="Compliance evidence settings")
+    auth: Optional[AuthConfig] = Field(
+        default=None, description="Authentication (ADR-015); the server refuses to start without it"
+    )
     allowed_hosts: list[str] = Field(
         default_factory=lambda: ["*"],
         description="Host names Chronowarden answers to (e.g. chronowarden.example.com, *.example.com); "
@@ -986,6 +1121,23 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
         return AppConfig.model_validate(data)
     except ValidationError as exc:
         raise ConfigError(_format_validation_errors(path, exc)) from exc
+
+
+def require_auth(config: AppConfig) -> AuthConfig:
+    """
+    Return the auth settings the server needs before it serves anything (ADR-015).
+
+    Raises:
+        ConfigError: If the config has no `auth` section.
+    """
+    if config.auth is None:
+        raise ConfigError(
+            "auth: missing; set auth.mode to 'oidc' or 'proxy', or to 'none' if only trusted networks can reach "
+            "Chronowarden (see config.example.yaml)"
+        )
+    if config.auth.mode == "none":
+        logger.warning("Authentication is off (auth.mode: none): anyone who reaches Chronowarden is an admin")
+    return config.auth
 
 
 def _check_theme_env() -> None:
