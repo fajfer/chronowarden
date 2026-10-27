@@ -40,6 +40,14 @@ and viewer roles decide who may change what (#75, ADR-015, ADR-026).
   stored hashed, revocable, audited as `token.created` / `token.revoked`.
 - `GET /api/v1/auth/me`; `/api/v1/info` reports `auth_mode`.
 - The audit log records who made each API change (`actor`).
+- Backends are built through a provider registry (#72, ADR-011): each `vaults:` entry takes `type:` (default
+  `vault`, so existing configs load unchanged), ready for Azure Key Vault and GCP Secret Manager.
+
+### Changed
+
+- **Breaking:** `/api/v1/vault/*` is now `/api/v1/providers/*`, and `POST /api/v1/sync/vault/{name}` is now
+  `POST /api/v1/sync/provider/{name}`. Provider health includes its `type`. The `integration` label of
+  `chronowarden_integration_health` is `<type>:<name>` (unchanged for Vault: `vault:<name>`).
 
 ## [0.8.0] - 2026-10-14
 

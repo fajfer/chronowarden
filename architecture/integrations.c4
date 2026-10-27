@@ -2,6 +2,7 @@
 //
 //SPDX-License-Identifier: EUPL-1.2
 
+// Providers are registered by type (ADR-011): each vaults: entry has type: (default vault); ProviderManager builds them
 // Vault integration reads/writes custom_metadata (chronowarden_ttl, chronowarden_severity, chronowarden_owner)
 // and discovers KV v2 secret engines for monitoring
 // Authentication supports token-based (token, token_env, token_file) and AppRole (role_id, secret_id) methods

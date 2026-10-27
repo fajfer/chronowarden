@@ -13,7 +13,7 @@ The system architecture is kept as code in this directory, in the [LikeC4](https
 ## Files
 
 - `specification.c4`: element kinds `actor`, `system`, `component`; relationship kind `api`.
-- `main.c4`: model (`user`, `pipelines` (API clients), `idp`, `authproxy`, `receivers` (webhook receivers),
+- `main.c4`: model (`user`, `pipelines` (API clients), `idp`, `authproxy`, `backends` (secret backends), `receivers`,
   `chronowarden` with `frontend`, `backend`, `auth`, `metadata`, `database`, `audit`, `compliance`, `alerting`) and
   the `index` view.
 - `integrations.c4`: comment-only notes on integration behaviour (custom metadata keys, auth methods, severity
@@ -41,8 +41,7 @@ The system architecture is kept as code in this directory, in the [LikeC4](https
 - There is no `likec4.config.*` / `.likec4rc` in the repo; the directory is used as the project root.
 - `npx likec4 validate` crashes in the maintainer's environment (2026-10-09), so there is no working automated check.
   Review `.c4` diffs by reading them.
-- The model has no element for the external secret backends (Vault/OpenBao) yet; integrations are described only
-  in the `integrations.c4` comments.
+- `backends` is one element for every provider type; per-provider behaviour lives in the `integrations.c4` notes.
 - `integrations.c4` lists `chronowarden_owner` as a custom metadata key, but no code reads or writes it.
 - SPDX headers in `.c4` files use `//SPDX-...` line comments.
 
