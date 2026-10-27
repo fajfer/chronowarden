@@ -33,7 +33,7 @@ def dev_config(credentials: dict[Backend, tuple[str, str]]) -> dict:
                 "severity": backend.severity,
             }
             for backend, (role_id, secret_id) in credentials.items()
-        ]
+        ],
     }
 
 
