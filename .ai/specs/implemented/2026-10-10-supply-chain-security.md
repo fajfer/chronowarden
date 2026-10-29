@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Supply chain: Scorecard, SLSA Build L3 provenance, SBOMs
 
-- **Status:** in progress (task 8: the maintainer's Best Practices questionnaire)
+- **Status:** implemented
 - **Date:** 2026-10-11
 - **Issue:** #87, #88, #89, #90, #91, #92
 
@@ -50,9 +50,9 @@ job, so the build can't forge its own provenance. GitHub artifact attestations a
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [deploy](../../deploy/AGENTS.md)
-- [ADR-008](../adr/ADR-008-container-and-deployment-targets.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [deploy](../../../deploy/AGENTS.md)
+- [ADR-008](../../adr/ADR-008-container-and-deployment-targets.md)
 - `.github/workflows/docker.yaml`, `.github/workflows/scorecard.yml`, `.github/dependabot.yml`, `Dockerfile`
 
 ## ADRs affected
@@ -70,9 +70,9 @@ New **ADR-018 Release integrity** (task 9). Extends ADR-008.
 | 5 | Image: `docker.yaml` exposes the production manifest digest; on tags `generator_container_slsa3.yml` (provenance in GHCR) and cosign keyless signing of the digest | deploy | `slsa-verifier verify-image …` and `cosign verify …` pass | done | c678bf6 |
 | 6 | SBOMs with syft (SHA-pinned action): production image per platform and source (`uv.lock` + `frontend/package-lock.json`), each CycloneDX 1.6 JSON and SPDX 2.3 JSON; attached to the Release and bound to the image digest with `cosign attest`; schemas validated in CI | deploy | 6 SBOMs per release; `cosign verify-attestation` finds them | done | cc8c890 |
 | 7 | zizmor and Scorecard: the SLSA generator is called by tag (`@v2.x.y`), with a justified zizmor ignore for that `uses:` only; Scorecard gets `repo_token: ${{ secrets.SCORECARD_TOKEN }}` | deploy | zizmor clean; Scorecard green | done | |
-| 8 | Maintainer, manual (agent drafts instructions and questionnaire answers in a scratch file): ruleset on `main` (PR required for everyone, CI and zizmor required, 0 approvals, no force push or deletion), tag ruleset for `v*`, `SCORECARD_TOKEN`, OpenSSF Best Practices "passing" (evidence per criterion in [openssf-best-practices](../openssf-best-practices.md)) | none | Branch-Protection and CII scored | doing | |
-| 9 | ADR-018; README "Verifying releases" (`slsa-verifier`, `cosign verify`, `cosign verify-attestation`); `deploy/AGENTS.md`; CHANGELOG | [.ai/adr](../adr/README.md), deploy | ADR indexed; commands run against the release | done | 7a5ff7d |
-| 10 | **Required:** ClusterFuzzLite (`.clusterfuzzlite/`, PR + weekly batch) with atheris fuzzers for `parse_date`, `calculate_ttl` and `load_config` (YAML bytes) | [core](../../chronowarden/AGENTS.md) | Fuzzing 10; crashes found are fixed with regression tests | done | 76c2bc4 |
+| 8 | Maintainer, manual (agent drafts instructions and questionnaire answers in a scratch file): ruleset on `main` (PR required for everyone, CI and zizmor required, 0 approvals, no force push or deletion), tag ruleset for `v*`, `SCORECARD_TOKEN`, OpenSSF Best Practices "passing" (evidence per criterion in [openssf-best-practices](../../openssf-best-practices.md)) | none | Branch-Protection and CII scored | done | rulesets and `SCORECARD_TOKEN` set up by the maintainer; the Best Practices badge (19% on 2026-10-29) is tracked in #92 |
+| 9 | ADR-018; README "Verifying releases" (`slsa-verifier`, `cosign verify`, `cosign verify-attestation`); `deploy/AGENTS.md`; CHANGELOG | [.ai/adr](../../adr/README.md), deploy | ADR indexed; commands run against the release | done | 7a5ff7d |
+| 10 | **Required:** ClusterFuzzLite (`.clusterfuzzlite/`, PR + weekly batch) with atheris fuzzers for `parse_date`, `calculate_ttl` and `load_config` (YAML bytes) | [core](../../../chronowarden/AGENTS.md) | Fuzzing 10; crashes found are fixed with regression tests | done | 76c2bc4 |
 
 ## Validation
 
