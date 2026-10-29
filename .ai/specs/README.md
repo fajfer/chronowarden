@@ -32,6 +32,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-29-hardening](implemented/2026-10-29-hardening.md) | Webhook address validation, unread webhook responses, body and owner-list caps, CA bundle cleanup |
 | [2026-10-09-generic-provider-registry](implemented/2026-10-09-generic-provider-registry.md) | #72: providers built by `type:` through a registry, `/providers` API (ADR-011) |
 | [2026-10-12-webhook-alerting](implemented/2026-10-12-webhook-alerting.md) | #99: Alertmanager-compatible webhooks to owners and default routes, retries, signing |
 | [2026-10-09-wire-prometheus-metrics](implemented/2026-10-09-wire-prometheus-metrics.md) | Defined-but-unset metrics get producers |
