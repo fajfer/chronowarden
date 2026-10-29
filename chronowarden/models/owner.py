@@ -5,6 +5,7 @@
 """Owner model definitions for Chronowarden."""
 
 from typing import Literal, Optional
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -36,10 +37,19 @@ class NotificationRouteCreate(NotificationRouteBase):
     @field_validator("address")
     @classmethod
     def check_http(cls, value: str) -> str:
-        """Webhooks are POSTed over HTTP(S) only (no file:, gopher: or other schemes)."""
+        """Webhooks are POSTed over HTTP(S) only (no file:, gopher: or other schemes) to a well-formed host."""
         value = value.strip()
-        if not value.lower().startswith(("http://", "https://")):
+        if any(character.isspace() or not character.isprintable() for character in value):
+            raise ValueError("the webhook address must not contain whitespace or control characters")
+        try:
+            parts = urlsplit(value)
+            _ = parts.port  # raises for a non-numeric or out-of-range port
+        except ValueError as exc:
+            raise ValueError(f"the webhook address is not a valid URL: {exc}") from exc
+        if parts.scheme.lower() not in ("http", "https"):
             raise ValueError("the webhook address must be an http:// or https:// URL")
+        if not parts.hostname:
+            raise ValueError("the webhook address must name a host")
         return value
 
 
