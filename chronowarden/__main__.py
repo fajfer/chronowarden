@@ -17,7 +17,7 @@ from chronowarden.alerting.delivery import deliver_due
 from chronowarden.audit.config_events import record_config_change
 from chronowarden.config import ConfigError, load_config
 from chronowarden.database import Database
-from chronowarden.integrations import VaultManager
+from chronowarden.integrations import ProviderManager
 from chronowarden.logging_config import configure_logging
 from chronowarden.scheduler import sync_and_alert
 
@@ -41,7 +41,7 @@ async def sync_once(config_path: Optional[str]) -> int:
     except ConfigError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
-    manager = VaultManager()
+    manager = ProviderManager()
     manager.connect_all(config)
     database = Database(DB_PATH)
     database.connect()

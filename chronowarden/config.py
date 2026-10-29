@@ -197,6 +197,9 @@ class VaultConfig(BaseModel):
 
     model_config = _STRICT
 
+    type: Literal["vault"] = Field(
+        default="vault", description="Provider type (ADR-011): 'vault' for HashiCorp Vault and OpenBao KV v2"
+    )
     name: str = Field(description="Unique identifier for this Vault instance")
     address: str = Field(description="Vault server address (e.g. https://vault.example.com:8200)")
     auth_method: str = Field(default="token", description="Authentication method: 'token' or 'approle'")

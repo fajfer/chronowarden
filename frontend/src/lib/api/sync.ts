@@ -5,7 +5,7 @@
 import { apiPost } from './client';
 import type { SyncResult } from '#lib/types/index.js';
 
-/** POST /api/v1/sync/vault/:name — trigger sync for a specific vault. */
+/** POST /api/v1/sync/provider/:name — trigger sync for one backend. */
 export function triggerVaultSync(vaultName: string): Promise<SyncResult> {
-  return apiPost<SyncResult>(`/sync/vault/${vaultName}`);
+  return apiPost<SyncResult>(`/sync/provider/${vaultName}`);
 }

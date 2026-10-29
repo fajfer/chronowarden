@@ -58,7 +58,7 @@ class TestSyncApiReconnectLoop:
             ),
             patch("chronowarden.metadata.detect_changes", return_value=synced),
         ):
-            response = client.post("/api/v1/sync/vault/dev-vault")
+            response = client.post("/api/v1/sync/provider/dev-vault")
 
         assert response.status_code == 200
         assert response.json()["vault"] == "dev-vault"
@@ -89,7 +89,7 @@ class TestSyncReconnectFirst:
             patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())),
             patch("chronowarden.metadata.detect_changes", return_value=synced),
         ):
-            response = _build_client().post("/api/v1/sync/vault/dev-vault")
+            response = _build_client().post("/api/v1/sync/provider/dev-vault")
 
         assert response.status_code == 200
         assert response.json()["secrets_synced"] == 1
@@ -99,7 +99,7 @@ class TestSyncReconnectFirst:
         """An offline vault returns 503 with the reason and a scheduled background retry."""
         manager, _ = _disconnected_vault(reconnect_ok=False, error_kind="offline")
         with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())):
-            response = _build_client().post("/api/v1/sync/vault/dev-vault")
+            response = _build_client().post("/api/v1/sync/provider/dev-vault")
 
         assert response.status_code == 503
         detail = response.json()["detail"]
@@ -112,7 +112,7 @@ class TestSyncReconnectFirst:
         """An authentication failure returns 503 without a scheduled retry."""
         manager, _ = _disconnected_vault(reconnect_ok=False, error_kind="auth")
         with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())):
-            response = _build_client().post("/api/v1/sync/vault/dev-vault")
+            response = _build_client().post("/api/v1/sync/provider/dev-vault")
 
         assert response.status_code == 503
         assert response.json()["detail"]["reason"] == "auth"
@@ -123,7 +123,7 @@ class TestSyncReconnectFirst:
         manager = MagicMock()
         manager.get.return_value = None
         with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())):
-            response = _build_client().post("/api/v1/sync/vault/missing")
+            response = _build_client().post("/api/v1/sync/provider/missing")
 
         assert response.status_code == 404
         manager.reconnect.assert_not_called()
@@ -131,9 +131,9 @@ class TestSyncReconnectFirst:
     def test_sync_holds_the_vault_lock(self) -> None:
         """sync_vault_now runs detect_changes while holding the vault's sync lock."""
         from chronowarden.api.sync import sync_vault_now
-        from chronowarden.integrations.manager import VaultManager
+        from chronowarden.integrations.manager import ProviderManager
 
-        manager = VaultManager()
+        manager = ProviderManager()
         manager._vaults["v"] = MagicMock()
         seen_locked: list[bool] = []
 
@@ -155,7 +155,7 @@ def test_manual_sync_is_rate_limited_per_vault(monkeypatch: pytest.MonkeyPatch) 
     manager, _ = _disconnected_vault(reconnect_ok=False)
     client = _build_client()
     with patch("chronowarden.api.sync._get_app_dependencies", return_value=(manager, AppConfig(), MagicMock())):
-        assert client.post("/api/v1/sync/vault/dev-vault").status_code == 503
-        response = client.post("/api/v1/sync/vault/dev-vault")
+        assert client.post("/api/v1/sync/provider/dev-vault").status_code == 503
+        response = client.post("/api/v1/sync/provider/dev-vault")
         assert response.status_code == 429 and response.headers["Retry-After"] == "30"
-        assert client.post("/api/v1/sync/vault/other-vault").status_code == 503
+        assert client.post("/api/v1/sync/provider/other-vault").status_code == 503

@@ -34,7 +34,7 @@ def test_sync_exit_codes(
     monkeypatch.chdir(tmp_path)
     with (
         patch("chronowarden.__main__.load_config", return_value=AppConfig()),
-        patch("chronowarden.__main__.VaultManager", return_value=MagicMock()) as manager,
+        patch("chronowarden.__main__.ProviderManager", return_value=MagicMock()) as manager,
         patch("chronowarden.__main__.sync_and_alert", new=AsyncMock(return_value=results)),
         patch("chronowarden.__main__.deliver_due"),
     ):

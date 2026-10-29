@@ -16,7 +16,7 @@ from requests.exceptions import RequestException
 from chronowarden.audit.observe import observed_state, record_config_applied, record_observed_changes
 from chronowarden.config import AppConfig
 from chronowarden.database import Database, SecretMetadataCache
-from chronowarden.integrations.vault import VaultIntegration
+from chronowarden.integrations.base import BaseIntegration
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -160,7 +160,7 @@ def calculate_ttl(
 
 
 def sync_secret_metadata(
-    vault: VaultIntegration,
+    vault: BaseIntegration,
     vault_name: str,
     engine_id: str,
     secret_path: str,
@@ -179,7 +179,7 @@ def sync_secret_metadata(
     When severity is 'none', the secret is monitored but never rotated (TTL is null).
 
     Args:
-        vault: The VaultIntegration instance.
+        vault: The backend integration.
         vault_name: Name of the vault.
         engine_id: Engine mount path.
         secret_path: Path to the secret within the engine.
@@ -297,7 +297,7 @@ def sync_secret_metadata(
 
 
 def _list_secret_paths(
-    vault: VaultIntegration, engine_id: str, prefix: str = "", failures: Optional[list[str]] = None
+    vault: BaseIntegration, engine_id: str, prefix: str = "", failures: Optional[list[str]] = None
 ) -> list[str]:
     """
     Recursively list all secret paths under a given engine and prefix.
@@ -307,7 +307,7 @@ def _list_secret_paths(
     root. A folder that can't be listed is skipped and recorded in `failures`.
 
     Args:
-        vault: The VaultIntegration instance.
+        vault: The backend integration.
         engine_id: Engine mount path.
         prefix: Optional (empty for root) prefix to filter secrets.
         failures: Collects the folders whose listing failed, so callers know the result is incomplete.
@@ -367,7 +367,7 @@ def _reconcile_removed(
 
 
 def detect_changes(
-    vault: VaultIntegration,
+    vault: BaseIntegration,
     vault_name: str,
     config: AppConfig,
     db: Database,
@@ -376,7 +376,7 @@ def detect_changes(
     Poll a vault for changes across all discovered engines.
 
     Args:
-        vault: The VaultIntegration instance.
+        vault: The backend integration.
         vault_name: Name of the vault.
         config: Application configuration.
         db: Database for internal state.

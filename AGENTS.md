@@ -58,7 +58,7 @@ Shorthand: `<area>` means `<area>/AGENTS.md`. Read root + the listed files, noth
 
 | Task | Read |
 |---|---|
-| Add a new secret provider (Azure Key Vault, GCP Secret Manager, …) | [integrations](chronowarden/integrations/AGENTS.md), [architecture](architecture/AGENTS.md), [ADR-011](.ai/adr/ADR-011-provider-registry.md), [generic registry spec](.ai/specs/2026-10-09-generic-provider-registry.md) |
+| Add a new secret provider (Azure Key Vault, GCP Secret Manager, …) | [integrations](chronowarden/integrations/AGENTS.md), [architecture](architecture/AGENTS.md), [ADR-011](.ai/adr/ADR-011-provider-registry.md) |
 | Vault connection, auth, TLS or reconnect issue | [integrations](chronowarden/integrations/AGENTS.md), [ADR-009](.ai/adr/ADR-009-offline-tolerant-reconnect.md) |
 | Add or change a REST endpoint | [api](chronowarden/api/AGENTS.md), [models](chronowarden/models/AGENTS.md), [auth](chronowarden/auth/AGENTS.md) |
 | Login, roles, API tokens, who may do what | [auth](chronowarden/auth/AGENTS.md), [ADR-026](.ai/adr/ADR-026-sessions-tokens-and-permissions.md) |

@@ -9,6 +9,8 @@ import type { AuthMode } from './Auth';
  */
 export interface VaultInstanceHealth {
   name: string;
+  /** Provider type from `type:` in config (ADR-011), e.g. `vault`. */
+  type: string;
   address: string;
   connected: boolean;
   healthy: boolean;

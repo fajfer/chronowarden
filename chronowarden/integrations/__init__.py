@@ -5,11 +5,15 @@
 """Integrations package for Chronowarden."""
 
 from chronowarden.integrations.base import BaseIntegration
-from chronowarden.integrations.manager import VaultManager
+from chronowarden.integrations.manager import ProviderManager
+from chronowarden.integrations.registry import build_provider, provider_types, register_provider
 from chronowarden.integrations.vault import VaultIntegration
 
 __all__ = [
     "BaseIntegration",
+    "ProviderManager",
     "VaultIntegration",
-    "VaultManager",
+    "build_provider",
+    "provider_types",
+    "register_provider",
 ]

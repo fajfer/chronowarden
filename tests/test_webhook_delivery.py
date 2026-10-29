@@ -136,7 +136,7 @@ class OneSecretVault:
         return True
 
 
-class OneVaultManager:
+class OneProviderManager:
     def __init__(self, vault: Any) -> None:
         self.vault = vault
         self._locks: dict[str, Any] = {}
@@ -160,7 +160,7 @@ def test_a_sync_of_an_expired_secret_sends_one_webhook(db: Database, receiver: R
             "alerting": {"default_routes": [{"name": "ops", "url": receiver.url}]},
         }
     )
-    manager = OneVaultManager(OneSecretVault())
+    manager = OneProviderManager(OneSecretVault())
     asyncio.run(sync_and_alert(manager, config, db))
     deliver_due(db, config)
     assert [json.loads(r["body"])["alerts"][0]["labels"]["alertname"] for r in receiver.requests] == ["SecretExpired"]
@@ -175,7 +175,7 @@ def test_an_unreachable_vault_alerts_the_default_routes(db: Database, receiver: 
     vault.last_error_kind = "offline"  # type: ignore[assignment]
     vault.last_error = "Vault at http://v:8200 appears to be offline"  # type: ignore[assignment]
     config = AppConfig.model_validate({"alerting": {"default_routes": [{"name": "ops", "url": receiver.url}]}})
-    asyncio.run(sync_and_alert(OneVaultManager(vault), config, db))
+    asyncio.run(sync_and_alert(OneProviderManager(vault), config, db))
     deliver_due(db, config)
     [request] = receiver.requests
     alert = json.loads(request["body"])["alerts"][0]

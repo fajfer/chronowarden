@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from chronowarden.api.vault import router
+from chronowarden.api.providers import router
 
 
 def _build_client() -> TestClient:
@@ -32,11 +32,13 @@ class TestVaultApiErrors:
         vault.address = "http://localhost:8201"
         vault.last_error = "AppRole authentication failed: invalid role_id or secret_id " "(mount point 'chronowarden')"
         manager.get.return_value = vault
+        manager.provider_type.return_value = "vault"
 
-        with patch("chronowarden.api.vault._get_vault_manager", return_value=manager):
-            response = client.get("/api/v1/vault/dev-vault/health")
+        with patch("chronowarden.api.providers._get_vault_manager", return_value=manager):
+            response = client.get("/api/v1/providers/dev-vault/health")
 
         assert response.status_code == 200
+        assert response.json()["type"] == "vault"
         assert response.json()["error"] == vault.last_error
         assert response.json()["address"] == "http://localhost:8201"
 
@@ -48,8 +50,8 @@ class TestVaultApiErrors:
             "dev-vault": {"connected": True, "healthy": True, "address": "http://localhost:8201"},
         }
 
-        with patch("chronowarden.api.vault._get_vault_manager", return_value=manager):
-            response = client.get("/api/v1/vault/health")
+        with patch("chronowarden.api.providers._get_vault_manager", return_value=manager):
+            response = client.get("/api/v1/providers/health")
 
         assert response.status_code == 200
         assert response.json()[0]["address"] == "http://localhost:8201"
@@ -59,6 +61,6 @@ class TestVaultApiErrors:
         client = _build_client()
         manager = MagicMock()
         manager.get.return_value = MagicMock()
-        with patch("chronowarden.api.vault._get_vault_manager", return_value=manager):
-            assert client.get("/api/v1/vault/dev-vault/secrets/list").status_code == 404
-            assert client.post("/api/v1/vault/dev-vault/secrets/metadata", json={"path": "x"}).status_code == 404
+        with patch("chronowarden.api.providers._get_vault_manager", return_value=manager):
+            assert client.get("/api/v1/providers/dev-vault/secrets/list").status_code == 404
+            assert client.post("/api/v1/providers/dev-vault/secrets/metadata", json={"path": "x"}).status_code == 404

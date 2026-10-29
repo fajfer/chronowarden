@@ -16,8 +16,8 @@ REST API used by the frontend and by operators. Every router is mounted under `/
 | `health.py` | none | `GET /health`, `/info`, `/ready`, `/metrics` (Prometheus); open, no login |
 | `auth.py` | `/auth` | `GET /login`, `/callback` (OIDC), `POST /logout`, `GET /me`, `GET/POST/DELETE /tokens` (admin); see [auth](../auth/AGENTS.md) |
 | `secrets.py` | `/secrets` | `GET /` (filters `vault_name`, `engine_id`, `severity`, `system_id`, `owner_id`, `unassigned`, `include_removed`), `GET /{id}`, `PUT /{id}/system`, `PUT /{id}/owners`, `POST /{id}/confirmations`, `PUT /{id}/privileged`, `GET /{id}/history`, `DELETE /{id}` and `DELETE /removed` (purge removed secrets only; 409 for one that still exists) |
-| `sync.py` | `/sync` | `POST /vault/{vault_name}` |
-| `vault.py` | `/vault` | `GET /instances`, `/health`, `/{name}/health` |
+| `sync.py` | `/sync` | `POST /provider/{vault_name}` |
+| `providers.py` | `/providers` | `GET /instances`, `/health`, `/{name}/health` (with the provider `type`) |
 | `owners.py` | `/owners` | CRUD for owners, `POST/DELETE` webhook routes (addresses masked to scheme and host), `POST/DELETE /{id}/routes/{route_id}/signing` (secret returned once), `POST /{id}/test-route/{route_id}` (real send) |
 | `alerts.py` | none | `GET /alerts` (firing), `GET /webhooks/deliveries` (log); see [ADR-025](../../.ai/adr/ADR-025-alert-lifecycle-and-webhook-delivery.md) |
 | `audit.py` | `/audit` | `GET /events` (filters, `before_id` paging), `/events.jsonl` (export as stored), `/verify`, `POST /events/{id}/revert`; see [audit](../audit/AGENTS.md) |
@@ -39,8 +39,8 @@ REST API used by the frontend and by operators. Every router is mounted under `/
   and `/owners`, which replace the whole value and resolve `{id}` to the secret identity before storing (ADR-017).
   Each change is an audit event (`secret.system`, `secret.owners`); `GET /secrets/{id}/history` lists them. Effective owners and the filters come from
   `chronowarden/assignments.py` (`AssignmentIndex`, loaded once per request).
-- `POST /sync/vault/{name}` also (re)starts the manager's reconnect loop.
-- `POST /sync/vault/{name}` (per vault, `manual_sync_cooldown`) and `POST /compliance/snapshots`
+- `POST /sync/provider/{name}` also (re)starts the manager's reconnect loop.
+- `POST /sync/provider/{name}` (per vault, `manual_sync_cooldown`) and `POST /compliance/snapshots`
   (`snapshot_min_interval`) answer 429 with `Retry-After` when called too soon (`api/cooldown.py`, in memory per
   process). Tests run with both off (`tests/conftest.py`); mark a test `cooldowns` to keep them on.
 
@@ -61,7 +61,7 @@ REST API used by the frontend and by operators. Every router is mounted under `/
   secret's expiry profile (`AppConfig.get_alert_days`, default 30d, #70).
 - `_get_app_dependencies()` returns a different tuple order per module: `secrets` → `(db, config, manager)`,
   `sync` → `(manager, config, db)`.
-- `POST /sync/vault/{name}` reconnects a disconnected vault first, then syncs via `sync_vault_now` (per-vault
+- `POST /sync/provider/{name}` reconnects a disconnected vault first, then syncs via `sync_vault_now` (per-vault
   lock, blocking calls in a worker thread). On failure: 503 with a dict `detail` (`message`, `reason`, `error`,
   `retry_scheduled`); the frontend `stores/sync.ts` parses it (#59).
 - A freshly rotated secret isn't necessarily applied in its environment; rotation confirmation plus an audit log

@@ -1121,3 +1121,17 @@ class TestAuthConfig:
     def test_invalid(self, auth: dict, message: str) -> None:
         with pytest.raises(ValidationError, match=message):
             AppConfig.model_validate({"auth": auth})
+
+
+class TestProviderType:
+    """`type:` on each `vaults:` entry (ADR-011)."""
+
+    def test_defaults_to_vault(self) -> None:
+        config = AppConfig.model_validate({"vaults": [{"name": "a", "address": "http://v:8200", "token": "t"}]})
+        assert config.vaults[0].type == "vault"
+
+    def test_unknown_type_is_refused(self) -> None:
+        with pytest.raises(ValidationError, match="type"):
+            AppConfig.model_validate(
+                {"vaults": [{"type": "gitlab", "name": "a", "address": "http://v:8200", "token": "t"}]}
+            )

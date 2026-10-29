@@ -7,7 +7,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 - **Status:** Accepted
 - **Date:** 2026-10-09
-- **Evidence:** maintainer decisions of 2026-10-14; issue #72; spec `.ai/specs/2026-10-09-generic-provider-registry.md`; PR #26 gap analysis.
+- **Evidence:** maintainer decisions of 2026-10-14; issue #72; spec `.ai/specs/implemented/2026-10-09-generic-provider-registry.md`; PR #26 gap analysis.
 
 ## Context
 
