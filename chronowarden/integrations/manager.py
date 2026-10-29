@@ -6,6 +6,7 @@
 
 import asyncio
 import logging
+import os
 import tempfile
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -116,7 +117,8 @@ class ProviderManager:
         Args:
             config: Application configuration containing vault definitions.
         """
-        # Create global CA bundle if directory is configured
+        # Create global CA bundle if directory is configured; a previous one is removed first
+        self._remove_ca_bundle()
         if config.ca_certs_dir:
             self._ca_bundle_path = self._create_ca_bundle(config.ca_certs_dir)
 
@@ -127,11 +129,22 @@ class ProviderManager:
             self._connect_vault(vault_config)
 
     def disconnect_all(self) -> None:
-        """Disconnect from all vault instances and stop reconnection loop."""
+        """Disconnect from all vault instances, stop reconnection loop and remove the CA bundle."""
         self.stop_reconnect_loop()
         for name in list(self._vaults.keys()):
             self._disconnect_vault(name)
         self._pending_configs.clear()
+        self._remove_ca_bundle()
+
+    def _remove_ca_bundle(self) -> None:
+        """Delete the temporary CA bundle, if any; `connect_all` creates a new one."""
+        if self._ca_bundle_path is None:
+            return
+        try:
+            os.unlink(self._ca_bundle_path)
+        except OSError:
+            logger.debug("Failed to remove the CA bundle %s", self._ca_bundle_path, exc_info=True)
+        self._ca_bundle_path = None
 
     def health(self) -> dict[str, dict[str, Any]]:
         """
