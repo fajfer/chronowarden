@@ -8,6 +8,9 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+# More owners than any real system has; caps the work one request can cause
+MAX_OWNER_IDS = 1000
+
 
 class OwnerRef(BaseModel):
     """An owner as referenced from a system or a secret."""
@@ -66,7 +69,7 @@ class System(SystemBase):
 class SystemCreate(SystemBase):
     """Request body for creating a system."""
 
-    owner_ids: list[str] = Field(default_factory=list, description="Owners of the system")
+    owner_ids: list[str] = Field(default_factory=list, max_length=MAX_OWNER_IDS, description="Owners of the system")
 
 
 class SystemUpdate(BaseModel):
@@ -84,7 +87,9 @@ class SystemUpdate(BaseModel):
 class OwnerIds(BaseModel):
     """Request body replacing a list of owners."""
 
-    owner_ids: list[str] = Field(description="The complete new list of owner IDs; [] removes all")
+    owner_ids: list[str] = Field(
+        max_length=MAX_OWNER_IDS, description="The complete new list of owner IDs; [] removes all"
+    )
 
 
 class SystemAssignment(BaseModel):

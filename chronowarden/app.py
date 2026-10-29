@@ -31,6 +31,7 @@ from chronowarden.api import (
 )
 from chronowarden.api.sync import sync_vault_now
 from chronowarden.audit.config_events import record_config_change
+from chronowarden.body_limit import BodyLimitMiddleware
 from chronowarden.config import AppConfig, load_config, require_auth
 from chronowarden.database import Database
 from chronowarden.integrations import ProviderManager
@@ -153,8 +154,11 @@ async def _guard(request: Request, call_next: Callable[[Request], Awaitable[Resp
     return await guard_requests(request, call_next, app_config.allowed_hosts)
 
 
-# Registered after the guard, so it wraps it (Starlette: the last registered middleware runs first) and also counts
-# the guard's refusals
+app.add_middleware(BodyLimitMiddleware)
+
+
+# Registered after the guard and the body limit, so it wraps them (Starlette: the last registered middleware runs
+# first) and also counts their refusals
 @app.middleware("http")
 async def _metrics(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     """Count and time every request by route template (#71)."""
