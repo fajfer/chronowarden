@@ -11,10 +11,11 @@ import hmac
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
-from chronowarden.alerting.delivery import deliver_due
+from chronowarden.alerting.delivery import deliver_due, post
 from chronowarden.alerting.signing import generate_secret
 from chronowarden.config import AppConfig
 from chronowarden.database import Database
@@ -180,3 +181,17 @@ def test_an_unreachable_vault_alerts_the_default_routes(db: Database, receiver: 
     [request] = receiver.requests
     alert = json.loads(request["body"])["alerts"][0]
     assert alert["labels"] == {"alertname": "VaultUnreachable", "vault": "prod", "reason": "offline"}
+
+
+@pytest.mark.parametrize("status_code", [200, 302, 500])
+def test_the_response_body_is_never_read(status_code: int) -> None:
+    """Regression: a receiver can't make the server buffer a huge or endless response body."""
+    response = MagicMock(status_code=status_code, ok=status_code < 400)
+    response.__enter__.return_value = response
+    type(response).content = PropertyMock(side_effect=AssertionError("the body was read"))
+    type(response).text = PropertyMock(side_effect=AssertionError("the body was read"))
+    with patch("chronowarden.alerting.delivery.requests.post", return_value=response) as send:
+        status, _ = post("https://hooks.example.com/x", b"{}", "msg_1", None, datetime.now(tz=UTC))
+    assert status == status_code
+    assert send.call_args.kwargs["stream"] is True
+    response.__exit__.assert_called_once()

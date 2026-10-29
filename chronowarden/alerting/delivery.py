@@ -47,7 +47,7 @@ def _target(db: Any, config: Any, delivery: dict[str, Any]) -> tuple[Optional[st
 
 def post(url: str, body: bytes, message_id: str, secret: Optional[str], now: datetime) -> tuple[Optional[int], str]:
     """
-    POST one webhook: 10 s timeout, no redirects, signed when the route has a secret.
+    POST one webhook: 10 s timeout, no redirects, response body unread, signed when the route has a secret.
 
     Returns:
         (status code or None, error text or ""). Error texts never contain the URL, which may carry a token.
@@ -60,12 +60,17 @@ def post(url: str, body: bytes, message_id: str, secret: Optional[str], now: dat
     if secret:
         headers.update(signature_headers(secret, message_id, int(now.timestamp()), body))
     try:
-        response = requests.post(url, data=body, headers=headers, timeout=TIMEOUT_SECONDS, allow_redirects=False)
+        # stream=True reads only the status line and headers: the body is never read, so a receiver can't make us
+        # buffer an endless response (the timeout is per read, not a total)
+        response = requests.post(
+            url, data=body, headers=headers, timeout=TIMEOUT_SECONDS, allow_redirects=False, stream=True
+        )
     except requests.RequestException as exc:
         return None, type(exc).__name__
-    if 300 <= response.status_code < 400:
-        return response.status_code, f"HTTP {response.status_code}: redirects aren't followed"
-    return response.status_code, "" if response.ok else f"HTTP {response.status_code}"
+    with response:
+        if 300 <= response.status_code < 400:
+            return response.status_code, f"HTTP {response.status_code}: redirects aren't followed"
+        return response.status_code, "" if response.ok else f"HTTP {response.status_code}"
 
 
 def send(db: Any, config: Any, delivery: dict[str, Any], now: datetime) -> str:
