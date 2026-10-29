@@ -319,6 +319,40 @@ class TestOwnersAPI:
             assert response.status_code == 422
             assert self.db.list_notification_routes("owner-1") == []
 
+    @pytest.mark.parametrize(
+        "address",
+        [
+            "http://host:abc/x",
+            "http://host:99999/x",
+            "http://[unclosed/x",
+            "http:///path-only",
+            "https://hooks.example.com/a b",
+            "https://hooks.example.com/\x00",
+            "ftp://hooks.example.com/",
+        ],
+    )
+    def test_malformed_route_address_rejected(self, address: str) -> None:
+        """Regression: a malformed address is refused (422) instead of being stored and breaking listings."""
+        self.db.create_owner("owner-1", "Alice", "alice@example.com")
+        client = self._build_client()
+        with patch("chronowarden.api.owners._get_db", return_value=self.db):
+            response = client.post("/api/v1/owners/owner-1/routes", json={"type": "webhook", "address": address})
+            assert response.status_code == 422
+            assert self.db.list_notification_routes("owner-1") == []
+            assert client.get("/api/v1/owners/").status_code == 200
+
+    def test_stored_malformed_route_still_lists_and_deletes(self) -> None:
+        """Regression: a malformed address stored by an older version doesn't break listing or deleting."""
+        self.db.create_owner("owner-1", "Alice", "alice@example.com")
+        self.db.create_notification_route("route-1", "owner-1", "webhook", "http://host:abc/x", "Test")
+        client = self._build_client()
+        with patch("chronowarden.api.owners._get_db", return_value=self.db):
+            listing = client.get("/api/v1/owners/")
+            assert listing.status_code == 200
+            assert listing.json()[0]["notification_routes"][0]["address"] == "…"
+            assert client.delete("/api/v1/owners/owner-1/routes/route-1").status_code == 204
+            assert self.db.list_notification_routes("owner-1") == []
+
     def test_delete_notification_route(self) -> None:
         """Test deleting a notification route via API."""
         self.db.create_owner("owner-1", "Alice", "alice@example.com")
@@ -395,6 +429,9 @@ class TestOwnersAPI:
         ("https://hooks.slack.com/services/T0/B0/secret", "https://hooks.slack.com/…"),
         ("https://user:pass@hooks.example.com:8443/x?token=t", "https://hooks.example.com:8443/…"),
         ("not a url", "…"),
+        ("http://host:abc/x", "…"),
+        ("http://host:99999/x", "…"),
+        ("http://[unclosed/x", "…"),
     ],
 )
 def test_mask_address(address: str, masked: str) -> None:

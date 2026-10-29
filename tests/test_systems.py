@@ -106,6 +106,13 @@ class TestSystemsApi:
         response = client.put(f"/api/v1/systems/{system['id']}/owners", json={"owner_ids": ["bob"]})
         assert [o["id"] for o in response.json()["owners"]] == ["bob"]
 
+    def test_too_many_owner_ids_is_422(self, client: TestClient) -> None:
+        """Regression: owner lists are capped before any id is looked up."""
+        ids = [f"owner-{n}" for n in range(1001)]
+        assert client.post("/api/v1/systems/", json={"name": "Billing", "owner_ids": ids}).status_code == 422
+        system = _create_system(client)
+        assert client.put(f"/api/v1/systems/{system['id']}/owners", json={"owner_ids": ids}).status_code == 422
+
     def test_unknown_system_is_404(self, client: TestClient) -> None:
         assert client.get("/api/v1/systems/nope").status_code == 404
         assert client.put("/api/v1/systems/nope", json={"name": "X"}).status_code == 404

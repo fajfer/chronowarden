@@ -77,13 +77,17 @@ def mask_address(address: str) -> str:
     """
     Mask a webhook URL down to its scheme and host.
 
-    Webhook URLs often carry a token in the path or query (Slack, Teams), so only the stored copy keeps them.
+    Webhook URLs often carry a token in the path or query (Slack, Teams), so only the stored copy keeps them. Never
+    raises: a malformed stored address must not break listing or deleting routes.
     """
-    parts = urlsplit(address)
-    if not parts.scheme or not parts.hostname:
+    try:
+        parts = urlsplit(address)
+        hostname, port = parts.hostname, parts.port
+    except ValueError:
         return "…"
-    port = f":{parts.port}" if parts.port else ""
-    return f"{parts.scheme}://{parts.hostname}{port}/…"
+    if not parts.scheme or not hostname:
+        return "…"
+    return f"{parts.scheme}://{hostname}{f':{port}' if port else ''}/…"
 
 
 def _route_view(route: dict) -> dict:

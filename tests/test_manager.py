@@ -5,11 +5,12 @@
 """Tests for Vault manager behavior."""
 
 import asyncio
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from chronowarden.config import VaultConfig
+from chronowarden.config import AppConfig, VaultConfig
 from chronowarden.integrations import BaseIntegration, VaultIntegration, provider_types, register_provider
 from chronowarden.integrations.manager import ProviderManager
 
@@ -301,3 +302,25 @@ class TestRegistry:
     def test_types_register_once(self) -> None:
         with pytest.raises(ValueError, match="registered already"):
             register_provider("vault", lambda config, ca: None)
+
+
+def test_the_ca_bundle_is_removed_on_disconnect_and_reconnect(tmp_path: Path) -> None:
+    """Regression: every connect wrote a new temporary CA bundle and nothing removed it."""
+    certs = tmp_path / "certs"
+    certs.mkdir()
+    (certs / "ca.pem").write_text("-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n")
+    config = AppConfig(ca_certs_dir=str(certs))
+    manager = ProviderManager()
+
+    manager.connect_all(config)
+    first = manager._ca_bundle_path
+    assert first is not None and Path(first).is_file()
+
+    manager.connect_all(config)
+    second = manager._ca_bundle_path
+    assert second is not None and Path(second).is_file()
+    assert not Path(first).exists()
+
+    manager.disconnect_all()
+    assert manager._ca_bundle_path is None
+    assert not Path(second).exists()

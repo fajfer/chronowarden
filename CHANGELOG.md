@@ -48,6 +48,14 @@ and viewer roles decide who may change what (#75, ADR-015, ADR-026).
 - **Breaking:** `/api/v1/vault/*` is now `/api/v1/providers/*`, and `POST /api/v1/sync/vault/{name}` is now
   `POST /api/v1/sync/provider/{name}`. Provider health includes its `type`. The `integration` label of
   `chronowarden_integration_health` is `<type>:<name>` (unchanged for Vault: `vault:<name>`).
+- Request bodies are capped at 1 MiB (413), also when sent chunked, and `owner_ids` lists at 1000 entries (422).
+
+### Fixed
+
+- A webhook address with an invalid port, an unclosed IPv6 bracket, whitespace or no host is refused with 422; a
+  stored one no longer breaks listing or deleting an owner's routes.
+- Webhook deliveries no longer read the receiver's response body, so a large or endless response can't grow memory.
+- The temporary CA bundle (`chronowarden-ca-*.pem`) is removed on shutdown and after each one-shot sync.
 
 ## [0.8.0] - 2026-10-14
 
