@@ -37,7 +37,7 @@ spec:
           containers:
             - name: sync
               # Headless images exist from 0.8.0 on
-              image: ghcr.io/fajfer/chronowarden:v0.8.0-headless
+              image: ghcr.io/fajfer/chronowarden:v0.9.0-headless
               imagePullPolicy: IfNotPresent
               # Exit 0: every vault synced; 1: one was unreachable or failed; 2: configuration error
               command: ["python", "-m", "chronowarden", "sync"]

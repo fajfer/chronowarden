@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Access control: authentication, roles and API tokens
 
-- **Status:** in progress
+- **Status:** implemented
 - **Date:** 2026-10-27
 - **Issue:** #75
 
@@ -36,11 +36,11 @@ examples, `architecture/`, CHANGELOG.
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md)
-- [core](../../chronowarden/AGENTS.md), [api](../../chronowarden/api/AGENTS.md),
-  [models](../../chronowarden/models/AGENTS.md), [audit](../../chronowarden/audit/AGENTS.md)
-- [ADR-015](../adr/ADR-015-authentication.md), [ADR-026](../adr/ADR-026-sessions-tokens-and-permissions.md),
-  [ADR-010](../adr/ADR-010-owners-systems-and-permissions.md)
+- [root AGENTS.md](../../../AGENTS.md)
+- [core](../../../chronowarden/AGENTS.md), [api](../../../chronowarden/api/AGENTS.md),
+  [models](../../../chronowarden/models/AGENTS.md), [audit](../../../chronowarden/audit/AGENTS.md)
+- [ADR-015](../../adr/ADR-015-authentication.md), [ADR-026](../../adr/ADR-026-sessions-tokens-and-permissions.md),
+  [ADR-010](../../adr/ADR-010-owners-systems-and-permissions.md)
 
 ## ADRs affected
 
@@ -106,7 +106,7 @@ New **ADR-026 Sessions, API tokens and the permission matrix** extends ADR-015 w
 | 9 | Frontend: auth store, login page, 401 handling, navbar, permission-aware controls, API tokens tab, `idp_group`, `none` banner | frontend, `frontend/src/lib/stores/auth.ts`, `frontend/src/lib/api/client.ts`, `frontend/src/routes/login/+page.svelte`, `frontend/src/routes/settings/+page.svelte` | `npm run check` with no new warnings; manual run in all three modes | done | 3255dea |
 | 10 | Docs: guide `docs/guides/authentication.md` (AI draft notice), README warning and roadmap, deploy examples, `config.example.yaml` | deploy, `README.md`, `deploy/compose/config.yaml`, `deploy/kubernetes/` | Every mode documented with an example; the "no authentication" warnings are gone | done | 7ee83a5, df80421 |
 | 11 | Architecture model, AGENTS (new `chronowarden/auth/AGENTS.md` + router row), ADR-010/014 update notes, CHANGELOG with upgrade notes | architecture, `CHANGELOG.md` | `python3 scripts/check_agents_docs.py` and LikeC4 validation pass | done | 47e101f |
-| 12 | Release 0.9.0: version and changelog | deploy | Release PR merged; the tag waits for the maintainer's go | todo | |
+| 12 | Release 0.9.0: version and changelog | deploy | Release PR merged; the tag waits for the maintainer's go | done | release/0.9.0 PR |
 
 ## Validation
 
