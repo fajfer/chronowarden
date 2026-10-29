@@ -14,8 +14,11 @@ git history.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-29
+
 Access control: people log in through OIDC or an authenticating proxy, pipelines use API tokens, and admin, owner
-and viewer roles decide who may change what (#75, ADR-015, ADR-026).
+and viewer roles decide who may change what (#75, ADR-015, ADR-026). Backends are built through a provider registry
+(#72, ADR-011), and webhook routes, request bodies and the CA bundle are hardened.
 
 ### Upgrade notes
 
@@ -382,7 +385,8 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
-[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/fajfer/chronowarden/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/fajfer/chronowarden/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/fajfer/chronowarden/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/fajfer/chronowarden/compare/v0.7.1...v0.7.2
