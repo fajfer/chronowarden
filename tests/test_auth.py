@@ -41,11 +41,21 @@ def _request(headers: Optional[dict[str, str]] = None, peer: str = "10.1.2.3", c
 
 
 def _token(
-    db: Database, role: str = "viewer", owner_id: Optional[str] = None, expires: timedelta = timedelta(days=1)
+    db: Database,
+    role: str = "viewer",
+    owner_id: Optional[str] = None,
+    expires: timedelta = timedelta(days=1),
+    issued: datetime = NOW,
 ) -> str:
     token = new_api_token()
     db.create_api_token(
-        f"id-{role}", f"{role}-token", digest(token), role, owner_id, utc_timestamp(NOW), utc_timestamp(NOW + expires)
+        f"id-{role}",
+        f"{role}-token",
+        digest(token),
+        role,
+        owner_id,
+        utc_timestamp(issued),
+        utc_timestamp(issued + expires),
     )
     return token
 
@@ -228,7 +238,9 @@ class TestDependencies:
             assert self._client().get("/read").status_code == 503
 
     def test_roles(self, db: Database) -> None:
-        viewer, admin = _token(db, "viewer"), _token(db, "admin")
+        # Requests check expiry against the real clock, so these tokens must be valid now, not at NOW
+        now = datetime.now(tz=timezone.utc)
+        viewer, admin = _token(db, "viewer", issued=now), _token(db, "admin", issued=now)
         with patch("chronowarden.auth.dependencies._get_auth_context", return_value=(OIDC, db)):
             client = self._client()
             read = client.get("/read", headers={"Authorization": f"Bearer {viewer}"})
