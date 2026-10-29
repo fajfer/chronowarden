@@ -76,6 +76,7 @@ Shorthand: `<area>` means `<area>/AGENTS.md`. Read root + the listed files, noth
 | Architecture model (LikeC4) | [architecture](architecture/AGENTS.md) |
 | Record a decision | [.ai/adr](.ai/adr/README.md) |
 | Plan a 3+ step task | [.ai/specs](.ai/specs/README.md) |
+| Cut a release, handle Dependabot PRs | [release](.ai/docs/release.md), [deploy](deploy/AGENTS.md) |
 
 User docs in `docs/` (mkdocs) are for humans. Agents may draft pages there when a spec asks for it; every drafted
 page starts with a notice that it is an AI-generated draft, and only the maintainer removes or rewords that notice.
@@ -92,6 +93,9 @@ page starts with a notice that it is an AI-generated draft, and only the maintai
 - Line too long: break strings with parentheses, use multi-line calls, split imports.
 - Types: explicit `None` checks for `Optional`, narrow string types; type-checker version warnings can be ignored
   if checks pass.
+- Tests: never compare a fixed date with the real clock (a token "valid for a day" from a fixed `NOW` expires
+  in CI the next day); pass the time in, or derive fixtures from `datetime.now()`.
+- Validation in a command chain: check the command's own exit code; `cmd | tail` reports `tail`'s.
 - Exceptions: use `logger.exception("Failed")` when catching. Catch specific exceptions where possible:
   - file ops: `except (OSError, PermissionError):`
   - JSON: `except json.JSONDecodeError:`
