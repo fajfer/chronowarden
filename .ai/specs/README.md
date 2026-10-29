@@ -23,6 +23,8 @@ files an agent must read (**Load**), so it can be done with only those files.
 
 | Spec | Goal |
 |---|---|
+| [2026-10-29-azure-key-vault](2026-10-29-azure-key-vault.md) | `type: azure-key-vault`: secret properties and tags, no values (ADR-011) |
+| [2026-10-29-gcp-secret-manager](2026-10-29-gcp-secret-manager.md) | `type: gcp-secret-manager`: secret metadata and annotations, no payloads (ADR-011) |
 | [2026-10-10-compliance-policies-and-reports](2026-10-10-compliance-policies-and-reports.md) | 0.7.x: policies in config with example YAML, PDF reports with Typst |
 
 ## Implemented
