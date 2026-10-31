@@ -81,7 +81,7 @@ None.
 | 2 | Keycloak: realm template, start and wait, `--auth oidc` config | `devenv/`, `docs/guides/authentication.md` | Logging in as each user in a browser gives the expected role in `/api/v1/auth/me` | done | 02c318b |
 | 3 | Seed owners and systems; `--receiver`; `--app` and `--app image` | `devenv/backends.py`, `tests/conftest.py` | A sync sends a webhook the receiver records; the `owner` user acts for the seeded owner | done | cbeea6a |
 | 4 | Integration test: Keycloak in testcontainers, the full authorization code flow driven over HTTP (login form post), roles per user, logout | `tests/integration`, `chronowarden/auth/oidc.py` | `pytest -m integration` green locally and in the existing CI integration job | done | ec9cb04 |
-| 5 | Runbook `.ai/docs/dev-env.md` (isolation rules, flags, what `run.json` holds), README "Development", `deploy/AGENTS.md`, router row "Run the app or a dev env", CHANGELOG | deploy, `README.md` | `check_agents_docs.py` passes | done | |
+| 5 | Runbook `.ai/docs/dev-env.md` (isolation rules, flags, what `run.json` holds), README "Development", `deploy/AGENTS.md`, router row "Run the app or a dev env", CHANGELOG | deploy, `README.md` | `check_agents_docs.py` passes | done | 18c4631 |
 
 ## Validation
 
