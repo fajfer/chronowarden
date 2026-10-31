@@ -55,5 +55,6 @@ chronowarden.db*
 .svelte-kit/
 
 # SI
-.claude
+.claude/*
+!.claude/agents/
 skills-lock.json
