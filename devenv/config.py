@@ -5,6 +5,7 @@
 """Writing the dev config.yaml without clobbering a hand-written one."""
 
 from pathlib import Path
+from typing import Any, Optional
 
 import yaml
 
@@ -17,10 +18,10 @@ class ConfigExistsError(Exception):
     """The config file exists and wasn't written by dev-setup.py."""
 
 
-def dev_config(credentials: dict[Backend, tuple[str, str]]) -> dict:
-    """The config for the dev backends, authenticating with their AppRoles; no login on the local machine."""
+def dev_config(credentials: dict[Backend, tuple[str, str]], auth: Optional[dict[str, Any]] = None) -> dict:
+    """The config for the dev backends, authenticating with their AppRoles; no login unless `auth` is given."""
     return {
-        "auth": {"mode": "none"},
+        "auth": auth or {"mode": "none"},
         "vaults": [
             {
                 "name": backend.config_name,
@@ -42,7 +43,12 @@ def can_write(path: Path, force: bool = False) -> bool:
     return force or not path.exists() or path.read_text().startswith(HEADER)
 
 
-def write_dev_config(path: Path, credentials: dict[Backend, tuple[str, str]], force: bool = False) -> None:
+def write_dev_config(
+    path: Path,
+    credentials: dict[Backend, tuple[str, str]],
+    force: bool = False,
+    auth: Optional[dict[str, Any]] = None,
+) -> None:
     """
     Write the dev config, unless a config not written by dev-setup.py is there and `force` isn't set.
 
@@ -53,4 +59,4 @@ def write_dev_config(path: Path, credentials: dict[Backend, tuple[str, str]], fo
         raise ConfigExistsError(
             f"{path} wasn't written by dev-setup.py; use --force to replace it or --config elsewhere"
         )
-    path.write_text(HEADER + yaml.safe_dump(dev_config(credentials), sort_keys=False))
+    path.write_text(HEADER + yaml.safe_dump(dev_config(credentials, auth), sort_keys=False))

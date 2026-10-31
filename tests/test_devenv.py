@@ -13,6 +13,8 @@ from types import ModuleType
 import pytest
 import yaml
 
+from chronowarden.config import load_config
+from devenv import keycloak
 from devenv.backends import OPENBAO, VAULT
 from devenv.config import HEADER, can_write, write_dev_config
 from devenv.runs import (
@@ -209,3 +211,34 @@ class TestCleanup:
         runtime = FakeRuntime({"cw-a-vault": {LABEL: "a"}, "cw-a-openbao": {LABEL: "a"}, "unrelated": {}})
         dev_setup.list_runs(runtime)
         assert capsys.readouterr().out == "a: cw-a-openbao, cw-a-vault\n"
+
+
+class TestKeycloak:
+    def test_realm_fills_client_and_users(self) -> None:
+        passwords = {"admin": "pa", "owner": "po", "viewer": "pv"}
+        data = keycloak.realm("http://localhost:9000/api/v1/auth/callback", "s3cret", passwords)
+        client = data["clients"][0]
+        assert (client["clientId"], client["secret"]) == ("chronowarden", "s3cret")
+        assert client["redirectUris"] == ["http://localhost:9000/api/v1/auth/callback"]
+        assert client["attributes"]["pkce.code.challenge.method"] == "S256"
+        assert client["protocolMappers"][0]["config"]["full.path"] == "false"
+        users = {u["username"]: u for u in data["users"]}
+        assert {name: u["credentials"][0]["value"] for name, u in users.items()} == passwords
+        assert all(u["emailVerified"] and not u["credentials"][0]["temporary"] for u in users.values())
+
+    def test_every_user_is_in_one_role_group(self) -> None:
+        groups = {g for names in keycloak.ROLE_GROUPS.values() for g in names}
+        data = keycloak.realm("http://x/cb", "s", {u: "p" for u in keycloak.usernames()})
+        assert {g["name"] for g in data["groups"]} == groups
+        for user in data["users"]:
+            assert [g.removeprefix("/") for g in user["groups"]] == keycloak.ROLE_GROUPS[user["username"]]
+
+    def test_oidc_config_validates(self, tmp_path: Path) -> None:
+        idp = keycloak.Keycloak("cw-a-keycloak", 49200)
+        auth = keycloak.oidc_auth(idp, "s3cret", "http://localhost:49201/api/v1/auth/callback")
+        path = tmp_path / "config.yaml"
+        write_dev_config(path, CREDENTIALS, auth=auth)
+        config = load_config(path)
+        assert config.auth.oidc is not None
+        assert config.auth.oidc.issuer == "http://localhost:49200/realms/chronowarden"
+        assert config.auth.roles.admin == ["cw-admins"]

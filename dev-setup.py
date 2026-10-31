@@ -19,6 +19,7 @@ from pathlib import Path
 import hvac
 from requests.exceptions import RequestException
 
+from devenv import keycloak
 from devenv.backends import BACKENDS, Backend, random_token, seed, setup_approle
 from devenv.config import can_write, write_dev_config
 from devenv.runs import (
@@ -37,6 +38,8 @@ from devenv.runtime import ContainerRuntimeError, ContainerSpec, Runtime, detect
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("dev-setup")
+
+DEV_APP_PORT = 8000  # uvicorn's default, where the dev run's OIDC redirect URI points
 
 
 def _wait_ready(backend: Backend, token: str, timeout: float = 60) -> hvac.Client:
@@ -87,22 +90,62 @@ def _backends(run: str) -> list[Backend]:
     return [b.for_run(container_name(run, b.service, b.container), free_port()) for b in BACKENDS]
 
 
-def setup(runtime: Runtime, run: str, scratch: Path | None, config_path: Path, force: bool) -> int:
-    """Start, seed and configure the dev backends of `run`; returns the exit code."""
+def _start_keycloak(
+    runtime: Runtime, idp: keycloak.Keycloak, run: str, redirect_uri: str
+) -> tuple[dict, dict[str, str]]:
+    """Start Keycloak for `run`, import the realm; returns the `auth` config section and the users' passwords."""
+    admin_password = keycloak.random_password()
+    logger.info("Starting %s (%s) with %s", idp.container, keycloak.IMAGE, runtime.cli)
+    runtime.start(
+        ContainerSpec(
+            name=idp.container,
+            image=keycloak.IMAGE,
+            ports=[f"127.0.0.1:{idp.host_port}:{keycloak.PORT}"],
+            env={
+                "KC_BOOTSTRAP_ADMIN_USERNAME": keycloak.BOOTSTRAP_ADMIN,
+                "KC_BOOTSTRAP_ADMIN_PASSWORD": admin_password,
+            },
+            labels={LABEL: run},
+            command=["start-dev"],
+        )
+    )
+    keycloak.wait_ready(idp)
+    client_secret = keycloak.random_password()
+    passwords = {user: keycloak.random_password() for user in keycloak.usernames()}
+    keycloak.import_realm(idp, admin_password, keycloak.realm(redirect_uri, client_secret, passwords))
+    logger.info("%s ready at %s (realm %s)", idp.container, idp.address, keycloak.REALM)
+    return keycloak.oidc_auth(idp, client_secret, redirect_uri), passwords
+
+
+def _prepare_scratch(scratch: Path) -> bool:
+    """Empty `scratch` for a fresh run (only if a run created it) and create it private; False if it can't be used."""
+    if scratch.is_dir() and any(scratch.iterdir()):
+        if read_run(scratch) is None:
+            logger.error("%s isn't empty and has no run.json; choose another --scratch", scratch)
+            return False
+        shutil.rmtree(scratch)  # a fresh run gets a fresh database and logs
+    scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return True
+
+
+def setup(runtime: Runtime, run: str, scratch: Path | None, config_path: Path, force: bool, auth: str = "none") -> int:
+    """Start, seed and configure the dev backends (and Keycloak for `auth` oidc) of `run`; returns the exit code."""
     if scratch is not None:
-        if scratch.is_dir() and any(scratch.iterdir()):
-            if read_run(scratch) is None:
-                logger.error("%s isn't empty and has no run.json; choose another --scratch", scratch)
-                return 1
-            shutil.rmtree(scratch)  # a fresh run gets a fresh database and logs
-        scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if not _prepare_scratch(scratch):
+            return 1
         config_path, force = scratch / "config.yaml", True  # the scratch dir belongs to the run
     if not can_write(config_path, force):
         logger.error("%s wasn't written by dev-setup.py; use --force to replace it or --config elsewhere", config_path)
         return 1
     _remove_run(runtime, run)
+    dev = run == DEFAULT_RUN
     backends = _backends(run)
-    require_free({b.container: b.published_port for b in backends})
+    app_port = DEV_APP_PORT if dev else free_port()
+    idp = keycloak.Keycloak(container_name(run, "keycloak", "keycloak-dev"), keycloak.DEV_PORT if dev else free_port())
+    ports = {b.container: b.published_port for b in backends}
+    if auth == "oidc":
+        ports[idp.container] = idp.host_port
+    require_free(ports)
     credentials: dict[Backend, tuple[str, str]] = {}
     tokens: dict[Backend, str] = {}
     for backend in backends:
@@ -112,24 +155,36 @@ def setup(runtime: Runtime, run: str, scratch: Path | None, config_path: Path, f
         seed(client)
         credentials[backend] = setup_approle(client)
         logger.info("%s ready at %s", backend.container, backend.address)
-    write_dev_config(config_path, credentials, force=force)
+    app_url = f"http://localhost:{app_port}"
+    auth_config, passwords = None, {}
+    if auth == "oidc":
+        auth_config, passwords = _start_keycloak(runtime, idp, run, f"{app_url}/api/v1/auth/callback")
+    write_dev_config(config_path, credentials, force=force, auth=auth_config)
     logger.info("Wrote %s", config_path)
+    urls = {"app": app_url, **{b.config_name: b.address for b in backends}}
+    if auth == "oidc":
+        urls["keycloak"] = idp.address
     if scratch is not None:
         info = RunInfo(
             run=run,
             scratch=scratch,
             config=config_path,
-            containers=[b.container for b in backends],
-            urls={b.config_name: b.address for b in backends},
+            containers=[b.container for b in backends] + ([idp.container] if auth == "oidc" else []),
+            urls=urls,
+            users=passwords,
             root_tokens={b.config_name: tokens[b] for b in backends},
         )
         logger.info("Wrote %s; remove the run with: ./dev-setup.py --cleanup --run %s", info.write(), run)
     else:
-        logger.info("Run: uv run uvicorn chronowarden:app --reload")
-    # Printed, not logged: dev-only root tokens for poking at the servers by hand
+        logger.info("Run: uv run uvicorn chronowarden:app --reload --port %d", app_port)
+    # Printed, not logged: dev-only credentials for poking at the servers by hand
     print("\nRoot tokens (dev only):")
     for backend, token in tokens.items():
         print(f"  {backend.container} {backend.address}: {token}")
+    if passwords:
+        print(f"Keycloak users at {idp.address} (dev only):")
+        for user, password in passwords.items():
+            print(f"  {user}: {password}")
     return 0
 
 
@@ -166,6 +221,7 @@ def main() -> int:
     parser.add_argument("--cleanup", action="store_true", help="remove the run's containers and scratch dir and exit")
     parser.add_argument("--list", action="store_true", help="list the runs that have containers and exit")
     parser.add_argument("--config", type=Path, default=Path("config.yaml"), help="where the dev run writes its config")
+    parser.add_argument("--auth", choices=["none", "oidc"], default="none", help="login: none, or oidc via Keycloak")
     parser.add_argument("--force", action="store_true", help="replace a config not written by dev-setup.py")
     args = parser.parse_args()
     try:
@@ -176,7 +232,7 @@ def main() -> int:
             return list_runs(runtime)
         if args.cleanup:
             return cleanup(runtime, run, scratch)
-        return setup(runtime, run, scratch, args.config, args.force)
+        return setup(runtime, run, scratch, args.config, args.force, args.auth)
     except (ContainerRuntimeError, RunError) as exc:
         print(f"dev-setup: {exc}", file=sys.stderr)
         return 1

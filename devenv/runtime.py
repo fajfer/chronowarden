@@ -41,6 +41,7 @@ class ContainerSpec:
     env: dict[str, str] = field(default_factory=dict)
     cap_add: list[str] = field(default_factory=list)
     labels: dict[str, str] = field(default_factory=dict)
+    command: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -74,7 +75,7 @@ class Runtime:
             args += ["--cap-add", cap]
         for key, value in spec.labels.items():
             args += ["--label", f"{key}={value}"]
-        self._run(*args, spec.image)
+        self._run(*args, spec.image, *spec.command)
 
     def remove(self, name: str) -> None:
         """Force-remove a container."""
