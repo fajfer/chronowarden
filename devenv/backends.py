@@ -7,7 +7,7 @@
 import random
 import secrets
 import string
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import hvac
 
@@ -24,21 +24,36 @@ POLICY = "\n".join(
 
 @dataclass(frozen=True)
 class Backend:
-    """A dev backend: image, port and how its dev server takes a root token."""
+    """A dev backend: image, ports and how its dev server takes a root token."""
 
     container: str
     config_name: str
     image: str
-    port: int
+    port: int  # inside the container
     root_token_env: str
     severity: str
     extra_env: tuple[tuple[str, str], ...] = ()
     cap_add: tuple[str, ...] = ()
+    host_port: int | None = None  # published on 127.0.0.1; defaults to `port`
+
+    @property
+    def service(self) -> str:
+        """Short name in run container names: `openbao`, `vault`."""
+        return self.config_name.removeprefix("dev-")
+
+    @property
+    def published_port(self) -> int:
+        """The port on the host."""
+        return self.port if self.host_port is None else self.host_port
 
     @property
     def address(self) -> str:
         """Address on the host."""
-        return f"http://localhost:{self.port}"
+        return f"http://localhost:{self.published_port}"
+
+    def for_run(self, container: str, host_port: int) -> "Backend":
+        """This backend under another container name and host port (for a named run)."""
+        return replace(self, container=container, host_port=host_port)
 
 
 OPENBAO = Backend(

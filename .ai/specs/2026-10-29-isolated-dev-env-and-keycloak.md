@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Isolated dev environments with Keycloak
 
-- **Status:** approved
+- **Status:** in progress
 - **Date:** 2026-10-29
 - **Issue:** none
 
@@ -77,7 +77,7 @@ None.
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | Runs: names, labels, free ports, port check, scratch dir, `run.json`, `--list`, `--cleanup --run`; `dev` unchanged | `dev-setup.py`, `devenv/runtime.py`, `devenv/config.py` | Two runs side by side and `dev` untouched; unit tests for naming, port choice and cleanup by label | todo | |
+| 1 | Runs: names, labels, free ports, port check, scratch dir, `run.json`, `--list`, `--cleanup --run`; `dev` unchanged | `dev-setup.py`, `devenv/runtime.py`, `devenv/config.py` | Two runs side by side and `dev` untouched; unit tests for naming, port choice and cleanup by label | done | |
 | 2 | Keycloak: realm template, start and wait, `--auth oidc` config | `devenv/`, `docs/guides/authentication.md` | Logging in as each user in a browser gives the expected role in `/api/v1/auth/me` | todo | |
 | 3 | Seed owners and systems; `--receiver`; `--app` and `--app image` | `devenv/backends.py`, `tests/conftest.py` | A sync sends a webhook the receiver records; the `owner` user acts for the seeded owner | todo | |
 | 4 | Integration test: Keycloak in testcontainers, the full authorization code flow driven over HTTP (login form post), roles per user, logout | `tests/integration`, `chronowarden/auth/oidc.py` | `pytest -m integration` green locally and in the existing CI integration job | todo | |
