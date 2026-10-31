@@ -40,6 +40,13 @@ class ContainerSpec:
     ports: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
     cap_add: list[str] = field(default_factory=list)
+    labels: dict[str, str] = field(default_factory=dict)
+    command: list[str] = field(default_factory=list)
+    volumes: list[str] = field(default_factory=list)
+    network: str | None = None
+    workdir: str | None = None
+    entrypoint: str | None = None
+    extra_args: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -71,8 +78,29 @@ class Runtime:
             args += ["-e", f"{key}={value}"]
         for cap in spec.cap_add:
             args += ["--cap-add", cap]
-        self._run(*args, spec.image)
+        for key, value in spec.labels.items():
+            args += ["--label", f"{key}={value}"]
+        for volume in spec.volumes:
+            args += ["-v", volume]
+        for flag, value in (
+            ("--network", spec.network),
+            ("--workdir", spec.workdir),
+            ("--entrypoint", spec.entrypoint),
+        ):
+            if value is not None:
+                args += [flag, value]
+        args += spec.extra_args
+        self._run(*args, spec.image, *spec.command)
 
     def remove(self, name: str) -> None:
         """Force-remove a container."""
         self._run("rm", "--force", name)
+
+    def labelled(self, key: str, value: str | None = None) -> list[str]:
+        """Names of all containers (running or stopped) carrying label `key`, or `key=value` when given."""
+        selector = key if value is None else f"{key}={value}"
+        return self._run("ps", "-a", "--filter", f"label={selector}", "--format", "{{.Names}}").split()
+
+    def label(self, name: str, key: str) -> str:
+        """The value of label `key` on container `name` (empty if unset)."""
+        return self._run("inspect", "--format", f'{{{{index .Config.Labels "{key}"}}}}', name).strip()

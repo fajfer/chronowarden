@@ -14,6 +14,18 @@ git history.
 
 ## [Unreleased]
 
+### Added
+
+- Named dev environments: `./dev-setup.py --run <name>` starts its own OpenBao and Vault on free ports with a private
+  config, database and logs, side by side with the default one; `--list` and `--cleanup --run` manage them.
+  `--auth oidc` adds a Keycloak with an admin, an owner and a viewer user, `--receiver` a local webhook receiver,
+  and `--app` (or `--app image`) Chronowarden itself, with a seeded owner and system.
+- An integration test logs in through a real Keycloak (until now OIDC was tested against a fake provider).
+
+### Fixed
+
+- Local image builds no longer copy a local `frontend/node_modules` or database into the image (`.dockerignore`).
+
 ## [0.9.0] - 2026-10-29
 
 Access control: people log in through OIDC or an authenticating proxy, pipelines use API tokens, and admin, owner

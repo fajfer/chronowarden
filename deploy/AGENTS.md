@@ -66,7 +66,7 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   `zizmor: ignore[unpinned-uses]`. A release tag fails unless `pyproject.toml` and `CHANGELOG.md` match it.
 - `frontend-builder` runs on `$BUILDPLATFORM`: its output is arch-independent, and `npm ci` under QEMU arm64
   emulation hung intermittently (v0.6.2 tag build). Keep it native.
-- `dev-setup.py` (podman, else docker) keeps a `config.yaml` it didn't write; `devenv/` images are fully qualified.
+- `dev-setup.py` (podman, else docker) keeps a `config.yaml` it didn't write; [runs](../.ai/docs/dev-env.md).
 - `deployment.yaml` and `cronjob-sync.yaml` pin image tags; bump them with each release.
 
 ## Related ADRs
