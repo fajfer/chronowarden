@@ -11,10 +11,13 @@ Every environment is a named run (`--run`, default `dev`); see .ai/docs/dev-env.
 
 import argparse
 import logging
+import os
 import shutil
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import hvac
 from requests.exceptions import RequestException
@@ -22,6 +25,7 @@ from requests.exceptions import RequestException
 from devenv import keycloak
 from devenv.backends import BACKENDS, Backend, random_token, seed, setup_approle
 from devenv.config import can_write, write_dev_config
+from devenv.processes import spawn, stop, wait_http, wait_listening
 from devenv.runs import (
     DEFAULT_RUN,
     LABEL,
@@ -35,10 +39,14 @@ from devenv.runs import (
     require_free,
 )
 from devenv.runtime import ContainerRuntimeError, ContainerSpec, Runtime, detect_runtime
+from devenv.seed import seed_database
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("dev-setup")
 
+REPO = Path(__file__).resolve().parent
+APP_IMAGE = "chronowarden:test"  # docker build -t chronowarden:test . (deploy/AGENTS.md); podman adds localhost/
+WEBHOOKS_FILE = "webhooks.jsonl"
 DEV_APP_PORT = 8000  # uvicorn's default, where the dev run's OIDC redirect URI points
 
 
@@ -117,19 +125,91 @@ def _start_keycloak(
     return keycloak.oidc_auth(idp, client_secret, redirect_uri), passwords
 
 
+def _stop_processes(info: dict) -> None:
+    """Stop the processes a run recorded in run.json (by PID only)."""
+    for name, pid in info.get("pids", {}).items():
+        if stop(pid):
+            logger.info("Stopped %s (PID %d)", name, pid)
+
+
 def _prepare_scratch(scratch: Path) -> bool:
     """Empty `scratch` for a fresh run (only if a run created it) and create it private; False if it can't be used."""
     if scratch.is_dir() and any(scratch.iterdir()):
         if read_run(scratch) is None:
             logger.error("%s isn't empty and has no run.json; choose another --scratch", scratch)
             return False
+        _stop_processes(read_run(scratch) or {})
         shutil.rmtree(scratch)  # a fresh run gets a fresh database and logs
     scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
     return True
 
 
-def setup(runtime: Runtime, run: str, scratch: Path | None, config_path: Path, force: bool, auth: str = "none") -> int:
-    """Start, seed and configure the dev backends (and Keycloak for `auth` oidc) of `run`; returns the exit code."""
+@dataclass(frozen=True)
+class Options:
+    """What a run starts besides the vaults."""
+
+    auth: str = "none"  # or "oidc": Keycloak
+    receiver: bool = False  # a webhook receiver writing <scratch>/webhooks.jsonl
+    app: Optional[str] = None  # "source" or "image": start Chronowarden too
+
+
+def _start_receiver(scratch: Path, port: int) -> int:
+    """Start the webhook receiver; returns its PID."""
+    process = spawn(
+        [sys.executable, "-m", "devenv.receiver", "--port", str(port), "--out", str(scratch / WEBHOOKS_FILE)],
+        cwd=REPO,
+        log=scratch / "receiver.log",
+    )
+    wait_listening(port, process, scratch / "receiver.log")
+    return process.pid
+
+
+def _start_app_source(scratch: Path, config_path: Path, port: int) -> int:
+    """Start Chronowarden from this checkout with the run's config, working dir and port; returns its PID."""
+    log = scratch / "app.log"
+    process = spawn(
+        [sys.executable, "-m", "uvicorn", "chronowarden:app", "--host", "127.0.0.1", "--port", str(port)]
+        + ["--no-proxy-headers"],
+        cwd=scratch,
+        log=log,
+        env={"CHRONOWARDEN_CONFIG": str(config_path)},
+    )
+    wait_http(f"http://localhost:{port}/api/v1/ready", 60, lambda: process.poll() is None, str(log))
+    return process.pid
+
+
+def _start_app_image(runtime: Runtime, run: str, scratch: Path, port: int) -> str:
+    """Start the locally built production image with the scratch dir as /data; returns the container name."""
+    name = container_name(run, "app", "chronowarden-dev")
+    # Run as the host user: the scratch dir is private to it (podman also has to map it into the container)
+    user = ["--user", f"{os.getuid()}:{os.getgid()}"] + (["--userns=keep-id"] if runtime.cli == "podman" else [])
+    runtime.start(
+        ContainerSpec(
+            name=name,
+            image=f"localhost/{APP_IMAGE}" if runtime.cli == "podman" else APP_IMAGE,
+            env={"CHRONOWARDEN_CONFIG": "/data/config.yaml"},
+            labels={LABEL: run},
+            volumes=[f"{scratch}:/data"],
+            network="host",  # reaches the run's vaults, Keycloak and receiver on localhost, like the browser
+            workdir="/data",
+            entrypoint="python",
+            command=["-m", "uvicorn", "chronowarden:app", "--host", "127.0.0.1", "--port", str(port)]
+            + ["--no-proxy-headers"],
+            extra_args=user,
+        )
+    )
+    wait_http(f"http://localhost:{port}/api/v1/ready", 90, lambda: runtime.running(name), f"{runtime.cli} logs {name}")
+    return name
+
+
+def setup(
+    runtime: Runtime, run: str, scratch: Path | None, config_path: Path, force: bool, options: Options = Options()
+) -> int:
+    """Start, seed and configure the dev backends (and what `options` asks for) of `run`; returns the exit code."""
+    auth = options.auth
+    if run == DEFAULT_RUN and (options.receiver or options.app):
+        logger.error("--receiver and --app need a named run (--run <name>); the dev run is started by hand")
+        return 1
     if scratch is not None:
         if not _prepare_scratch(scratch):
             return 1
@@ -145,6 +225,11 @@ def setup(runtime: Runtime, run: str, scratch: Path | None, config_path: Path, f
     ports = {b.container: b.published_port for b in backends}
     if auth == "oidc":
         ports[idp.container] = idp.host_port
+    receiver_port = free_port()
+    if options.receiver:
+        ports["receiver"] = receiver_port
+    if options.app:
+        ports["app"] = app_port
     require_free(ports)
     credentials: dict[Backend, tuple[str, str]] = {}
     tokens: dict[Backend, str] = {}
@@ -159,7 +244,11 @@ def setup(runtime: Runtime, run: str, scratch: Path | None, config_path: Path, f
     auth_config, passwords = None, {}
     if auth == "oidc":
         auth_config, passwords = _start_keycloak(runtime, idp, run, f"{app_url}/api/v1/auth/callback")
-    write_dev_config(config_path, credentials, force=force, auth=auth_config)
+    receiver_url = f"http://127.0.0.1:{receiver_port}" if options.receiver else None
+    alerting = None
+    if receiver_url is not None:
+        alerting = {"enabled": True, "default_routes": [{"name": "dev-receiver", "url": f"{receiver_url}/default"}]}
+    write_dev_config(config_path, credentials, force=force, auth=auth_config, alerting=alerting)
     logger.info("Wrote %s", config_path)
     urls = {"app": app_url, **{b.config_name: b.address for b in backends}}
     if auth == "oidc":
@@ -174,7 +263,22 @@ def setup(runtime: Runtime, run: str, scratch: Path | None, config_path: Path, f
             users=passwords,
             root_tokens={b.config_name: tokens[b] for b in backends},
         )
-        logger.info("Wrote %s; remove the run with: ./dev-setup.py --cleanup --run %s", info.write(), run)
+        info.write()  # before starting processes: cleanup finds them even if a later step fails
+        route_secret = seed_database(scratch / "chronowarden.db", f"{receiver_url}/owner" if receiver_url else None)
+        if route_secret is not None:
+            info.signing_secrets["owner-route"] = route_secret
+        if receiver_url is not None:
+            info.urls["receiver"] = receiver_url
+            info.pids["receiver"] = _start_receiver(scratch, receiver_port)
+            info.write()
+        if options.app == "source":
+            info.pids["app"] = _start_app_source(scratch, config_path, app_port)
+        elif options.app == "image":
+            info.containers.append(_start_app_image(runtime, run, scratch, app_port))
+        info.write()
+        logger.info("Wrote %s; remove the run with: ./dev-setup.py --cleanup --run %s", scratch / "run.json", run)
+        if options.app:
+            logger.info("Chronowarden at %s", app_url)
     else:
         logger.info("Run: uv run uvicorn chronowarden:app --reload --port %d", app_port)
     # Printed, not logged: dev-only credentials for poking at the servers by hand
@@ -193,9 +297,11 @@ def cleanup(runtime: Runtime, run: str, scratch: Path | None) -> int:
     if not _remove_run(runtime, run):
         logger.info("Run %s has no containers, nothing to remove", run)
     if scratch is not None and scratch.is_dir():
-        if read_run(scratch) is None:
+        info = read_run(scratch)
+        if info is None:
             logger.error("%s has no run.json; not deleting a directory dev-setup.py didn't create", scratch)
             return 1
+        _stop_processes(info)
         shutil.rmtree(scratch)
         logger.info("Removed %s", scratch)
     return 0
@@ -222,6 +328,10 @@ def main() -> int:
     parser.add_argument("--list", action="store_true", help="list the runs that have containers and exit")
     parser.add_argument("--config", type=Path, default=Path("config.yaml"), help="where the dev run writes its config")
     parser.add_argument("--auth", choices=["none", "oidc"], default="none", help="login: none, or oidc via Keycloak")
+    parser.add_argument("--receiver", action="store_true", help="start a webhook receiver (<scratch>/webhooks.jsonl)")
+    parser.add_argument(
+        "--app", nargs="?", const="source", choices=["source", "image"], help="start Chronowarden: source or image"
+    )
     parser.add_argument("--force", action="store_true", help="replace a config not written by dev-setup.py")
     args = parser.parse_args()
     try:
@@ -232,7 +342,7 @@ def main() -> int:
             return list_runs(runtime)
         if args.cleanup:
             return cleanup(runtime, run, scratch)
-        return setup(runtime, run, scratch, args.config, args.force, args.auth)
+        return setup(runtime, run, scratch, args.config, args.force, Options(args.auth, args.receiver, args.app))
     except (ContainerRuntimeError, RunError) as exc:
         print(f"dev-setup: {exc}", file=sys.stderr)
         return 1

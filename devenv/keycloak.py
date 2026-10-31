@@ -34,11 +34,12 @@ class Keycloak:
 
     container: str
     host_port: int
+    host: str = "localhost"
 
     @property
     def address(self) -> str:
         """Base URL on the host."""
-        return f"http://localhost:{self.host_port}"
+        return f"http://{self.host}:{self.host_port}"
 
     @property
     def issuer(self) -> str:

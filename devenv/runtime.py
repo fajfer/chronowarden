@@ -42,6 +42,11 @@ class ContainerSpec:
     cap_add: list[str] = field(default_factory=list)
     labels: dict[str, str] = field(default_factory=dict)
     command: list[str] = field(default_factory=list)
+    volumes: list[str] = field(default_factory=list)
+    network: str | None = None
+    workdir: str | None = None
+    entrypoint: str | None = None
+    extra_args: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -75,6 +80,16 @@ class Runtime:
             args += ["--cap-add", cap]
         for key, value in spec.labels.items():
             args += ["--label", f"{key}={value}"]
+        for volume in spec.volumes:
+            args += ["-v", volume]
+        for flag, value in (
+            ("--network", spec.network),
+            ("--workdir", spec.workdir),
+            ("--entrypoint", spec.entrypoint),
+        ):
+            if value is not None:
+                args += [flag, value]
+        args += spec.extra_args
         self._run(*args, spec.image, *spec.command)
 
     def remove(self, name: str) -> None:

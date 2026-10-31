@@ -18,9 +18,15 @@ class ConfigExistsError(Exception):
     """The config file exists and wasn't written by dev-setup.py."""
 
 
-def dev_config(credentials: dict[Backend, tuple[str, str]], auth: Optional[dict[str, Any]] = None) -> dict:
+def dev_config(
+    credentials: dict[Backend, tuple[str, str]],
+    auth: Optional[dict[str, Any]] = None,
+    alerting: Optional[dict[str, Any]] = None,
+) -> dict:
     """The config for the dev backends, authenticating with their AppRoles; no login unless `auth` is given."""
+    extra = {} if alerting is None else {"alerting": alerting}
     return {
+        **extra,
         "auth": auth or {"mode": "none"},
         "vaults": [
             {
@@ -48,6 +54,7 @@ def write_dev_config(
     credentials: dict[Backend, tuple[str, str]],
     force: bool = False,
     auth: Optional[dict[str, Any]] = None,
+    alerting: Optional[dict[str, Any]] = None,
 ) -> None:
     """
     Write the dev config, unless a config not written by dev-setup.py is there and `force` isn't set.
@@ -59,4 +66,4 @@ def write_dev_config(
         raise ConfigExistsError(
             f"{path} wasn't written by dev-setup.py; use --force to replace it or --config elsewhere"
         )
-    path.write_text(HEADER + yaml.safe_dump(dev_config(credentials, auth), sort_keys=False))
+    path.write_text(HEADER + yaml.safe_dump(dev_config(credentials, auth, alerting), sort_keys=False))

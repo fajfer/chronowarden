@@ -86,6 +86,7 @@ class RunInfo:
     users: dict[str, str] = field(default_factory=dict)
     pids: dict[str, int] = field(default_factory=dict)
     root_tokens: dict[str, str] = field(default_factory=dict)
+    signing_secrets: dict[str, str] = field(default_factory=dict)
 
     def to_json(self) -> dict[str, Any]:
         """A JSON-ready dict (paths as strings)."""
@@ -98,6 +99,7 @@ class RunInfo:
             "users": self.users,
             "pids": self.pids,
             "root_tokens": self.root_tokens,
+            "signing_secrets": self.signing_secrets,
         }
 
     def write(self) -> Path:

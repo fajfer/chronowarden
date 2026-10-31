@@ -6,17 +6,25 @@
 
 import importlib.util
 import json
+import signal
 import socket
+import sys
+import threading
+import time
 from pathlib import Path
 from types import ModuleType
 
 import pytest
+import requests
 import yaml
 
 from chronowarden.config import load_config
+from chronowarden.database import Database
 from devenv import keycloak
 from devenv.backends import OPENBAO, VAULT
 from devenv.config import HEADER, can_write, write_dev_config
+from devenv.processes import spawn, stop, wait_http
+from devenv.receiver import make_server
 from devenv.runs import (
     DEFAULT_RUN,
     LABEL,
@@ -31,6 +39,7 @@ from devenv.runs import (
     require_free,
 )
 from devenv.runtime import ContainerRuntimeError, ContainerSpec, Runtime, detect_runtime
+from devenv.seed import OWNED_SECRETS, OWNER_EMAIL, seed_database
 
 CREDENTIALS = {OPENBAO: ("role-a", "secret-a"), VAULT: ("role-b", "secret-b")}
 
@@ -242,3 +251,65 @@ class TestKeycloak:
         assert config.auth.oidc is not None
         assert config.auth.oidc.issuer == "http://localhost:49200/realms/chronowarden"
         assert config.auth.roles.admin == ["cw-admins"]
+
+
+class TestProcesses:
+    def test_spawn_and_stop_by_pid(self, tmp_path: Path) -> None:
+        process = spawn(
+            [sys.executable, "-c", "import time; print('up', flush=True); time.sleep(60)"], tmp_path, tmp_path / "log"
+        )
+        assert stop(process.pid)
+        assert not stop(process.pid)  # gone (and reaped) once stop() returns
+
+    def test_stop_kills_what_ignores_sigterm(self, tmp_path: Path) -> None:
+        code = (
+            "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); print('up', flush=True); "
+            "time.sleep(60)"
+        )
+        process = spawn([sys.executable, "-c", code], tmp_path, tmp_path / "log")
+        wait_until = time.monotonic() + 5
+        while "up" not in (tmp_path / "log").read_text() and time.monotonic() < wait_until:
+            time.sleep(0.05)
+        assert stop(process.pid, timeout=0.5)
+        assert process.wait(timeout=5) == -signal.SIGKILL
+
+    def test_wait_http_fails_fast_when_the_process_dies(self, tmp_path: Path) -> None:
+        process = spawn([sys.executable, "-c", "raise SystemExit(3)"], tmp_path, tmp_path / "log")
+        with pytest.raises(ContainerRuntimeError, match="exited; see app.log"):
+            wait_http(f"http://127.0.0.1:{free_port()}/", 10, lambda: process.poll() is None, "app.log")
+
+
+class TestReceiver:
+    def test_records_requests_as_json_lines(self, tmp_path: Path) -> None:
+        out = tmp_path / "webhooks.jsonl"
+        server = make_server(0, out)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}/owner"
+            assert requests.post(url, json={"a": 1}, headers={"webhook-signature": "v1,x"}, timeout=5).ok
+        finally:
+            server.shutdown()
+        (entry,) = [json.loads(line) for line in out.read_text().splitlines()]
+        assert (entry["path"], json.loads(entry["body"])) == ("/owner", {"a": 1})
+        assert entry["headers"]["webhook-signature"] == "v1,x"
+
+
+class TestSeed:
+    def test_owner_system_and_signed_route(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "chronowarden.db"
+        secret = seed_database(db_path, "http://127.0.0.1:9/owner")
+        assert secret is not None and secret.startswith("whsec_")
+        db = Database(db_path)
+        db.connect()
+        try:
+            (owner,) = db.list_owners()
+            assert (owner["id"], owner["email"], owner["idp_group"]) == ("team-owner", OWNER_EMAIL, "teams")
+            (route,) = db.list_notification_routes("team-owner")
+            assert route["signed"] and route["address"] == "http://127.0.0.1:9/owner"
+            systems, owners = db.get_assignments()
+            assert all(systems[i] == "payments" and owners[i] == ["team-owner"] for i in OWNED_SECRETS)
+        finally:
+            db.close()
+
+    def test_without_receiver_no_route(self, tmp_path: Path) -> None:
+        assert seed_database(tmp_path / "chronowarden.db", None) is None
