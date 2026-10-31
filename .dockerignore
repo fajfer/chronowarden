@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+# Local build output and state must not reach the image: `COPY frontend/` would put a local node_modules over the
+# one `npm ci` installed, and `COPY chronowarden/` would ship a local database.
+frontend/node_modules
+frontend/build
+frontend/.svelte-kit
+**/__pycache__
+**/*.db
