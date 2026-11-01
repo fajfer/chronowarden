@@ -8,7 +8,7 @@
 #   identical for every target, and npm under QEMU emulation can hang.
 # ============================================================================
 # Base images are pinned by digest (tag kept for readers); Dependabot updates both.
-FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS frontend-builder
 
 WORKDIR /app/frontend
 
