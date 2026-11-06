@@ -5,9 +5,9 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-028: Release integrity with SBOMs in SPDX 3.0
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-07
-- **Evidence:** maintainer request of 2026-11-07; syft v1.46.0 added SPDX 3 output (anchore/syft#4269); the
+- **Evidence:** maintainer request and acceptance of 2026-11-07; syft v1.46.0 added SPDX 3 output (anchore/syft#4269); the
   in-toto SPDX 3 predicate `https://spdx.dev/Document/v3`
 - **Supersedes:** ADR-018
 
