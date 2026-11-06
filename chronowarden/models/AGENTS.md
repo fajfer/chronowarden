@@ -39,6 +39,7 @@ Pydantic request/response schemas (`chronowarden/models/`) and the SQLite metada
 - `SecretMetadataResponse` fields are mirrored in `frontend/src/lib/types/Secret.ts`, `Owner` in `Owner.ts`:
   changing a field means changing both.
 - `full_path` is computed as `vault_name/engine_id/secret_path`.
+- `connect()` makes the DB file and its `-wal`/`-shm` files `0600` (owner-only); a failed chmod is only logged.
 - `Database` uses one shared connection (`check_same_thread=False`) in WAL mode. Every method takes
   `self._conn_lock` (an `RLock`) and calls `_require_connection()`, which logs and returns `None` when the DB is
   not connected. Callers get `None`/empty results instead of an exception.

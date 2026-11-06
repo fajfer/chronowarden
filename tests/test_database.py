@@ -4,7 +4,10 @@
 
 """Tests for SQLite database operations."""
 
+import logging
+import os
 import sqlite3
+import stat
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -184,6 +187,57 @@ class TestDatabaseConnection:
         db = Database(db_path=tmp_path / "double_close.db")
         db.connect()
         db.close()
+        db.close()
+
+
+class TestDatabaseFilePermissions:
+    """The database file is owner-only (0600), whatever the umask."""
+
+    @staticmethod
+    def _mode(path: Path) -> int:
+        return stat.S_IMODE(path.stat().st_mode)
+
+    def test_a_new_database_is_created_owner_only(self, tmp_path: Path) -> None:
+        old_umask = os.umask(0o022)
+        try:
+            db = Database(db_path=tmp_path / "new.db")
+            db.connect()
+            db.upsert_secret_metadata(SecretMetadataCache(vault_name="v", engine_id="e", secret_path="s"))
+        finally:
+            os.umask(old_umask)
+        assert self._mode(tmp_path / "new.db") == 0o600
+        assert self._mode(tmp_path / "new.db-wal") == 0o600
+        db.close()
+
+    def test_an_existing_database_and_its_wal_files_are_restricted(self, tmp_path: Path) -> None:
+        paths = [tmp_path / name for name in ("old.db", "old.db-wal", "old.db-shm")]
+        sqlite3.connect(paths[0]).close()
+        for path in paths:
+            path.touch()
+            path.chmod(0o644)
+        db = Database(db_path=paths[0])
+        db.connect()
+        assert [self._mode(path) for path in paths] == [0o600, 0o600, 0o600]
+        db.close()
+
+    def test_in_memory_database_is_left_alone(self) -> None:
+        db = Database(db_path=Path(":memory:"))
+        db.connect()
+        assert not Path(":memory:").exists()
+        db.close()
+
+    def test_a_file_that_cannot_be_changed_is_logged_not_fatal(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def refuse(self: Path, mode: int) -> None:
+            raise PermissionError(1, "Operation not permitted")
+
+        monkeypatch.setattr(Path, "chmod", refuse)
+        db = Database(db_path=tmp_path / "shared.db")
+        with caplog.at_level(logging.WARNING):
+            db.connect()
+        assert "Cannot restrict" in caplog.text and "Operation not permitted" in caplog.text
+        assert db.list_all_secrets() == []
         db.close()
 
 

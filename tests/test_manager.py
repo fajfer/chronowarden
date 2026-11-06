@@ -5,6 +5,7 @@
 """Tests for Vault manager behavior."""
 
 import asyncio
+import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -268,6 +269,17 @@ class TestProviderManagerBuildIntegration:
             "r",
             "s",
         )
+
+    def test_verify_ssl_false_is_warned_about(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            VaultIntegration.from_config(VaultConfig(name="checked", address="https://v:8200", token="t"), None)
+        assert "verify_ssl" not in caplog.text
+        with caplog.at_level(logging.WARNING):
+            VaultIntegration.from_config(
+                VaultConfig(name="unchecked", address="https://v:8200", token="t", verify_ssl=False), None
+            )
+        assert [r.levelname for r in caplog.records] == ["WARNING"]
+        assert "'unchecked' has verify_ssl: false" in caplog.text
 
     def test_the_manager_builds_by_type(self) -> None:
         assert "vault" in provider_types()

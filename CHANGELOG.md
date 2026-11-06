@@ -14,6 +14,12 @@ git history.
 
 ## [Unreleased]
 
+### Security
+
+- The database file (`chronowarden.db`, and its `-wal` and `-shm` files) is created owner-only (`0600`), and an
+  existing one is restricted on start, whatever the umask. A file the process can't change is logged and left as is.
+- A vault with `verify_ssl: false` is logged as a warning at startup, since its TLS certificate isn't checked.
+
 ## [0.9.0] - 2026-10-29
 
 Access control: people log in through OIDC or an authenticating proxy, pipelines use API tokens, and admin, owner
