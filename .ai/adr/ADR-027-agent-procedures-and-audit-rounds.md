@@ -5,9 +5,9 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-027: Agent procedures in `.agents/skills`, thin tool wrappers, audit rounds outside the repo
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-31
-- **Evidence:** maintainer decisions of 2026-10-29 on the [auditor spec](../specs/2026-10-29-auditor-agent.md) and
+- **Evidence:** accepted by the maintainer 2026-11-07; maintainer decisions of 2026-10-29 on the [auditor spec](../specs/2026-10-29-auditor-agent.md) and
   the [live-QA spec](../specs/2026-10-29-live-qa-agent.md); the first round `~/chronowarden-audits/2026-10-18-owasp/`
 - **Supersedes:** none
 
