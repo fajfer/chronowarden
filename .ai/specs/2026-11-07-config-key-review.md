@@ -46,7 +46,7 @@ asks for it.
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | The maintainer decides each candidate under **Open questions** (keep / rename to X / remove / move) | this spec | Every candidate has a decision written next to it | todo | |
+| 1 | The maintainer decides each candidate under **Open questions** (keep / rename to X / remove / move) | this spec | Every candidate has a decision written next to it | doing | |
 | 2 | Apply the decisions in `config.py` and `config.example.yaml`; adjust `tests/test_config.py` (an old key is an error, through `extra="forbid"`) | spec Load, `tests/test_config.py` | `uv run pytest tests/test_config.py` passes; `config.example.yaml` loads | todo | |
 | 3 | Update everything that writes or documents config: `devenv/config.py`, `deploy/` (Compose, Kubernetes), `docs/reference/`, `README.md`, the config examples in the open Azure Key Vault and GCP Secret Manager specs | spec Load, the files named | `git grep` finds no old key name outside `CHANGELOG.md` and `implemented/` specs | todo | |
 | 4 | Key freeze test: `tests/test_config_keys.py` derives every key path from `AppConfig` and compares it with a checked-in list; a missing path fails with a message citing ADR-016, a new path asks to add it to the list | `chronowarden/config.py`, ADR-016 | Removing or renaming any key makes the test fail; adding one makes it fail until the list is updated | todo | |
@@ -72,14 +72,17 @@ Candidates, for the maintainer to decide (the agent proposes, it doesn't choose)
 - **`vaults:` → `providers:`?** Backends are generic since ADR-011, and the next ones (Azure Key Vault, GCP Secret
   Manager) are listed under `vaults:` with a `type:`. With it: `vault_reconnect_interval` →
   `reconnect_interval`, `vault_reconnect_max_attempts` → `reconnect_max_attempts`. Should this land before the
-  Azure and GCP providers, so they never ship under `vaults:`?
+  Azure and GCP providers, so they never ship under `vaults:`? **Decided 2026-11-07: keep `vaults:`** (and the
+  `vault_reconnect_*` keys).
 - **`vaults[].engines[]`:** "engine" is Vault's word; the cloud providers have no engines. Keep, or a neutral name?
 - **`vaults[].mount_path`:** only the default mount for `list_secrets` calls that don't pass one; sync discovers
   engines. Still needed?
 - **Inline credentials** (`token`, `role_id`, `secret_id`, `auth.oidc.client_secret`) next to their `_env` and
-  `_file` forms: keep all three, or only `_env` and `_file` from 1.0?
+  `_file` forms: keep all three, or only `_env` and `_file` from 1.0? **Decided 2026-11-07: only `_env` and
+  `_file`**; the inline `token`, `role_id`, `secret_id` and `auth.oidc.client_secret` are removed.
 - **`sentry_dsn`, `sentry_traces_sample_rate`, `sentry_profiles_sample_rate`:** flat at the top level, while
-  `metrics`, `ui`, `alerting` and `auth` are sections. Move to `sentry:`?
+  `metrics`, `ui`, `alerting` and `auth` are sections. Move to `sentry:`? **Decided 2026-11-07: yes**,
+  `sentry.dsn`, `sentry.traces_sample_rate`, `sentry.profiles_sample_rate`.
 - **`date_format`** (top level and per vault) and **`confirmation_grace`** (top level and per expiry profile): keep
   both levels?
 - **`ca_certs_dir`:** global, used only for vault connections. Keep it global, or move it per vault?
