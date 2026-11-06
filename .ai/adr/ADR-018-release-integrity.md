@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-018: Release integrity with SLSA Build L3, cosign and SBOMs
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-028
 - **Date:** 2026-10-11
 - **Evidence:** maintainer decisions of 2026-10-10 and 2026-10-11; supply-chain spec
 - **Supersedes:** none

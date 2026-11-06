@@ -62,7 +62,7 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   `.clusterfuzzlite/` on the OSS-Fuzz builder, which runs **Python 3.11** (the project declares 3.12+):
   `build.sh` installs the `uv.lock` versions with uv (hash-pinned in `.clusterfuzzlite/requirements.txt`) and the
   package with `--ignore-requires-python`. Code the fuzzers import must keep running on 3.11.
-- The SLSA generator is referenced by tag (`@v2.1.0`; the verifier trusts only tagged releases, ADR-018): the one
+- The SLSA generator is referenced by tag (`@v2.1.0`; the verifier trusts only tagged releases, ADR-028): the one
   `zizmor: ignore[unpinned-uses]`. A release tag fails unless `pyproject.toml` and `CHANGELOG.md` match it.
 - `frontend-builder` runs on `$BUILDPLATFORM`: its output is arch-independent, and `npm ci` under QEMU arm64
   emulation hung intermittently (v0.6.2 tag build). Keep it native.
