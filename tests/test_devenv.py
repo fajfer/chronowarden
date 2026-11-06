@@ -6,6 +6,7 @@
 
 import importlib.util
 import json
+import re
 import signal
 import socket
 import sys
@@ -21,7 +22,7 @@ import yaml
 from chronowarden.config import load_config
 from chronowarden.database import Database
 from devenv import keycloak
-from devenv.backends import OPENBAO, VAULT
+from devenv.backends import OPENBAO, POLICY, VAULT
 from devenv.config import HEADER, can_write, write_dev_config
 from devenv.processes import spawn, stop, wait_http
 from devenv.receiver import make_server
@@ -42,6 +43,20 @@ from devenv.runtime import ContainerRuntimeError, ContainerSpec, Runtime, detect
 from devenv.seed import OWNED_SECRETS, OWNER_EMAIL, seed_database
 
 CREDENTIALS = {OPENBAO: ("role-a", "secret-a"), VAULT: ("role-b", "secret-b")}
+
+
+class TestPolicy:
+    def test_dev_policy_is_the_readme_policy(self) -> None:
+        """The dev AppRole gets what users grant, so a narrower dev policy can't hide or fake permission errors."""
+        readme = (Path(__file__).parent.parent / "README.md").read_text()
+        section = readme.split("## Vault Permissions", 1)[1]
+        block = re.search(r"```hcl\n(.*?)```", section, re.DOTALL)
+        assert block is not None
+
+        def rules(hcl: str) -> list[str]:
+            return [line.strip() for line in hcl.splitlines() if line.strip() and not line.strip().startswith("#")]
+
+        assert rules(POLICY) == rules(block.group(1))
 
 
 class TestRuntime:

@@ -15,11 +15,21 @@ ENGINES = ("apps", "databases", "services")
 SECRETS_PER_ENGINE = 5
 APPROLE_MOUNT = "chronowarden"
 
-# The policy users grant (README "Vault Permissions"), for the dev engines
-POLICY = "\n".join(
-    [f'path "{engine}/metadata/*" {{\n  capabilities = ["read", "list", "update"]\n}}' for engine in ENGINES]
-    + ['path "sys/mounts" {\n  capabilities = ["read"]\n}']
-)
+# Exactly the policy users grant (README "Vault Permissions"): it also covers the dev servers' default `secret/` mount,
+# which the app discovers through sys/mounts
+POLICY = """\
+path "+/metadata/*" {
+  capabilities = ["list", "read", "update"]
+}
+
+path "+/metadata" {
+  capabilities = ["list"]
+}
+
+path "sys/mounts" {
+  capabilities = ["read"]
+}
+"""
 
 
 @dataclass(frozen=True)
