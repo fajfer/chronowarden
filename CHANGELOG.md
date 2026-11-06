@@ -22,6 +22,12 @@ git history.
   and `--app` (or `--app image`) Chronowarden itself, with a seeded owner and system.
 - An integration test logs in through a real Keycloak (until now OIDC was tested against a fake provider).
 
+### Changed
+
+- **Breaking:** release SBOMs are SPDX 3.0 (JSON-LD, spec version 3.0.1) instead of SPDX 2.3, and the SPDX image
+  attestation has the predicate type `https://spdx.dev/Document/v3`. Use the CycloneDX SBOM or convert if your tools
+  only read SPDX 2.x (ADR-028).
+
 ### Fixed
 
 - Local image builds no longer copy a local `frontend/node_modules` or database into the image (`.dockerignore`).
