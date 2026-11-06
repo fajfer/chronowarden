@@ -382,10 +382,10 @@ cosign verify "ghcr.io/fajfer/chronowarden@${DIGEST}" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-Each release also carries SBOMs in [CycloneDX 1.6](https://cyclonedx.org/) and [SPDX 2.3](https://spdx.dev/)
+Each release also carries SBOMs in [CycloneDX 1.6](https://cyclonedx.org/) and [SPDX 3.0](https://spdx.dev/)
 JSON: one per image platform (`chronowarden-image-{amd64,arm64}.*`) and one for the source
 (`chronowarden-source.*`, from `uv.lock` and `frontend/package-lock.json`). The image SBOMs are also attested to the
-image:
+image; for the SPDX one, pass `--type https://spdx.dev/Document/v3` instead of `cyclonedx`:
 
 ```bash
 cosign verify-attestation "ghcr.io/fajfer/chronowarden@${DIGEST}" --type cyclonedx \

@@ -45,3 +45,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-024](ADR-024-headless-image.md) | Headless image without the UI or Typst | Accepted | 2026-10-12 |
 | [ADR-025](ADR-025-alert-lifecycle-and-webhook-delivery.md) | Alert lifecycle and webhook delivery | Accepted | 2026-10-12 |
 | [ADR-026](ADR-026-sessions-tokens-and-permissions.md) | Sessions, API tokens and the permission matrix | Accepted | 2026-10-27 |
+| [ADR-028](ADR-028-spdx-3-sboms.md) | Release integrity with SBOMs in SPDX 3.0 | Proposed | 2026-11-07 |

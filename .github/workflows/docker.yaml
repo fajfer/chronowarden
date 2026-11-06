@@ -238,9 +238,9 @@ jobs:
           for arch in amd64 arm64; do
             "$SYFT" scan "registry:${IMAGE}" --platform "linux/${arch}" --quiet \
               -o "cyclonedx-json@1.6=${PREFIX}-${arch}.cdx.json" \
-              -o "spdx-json@2.3=${PREFIX}-${arch}.spdx.json"
+              -o "spdx-json@3.0=${PREFIX}-${arch}.spdx.json"
             jq -e '.specVersion == "1.6"' "${PREFIX}-${arch}.cdx.json" > /dev/null
-            jq -e '.spdxVersion == "SPDX-2.3"' "${PREFIX}-${arch}.spdx.json" > /dev/null
+            jq -e '."@context" == "https://spdx.org/rdf/3.0.1/spdx-context.jsonld" and any(."@graph"[]; .type == "CreationInfo" and .specVersion == "3.0.1")' "${PREFIX}-${arch}.spdx.json" > /dev/null
           done
 
       - name: Attest the SBOMs to the image
@@ -249,7 +249,7 @@ jobs:
             cosign attest --yes --type cyclonedx --predicate "$sbom" "$IMAGE"
           done
           for sbom in "${PREFIX}"-*.spdx.json; do
-            cosign attest --yes --type spdxjson --predicate "$sbom" "$IMAGE"
+            cosign attest --yes --type https://spdx.dev/Document/v3 --predicate "$sbom" "$IMAGE"
           done
 
       - name: Upload the SBOMs to the release

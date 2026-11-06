@@ -55,9 +55,9 @@ jobs:
         run: |
           "$SYFT" scan dir:. --exclude './dist/**' --exclude './.clusterfuzzlite/**' --quiet \
             -o cyclonedx-json@1.6=dist/chronowarden-source.cdx.json \
-            -o spdx-json@2.3=dist/chronowarden-source.spdx.json
+            -o spdx-json@3.0=dist/chronowarden-source.spdx.json
           jq -e '.specVersion == "1.6"' dist/chronowarden-source.cdx.json > /dev/null
-          jq -e '.spdxVersion == "SPDX-2.3"' dist/chronowarden-source.spdx.json > /dev/null
+          jq -e '."@context" == "https://spdx.org/rdf/3.0.1/spdx-context.jsonld" and any(."@graph"[]; .type == "CreationInfo" and .specVersion == "3.0.1")' dist/chronowarden-source.spdx.json > /dev/null
 
       - name: Hash release files
         id: hash

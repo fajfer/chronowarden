@@ -14,6 +14,12 @@ git history.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** release SBOMs are SPDX 3.0 (JSON-LD, spec version 3.0.1) instead of SPDX 2.3, and the SPDX image
+  attestation has the predicate type `https://spdx.dev/Document/v3`. Use the CycloneDX SBOM or convert if your tools
+  only read SPDX 2.x (ADR-028).
+
 ## [0.9.0] - 2026-10-29
 
 Access control: people log in through OIDC or an authenticating proxy, pipelines use API tokens, and admin, owner
