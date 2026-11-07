@@ -117,6 +117,15 @@ curl -H "Authorization: Bearer cwt_..." https://chronowarden.example.com/api/v1/
 Chronowarden stores only a hash of each token. Changes made with a token appear in the audit log as
 `token:<name>`; changes made by people as `user:<email or name>`. Revoking a token takes effect at once.
 
+A token works until it expires or is revoked, so a token that leaks (into a CI log, a commit or a pasted config)
+should be revoked at once; the token list shows when each one was last used. Every token starts with `cwt_`
+followed by 43 characters, so secret scanners can find leaked ones. Add this pattern to yours, for example as a
+[custom pattern in GitHub secret scanning](https://docs.github.com/en/code-security/secret-scanning/using-advanced-secret-scanning-and-push-protection-features/custom-patterns/defining-custom-patterns-for-secret-scanning):
+
+```text
+cwt_[A-Za-z0-9_-]{43}
+```
+
 ## Upgrading to 0.9
 
 Add an `auth` section before upgrading; without one the server stops at startup with a message saying so. To keep
