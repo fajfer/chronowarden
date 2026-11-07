@@ -61,8 +61,20 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Run against real OpenBao and HashiCorp Vault containers
-        run: uv run pytest -m integration
+      - name: Start the podman API socket
+        # testcontainers speaks the Docker API, which podman serves on this socket (ADR-032)
+        run: |
+          podman --version
+          mkdir -p "$RUNNER_TEMP/podman"
+          podman system service --time=0 "unix://$RUNNER_TEMP/podman/podman.sock" &
+          for _ in $(seq 1 20); do [ -S "$RUNNER_TEMP/podman/podman.sock" ] && exit 0; sleep 0.5; done
+          echo "::error::the podman socket didn't appear"; exit 1
+
+      - name: Run against real OpenBao, HashiCorp Vault and Keycloak containers
+        env:
+          # Ryuk, testcontainers' reaper container, needs the Docker daemon's socket; the tests stop their own
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+        run: DOCKER_HOST="unix://$RUNNER_TEMP/podman/podman.sock" uv run pytest -m integration
 
   frontend:
     name: Frontend type check
