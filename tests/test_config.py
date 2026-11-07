@@ -695,7 +695,7 @@ class TestLoadConfig:
         assert "vault_reconnect_interval:" in message
         assert "vaults.0.tken:" in message
 
-    @pytest.mark.parametrize("example", ["config.example.yaml", "deploy/compose/config.yaml"])
+    @pytest.mark.parametrize("example", ["config.example.yaml"])  # the Secret example: tests/test_build_files.py
     def test_shipped_examples_are_valid(self, example: str) -> None:
         """The example configs in the repository pass strict validation."""
         repo_root = pathlib.Path(__file__).resolve().parent.parent

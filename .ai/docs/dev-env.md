@@ -34,7 +34,7 @@ Each rule is a check, not advice:
 | `--auth oidc` | Keycloak 26 (`cw-<run>-keycloak`), realm `chronowarden`, users `admin`, `owner`, `viewer` in groups `cw-admins`, `teams`, `auditors`; the config maps them to the three roles |
 | `--receiver` | `devenv/receiver.py` on a free port: answers 200 and appends each request to `<scratch>/webhooks.jsonl` |
 | `--app` | `uvicorn chronowarden:app` from this checkout on the run's app port, working dir = scratch, log `<scratch>/app.log` |
-| `--app image` | the local `chronowarden:test` image (`docker build -t chronowarden:test .`), host network, scratch as `/data`; logs: `podman logs cw-<run>-app` |
+| `--app image` | the local `chronowarden:test` image (`buildah build -t chronowarden:test .`), host network, scratch as `/data`; logs: `podman logs cw-<run>-app` |
 
 A named run always seeds its database: owner `team-owner` (email `owner@chronowarden.test`, IdP group `teams`, so
 the Keycloak `owner` user acts for it), system `payments`, and both `apps/secret-1` secrets assigned to them. With

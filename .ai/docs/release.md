@@ -28,7 +28,8 @@ How a release goes out, as done for 0.8.0 and 0.9.0. The maintainer gives the go
   release; compare links at the bottom (`[Unreleased]` from the new tag, `[X.Y.Z]` from the previous one).
   `release.yaml` fails when the section is missing (`scripts/release_notes.sh`).
 - Image tags: README (`ghcr.io/…:vX.Y.Z` and the three `docker build` lines), `deploy/kubernetes/deployment.yaml`,
-  `deploy/kubernetes/cronjob-sync.yaml` (the image line only), the headless comment in `deploy/compose/config.yaml`.
+  `deploy/kubernetes/cronjob-sync.yaml` (the image line only), the headless comment in
+  `deploy/kubernetes/config-secret.example.yaml`.
 - README roadmap: the release's row lists what actually shipped (issues and ADRs).
 - The release's specs move to `.ai/specs/implemented/` (links one level deeper) and the specs index follows.
 
