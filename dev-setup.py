@@ -50,7 +50,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger("dev-setup")
 
 REPO = Path(__file__).resolve().parent
-APP_IMAGE = "chronowarden:test"  # docker build -t chronowarden:test . (deploy/AGENTS.md); podman adds localhost/
+APP_IMAGE = "chronowarden:test"  # buildah build -t chronowarden:test . (deploy/AGENTS.md); podman adds localhost/
 WEBHOOKS_FILE = "webhooks.jsonl"
 KEYCLOAK_USERS_FILE = "keycloak-users.json"  # the dev run's Keycloak passwords, next to its config
 DEV_APP_PORT = 8000  # uvicorn's default, where the dev run's OIDC redirect URI points

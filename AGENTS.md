@@ -73,7 +73,7 @@ Shorthand: `<area>` means `<area>/AGENTS.md`. Read root + the listed files, noth
 | Filter bug in the secrets table | [frontend](frontend/AGENTS.md) (+ [api](chronowarden/api/AGENTS.md) if the bug is in a query param) |
 | App startup, Sentry, SPA serving | [core](chronowarden/AGENTS.md), [ADR-007](.ai/adr/ADR-007-sveltekit-spa-served-by-fastapi.md) |
 | Run the app or a dev env (vaults, Keycloak, webhook receiver) | [dev-env](.ai/docs/dev-env.md), [deploy](deploy/AGENTS.md) |
-| Container image, Kubernetes, CI | [deploy](deploy/AGENTS.md), [ADR-031](.ai/adr/ADR-031-podman-and-buildah.md) |
+| Container image, Kubernetes, CI | [deploy](deploy/AGENTS.md), [ADR-032](.ai/adr/ADR-032-podman-preferred-docker-documented.md) |
 | Architecture model (LikeC4) | [architecture](architecture/AGENTS.md) |
 | Record a decision | [.ai/adr](.ai/adr/README.md) |
 | Plan a 3+ step task | [.ai/specs](.ai/specs/README.md) |

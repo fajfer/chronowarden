@@ -27,6 +27,6 @@ The production image has no shell for debugging (use the `dev` target). Kubernet
 
 ## Related files
 
-- [`Dockerfile`](../../Dockerfile)
+- [`Containerfile`](../../Containerfile) (was `Dockerfile`)
 - [`.github/workflows/docker.yaml`](../../.github/workflows/docker.yaml)
 - [`deploy/kubernetes/kustomization.yaml`](../../deploy/kubernetes/kustomization.yaml)

@@ -34,6 +34,9 @@ ENV UV_PYTHON_DOWNLOADS=never \
 
 WORKDIR /app
 
+# An empty directory the distroless stages copy to /app, owned by nonroot (see there)
+RUN mkdir /workdir
+
 COPY pyproject.toml uv.lock README.md /app/
 COPY chronowarden/ /app/chronowarden/
 
@@ -78,6 +81,11 @@ CMD ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--re
 # ============================================================================
 FROM gcr.io/distroless/python3-debian13:nonroot@sha256:1c32c3720dc4c7f0c7dbe998737f32c200add6511eca7cec705008be488b87d6 AS headless
 
+# /app and /app/data are nonroot's, so the database can be created there (the code below stays root's). Made explicit because
+# builders differ: BuildKit gives a new WORKDIR to the USER, buildah to root (ADR-032)
+COPY --from=backend-builder --chown=65532:65532 /workdir /app
+# For a volume: an empty named volume mounted here copies this directory's owner (podman and Docker alike)
+COPY --from=backend-builder --chown=65532:65532 /workdir /app/data
 WORKDIR /app
 
 COPY --from=backend-builder /app/.venv-headless/lib/python3.13/site-packages /app/.venv/lib/python3.13/site-packages
@@ -97,6 +105,11 @@ ENTRYPOINT ["python", "-m", "uvicorn", "chronowarden:app", "--host", "0.0.0.0", 
 # ============================================================================
 FROM gcr.io/distroless/python3-debian13:nonroot@sha256:1c32c3720dc4c7f0c7dbe998737f32c200add6511eca7cec705008be488b87d6 AS production
 
+# /app and /app/data are nonroot's, so the database can be created there (the code below stays root's). Made explicit because
+# builders differ: BuildKit gives a new WORKDIR to the USER, buildah to root (ADR-032)
+COPY --from=backend-builder --chown=65532:65532 /workdir /app
+# For a volume: an empty named volume mounted here copies this directory's owner (podman and Docker alike)
+COPY --from=backend-builder --chown=65532:65532 /workdir /app/data
 WORKDIR /app
 
 COPY --from=backend-builder /app/.venv/lib/python3.13/site-packages /app/.venv/lib/python3.13/site-packages

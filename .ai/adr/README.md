@@ -49,4 +49,5 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-028](ADR-028-spdx-3-sboms.md) | Release integrity with SBOMs in SPDX 3.0 | Accepted | 2026-11-07 |
 | [ADR-029](ADR-029-webhook-target-restrictions.md) | Admins can restrict where webhooks go | Accepted | 2026-11-07 |
 | [ADR-030](ADR-030-vex-for-not-affected-vulnerabilities.md) | CycloneDX VEX for every vulnerability we're not affected by | Accepted | 2026-11-07 |
-| [ADR-031](ADR-031-podman-and-buildah.md) | Podman and Buildah everywhere; a Containerfile; `podman kube play` for one host | Accepted | 2026-11-07 |
+| [ADR-031](ADR-031-podman-and-buildah.md) | Podman and Buildah everywhere; a Containerfile; `podman kube play` for one host | Superseded by ADR-032 | 2026-11-07 |
+| [ADR-032](ADR-032-podman-preferred-docker-documented.md) | Podman preferred, Docker documented | Accepted | 2026-11-07 |
