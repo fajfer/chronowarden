@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-022: Built-in webhook alerting, optional Prometheus metrics
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-029
 - **Date:** 2026-10-11
 - **Evidence:** maintainer decisions of 2026-10-11
 - **Supersedes:** ADR-012

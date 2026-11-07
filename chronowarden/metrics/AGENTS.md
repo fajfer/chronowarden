@@ -9,7 +9,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 Defines the Prometheus metrics, which are exposed at `GET /api/v1/metrics` (`chronowarden/api/health.py`, via
 `prometheus_client.generate_latest()` on the default registry) **only when `metrics.enabled: true`**; otherwise the
-endpoint returns 404 (off by default since 0.7, ADR-022). Metrics are still recorded either way.
+endpoint returns 404 (off by default since 0.7, ADR-029). Metrics are still recorded either way.
 
 ## Files
 
@@ -52,7 +52,7 @@ Metric names and labels are what `/api/v1/metrics` scrapers see. All are prefixe
 
 ## Related ADRs
 
-[ADR-022](../../.ai/adr/ADR-022-webhooks-and-optional-metrics.md) (optional metrics; supersedes ADR-012),
+[ADR-029](../../.ai/adr/ADR-029-webhook-target-restrictions.md) (optional metrics; supersedes ADR-022),
 [ADR-009](../../.ai/adr/ADR-009-offline-tolerant-reconnect.md)
 
 ## Validate

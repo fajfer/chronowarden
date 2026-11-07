@@ -21,6 +21,14 @@ If a lesson becomes a lasting rule, move it into the narrowest `AGENTS.md` it ap
 
 ## Entries
 
+### 2026-11-07: security design
+
+- **Mistake:** ADR-029 was drafted to block private and loopback webhook targets by default, against a threat that
+  wasn't checked: the metadata risk was overstated (webhooks are POSTs whose response is never read), and the
+  default would have broken every internal or air-gapped deployment.
+- **Rule:** before proposing a security mechanism, state who the attacker is, what they can actually do with the
+  code as it is, and who the default breaks; prefer an admin opt-in over a built-in list that needs upkeep.
+
 ### 2026-10-10: specs, scope
 
 - **Mistake:** asked to "prepare a document extending the 0.7 scope", the agent wrote specs straight into
