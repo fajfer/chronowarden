@@ -34,7 +34,7 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-013](ADR-013-in-process-and-headless-sync.md) | Scheduled sync in-process, plus a headless one-shot mode | Accepted | 2026-10-09 |
 | [ADR-014](ADR-014-rotation-confirmation-and-audit-log.md) | Rotation confirmation, audit log and change history | Accepted | 2026-10-11 |
 | [ADR-015](ADR-015-authentication.md) | Authentication for UI and API | Accepted | 2026-10-09 |
-| [ADR-016](ADR-016-stability-policy-for-1-0.md) | What 1.0 guarantees | Proposed | 2026-10-09 |
+| [ADR-016](ADR-016-stability-policy-for-1-0.md) | What 1.0 guarantees | Accepted | 2026-11-07 |
 | [ADR-017](ADR-017-sqlite-holds-assignments.md) | SQLite holds assignments that can't be rebuilt from the backends | Accepted | 2026-10-11 |
 | [ADR-018](ADR-018-release-integrity.md) | Release integrity with SLSA Build L3, cosign and SBOMs | Superseded by ADR-028 | 2026-10-11 |
 | [ADR-019](ADR-019-compliance-policies-as-config.md) | Compliance policies as config, with examples instead of built-in packs | Accepted | 2026-10-11 |
