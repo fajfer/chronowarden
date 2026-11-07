@@ -80,6 +80,12 @@ class VaultIntegration(BaseIntegration):
             "verify_ssl": config.verify_ssl,
             "ca_bundle": ca_bundle,
         }
+        if not config.verify_ssl:
+            logger.warning(
+                "Vault '%s' has verify_ssl: false: its TLS certificate is not checked, so the connection and its "
+                "token can be intercepted",
+                config.name,
+            )
         if config.auth_method == "approle":
             credentials = {"role_id": config.resolve_role_id(), "secret_id": config.resolve_secret_id()}
         else:

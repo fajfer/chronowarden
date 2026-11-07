@@ -6,6 +6,7 @@
 
 import json
 import logging
+import os
 import sqlite3
 from collections.abc import Iterator
 from datetime import datetime, timezone
@@ -22,6 +23,7 @@ from chronowarden.timestamps import utc_timestamp
 logger = logging.getLogger("uvicorn.error")
 
 DEFAULT_DB_PATH = Path("chronowarden.db")
+DB_FILE_MODE = 0o600  # owner only: the database holds owners, assignments, audit events and credential hashes
 
 # A secret's real identity (ADR-017): vault name, engine mount, path inside the engine
 SecretIdentity = tuple[str, str, str]
@@ -99,11 +101,33 @@ class Database:
             MigrationError: If a migration fails or the database is newer than this release.
         """
         with self._conn_lock:
+            self._restrict_permissions()
             self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA journal_mode=WAL")
             migrate(self._conn)
             logger.info("Database connected at %s", self._db_path)
+
+    def _restrict_permissions(self) -> None:
+        """
+        Create the database file owner-only, or make an existing one so, before SQLite opens it.
+
+        SQLite gives the WAL and shared-memory files it creates the main file's mode; existing ones are changed too.
+        A file the process can't change (e.g. one it doesn't own) is logged and left as it is.
+        """
+        if str(self._db_path) == ":memory:":
+            return
+        try:
+            os.close(os.open(self._db_path, os.O_CREAT | os.O_WRONLY, DB_FILE_MODE))
+        except OSError as exc:
+            logger.warning("Cannot create %s owner-only: %s", self._db_path, exc.strerror)
+            return
+        for path in (self._db_path, Path(f"{self._db_path}-wal"), Path(f"{self._db_path}-shm")):
+            try:
+                if path.exists():
+                    path.chmod(DB_FILE_MODE)
+            except OSError as exc:
+                logger.warning("Cannot restrict %s to mode 0600: %s", path, exc.strerror)
 
     def close(self) -> None:
         """Close the database connection."""
