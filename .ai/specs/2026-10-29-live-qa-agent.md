@@ -33,7 +33,7 @@ a `qa` pytest marker, excluded by default like `integration`), `.agents/skills/l
 
 - [root AGENTS.md](../../AGENTS.md), [frontend](../../frontend/AGENTS.md), [auth](../../chronowarden/auth/AGENTS.md),
   [alerting](../../chronowarden/alerting/AGENTS.md)
-- [Isolated dev env spec](2026-10-29-isolated-dev-env-and-keycloak.md) (this spec needs its tasks 1 to 3),
+- [Isolated dev env spec](implemented/2026-10-29-isolated-dev-env-and-keycloak.md) (this spec needs its tasks 1 to 3),
   [auditor spec](2026-10-29-auditor-agent.md) (finding format)
 
 ## ADRs affected

@@ -68,7 +68,7 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 ```bash
 docker run --network=host --rm -p 8000:8000 \
     -v $(pwd)/config.yaml:/data/config.yaml \
-  ghcr.io/fajfer/chronowarden:v0.9.0
+  ghcr.io/fajfer/chronowarden:v0.10.0
 ```
 
 Add `-v $(pwd)/chronowarden.db:/app/chronowarden.db` to keep the database. From 0.7 it holds system and owner
@@ -88,13 +88,13 @@ The production and headless images are signed and carry SLSA provenance and SBOM
 
 #### Building image
 Production (default) \
-`docker build -t fajfer/chronowarden:0.9.0 .`
+`docker build -t fajfer/chronowarden:0.10.0 .`
 
 Headless \
-`docker build --target headless -t fajfer/chronowarden:0.9.0-headless .`
+`docker build --target headless -t fajfer/chronowarden:0.10.0-headless .`
 
 Development \
-`docker build --target dev -t fajfer/chronowarden:0.9.0-dev .`
+`docker build --target dev -t fajfer/chronowarden:0.10.0-dev .`
 
 ### Prerequisites
 
@@ -441,7 +441,8 @@ as ADRs in [`.ai/adr/`](.ai/adr/README.md).
 | **0.7.x Policies and reports** | Compliance policies in config (example YAML for KNF KRI ICT, PCI DSS 4.0, DORA in the docs), PDF reports with Typst | #97, #98 | [ADR-019](.ai/adr/ADR-019-compliance-policies-as-config.md), [ADR-020](.ai/adr/ADR-020-pdf-reports-with-typst.md) |
 | **0.8 Alerting** | Built-in webhook alerting to owners, scheduled and headless sync, grace-period escalation | #48, #71, #74, #99 | [ADR-022](.ai/adr/ADR-022-webhooks-and-optional-metrics.md), [ADR-013](.ai/adr/ADR-013-in-process-and-headless-sync.md) |
 | **0.9 Access control** | Authentication for UI and API (OIDC or proxy headers, API tokens), admin/owner/viewer roles: only owners edit their secrets; generic provider registry and `/providers` API | #75, #72 | [ADR-015](.ai/adr/ADR-015-authentication.md), [ADR-026](.ai/adr/ADR-026-sessions-tokens-and-permissions.md), [ADR-011](.ai/adr/ADR-011-provider-registry.md) |
-| **1.0** | Stability promise for config, API, metrics and DB schema | n/a | [ADR-016](.ai/adr/ADR-016-stability-policy-for-1-0.md) |
+| **0.10 Verifiable dependencies** | CycloneDX VEX per SBOM with every release, SPDX 3.0 SBOMs, owner-only database file, warning for unchecked TLS, isolated named dev environments with Keycloak | n/a | [ADR-030](.ai/adr/ADR-030-vex-for-not-affected-vulnerabilities.md), [ADR-028](.ai/adr/ADR-028-spdx-3-sboms.md), [ADR-027](.ai/adr/ADR-027-agent-procedures-and-audit-rounds.md) |
+| **1.0** | Stability promise for config, API, metrics, webhook payloads and DB schema; config keys reviewed first | n/a | [ADR-016](.ai/adr/ADR-016-stability-policy-for-1-0.md) |
 | **1.x Backends** | Public cloud vaults on the provider registry: Azure Key Vault, GCP Secret Manager | n/a | [ADR-011](.ai/adr/ADR-011-provider-registry.md) |
 
 ## License

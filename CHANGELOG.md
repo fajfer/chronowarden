@@ -14,8 +14,18 @@ git history.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-07
+
+Verifiable dependencies and safer defaults: every release carries a CycloneDX VEX per SBOM, stating which reported
+vulnerabilities don't affect Chronowarden and what was checked (ADR-030), SBOMs move to SPDX 3.0 (ADR-028), the
+database file is owner-only, and unchecked TLS is logged. Contributors and agents get isolated, named dev
+environments with Keycloak, a webhook receiver and seeded data.
+
 ### Added
 
+- A CycloneDX VEX (`*.vex.cdx.json`) next to every CycloneDX SBOM on the release, generated from
+  `vex/chronowarden.vex.cdx.json`; the image ones are attested with the predicate type `https://cyclonedx.org/vex`.
+  `trivy sbom --vex` reads them (README "Verifying releases", ADR-030).
 - Named dev environments: `./dev-setup.py --run <name>` starts its own OpenBao and Vault on free ports with a private
   config, database and logs, side by side with the default one; `--list` and `--cleanup --run` manage them.
   `--auth oidc` adds a Keycloak with an admin, an owner and a viewer user, `--receiver` a local webhook receiver,
@@ -409,7 +419,8 @@ the compliance work in 0.7.
 - The UI stored the current theme on every page load, so a changed instance default never reached users who had
   visited before.
 
-[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/fajfer/chronowarden/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/fajfer/chronowarden/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/fajfer/chronowarden/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/fajfer/chronowarden/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/fajfer/chronowarden/compare/v0.7.2...v0.7.3
