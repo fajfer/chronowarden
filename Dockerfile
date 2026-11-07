@@ -21,9 +21,9 @@ RUN npm run build
 # ============================================================================
 # Stage 2: Backend builder
 # ============================================================================
-FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv
+FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
-FROM python:3.13.15-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b AS backend-builder
+FROM python:3.13.17-slim@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962 AS backend-builder
 
 COPY --from=uv /uv /usr/local/bin/uv
 
@@ -46,7 +46,7 @@ RUN uv sync --locked --no-dev --no-editable --no-cache --extra reports \
 # Stage 3a: Development image  (--target dev)
 #   Includes shell, dev tools, editable source mounts expected
 # ============================================================================
-FROM python:3.13.15-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b AS dev
+FROM python:3.13.17-slim@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962 AS dev
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git \
