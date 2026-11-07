@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-008: Distroless image; Compose and bare Kubernetes manifests
 
-- **Status:** Accepted (retroactive)
+- **Status:** Superseded by ADR-031
 - **Date:** 2026-02-09
 - **Evidence:** `fe68be8` (Dockerfile), `84ea691` (CI to GHCR), `287cbfa` (Kubernetes manifests); PR #17 proposed `python:3.12-slim` after a Python-version crash, but distroless was kept (`a82af9b`).
 
