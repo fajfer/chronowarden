@@ -47,3 +47,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-026](ADR-026-sessions-tokens-and-permissions.md) | Sessions, API tokens and the permission matrix | Accepted | 2026-10-27 |
 | [ADR-027](ADR-027-agent-procedures-and-audit-rounds.md) | Agent procedures in `.agents/skills`, thin tool wrappers, audit rounds outside the repo | Accepted | 2026-10-31 |
 | [ADR-028](ADR-028-spdx-3-sboms.md) | Release integrity with SBOMs in SPDX 3.0 | Accepted | 2026-11-07 |
+| [ADR-029](ADR-029-webhook-target-restrictions.md) | Webhooks only reach public addresses unless allowed | Proposed | 2026-11-07 |
