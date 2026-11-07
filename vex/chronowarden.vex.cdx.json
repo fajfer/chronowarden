@@ -1,0 +1,45 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:502eac60-4fb0-4279-b01a-d99654740888",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-07T00:00:00Z",
+    "component": {
+      "type": "application",
+      "bom-ref": "chronowarden",
+      "name": "chronowarden"
+    }
+  },
+  "vulnerabilities": [
+    {
+      "bom-ref": "GHSA-gcqx-w48m-w2h4",
+      "id": "CVE-2026-93753",
+      "source": {
+        "name": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-93753"
+      },
+      "references": [
+        {
+          "id": "GHSA-gcqx-w48m-w2h4",
+          "source": {
+            "name": "GitHub Advisory Database",
+            "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4"
+          }
+        }
+      ],
+      "analysis": {
+        "state": "not_affected",
+        "justification": "code_not_reachable",
+        "detail": "deepmerge (prototype poisoning in mergeObject) is only a build-time dependency of the frontend: it comes in through @sveltejs/vite-plugin-svelte and through @rollup/plugin-node-resolve, a dependency of flowbite-datepicker. Both are build tools that merge configuration we write; no user or network input reaches them. The production UI bundle contains no deepmerge code (checked on a fresh build on 2026-11-07), flowbite-datepicker's runtime code doesn't import it, and the images ship no Node.js. It appears only in the source SBOM, which lists the frontend's build dependencies.",
+        "firstIssued": "2026-11-07T00:00:00Z",
+        "lastUpdated": "2026-11-07T00:00:00Z"
+      },
+      "affects": [
+        {
+          "ref": "pkg:npm/deepmerge@4.3.1"
+        }
+      ]
+    }
+  ]
+}

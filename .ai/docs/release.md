@@ -16,7 +16,9 @@ How a release goes out, as done for 0.8.0 and 0.9.0. The maintainer gives the go
    Dependabot PR is updated to `main` (`gh pr update-branch`) and merged once its checks pass, one at a time,
    because several touch `uv.lock`.
 3. `gh api repos/fajfer/chronowarden/dependabot/alerts?state=open` lists what the release would ship; dev-only
-   alerts don't block it.
+   alerts don't block it. An alert judged not exploitable gets a statement in `vex/chronowarden.vex.cdx.json`
+   (`not_affected`, a justification, and a `detail` naming what was checked) before it is dismissed, and the
+   dismissal links to it ([ADR-030](../adr/ADR-030-vex-for-not-affected-vulnerabilities.md)).
 
 ## The release PR (`release/X.Y.Z`, `chore: Release X.Y.Z`)
 
