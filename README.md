@@ -187,7 +187,18 @@ This script:
 uv run python dev-setup.py --cleanup
 ```
 
-**Integration tests** run Chronowarden against real OpenBao and Vault containers (testcontainers); CI runs them too:
+**Named runs** start a separate environment on free ports with its own config, database and logs in
+`$TMPDIR/chronowarden-<name>/`, next to the default one and to each other:
+```bash
+./dev-setup.py --run demo --auth oidc --receiver --app   # vaults, Keycloak, a webhook receiver and Chronowarden
+./dev-setup.py --list                                     # runs that have containers
+./dev-setup.py --cleanup --run demo
+```
+`--auth oidc` adds a Keycloak with users `admin`, `owner` and `viewer` (one per role); `--app image` runs the
+locally built image instead of the source. The URLs and dev passwords are in `run.json` in the run's directory.
+
+**Integration tests** run Chronowarden against real OpenBao, Vault and Keycloak containers (testcontainers); CI runs
+them too:
 ```bash
 uv run pytest -m integration
 ```

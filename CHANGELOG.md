@@ -14,11 +14,23 @@ git history.
 
 ## [Unreleased]
 
+### Added
+
+- Named dev environments: `./dev-setup.py --run <name>` starts its own OpenBao and Vault on free ports with a private
+  config, database and logs, side by side with the default one; `--list` and `--cleanup --run` manage them.
+  `--auth oidc` adds a Keycloak with an admin, an owner and a viewer user, `--receiver` a local webhook receiver,
+  and `--app` (or `--app image`) Chronowarden itself, with a seeded owner and system.
+- An integration test logs in through a real Keycloak (until now OIDC was tested against a fake provider).
+
 ### Changed
 
 - **Breaking:** release SBOMs are SPDX 3.0 (JSON-LD, spec version 3.0.1) instead of SPDX 2.3, and the SPDX image
   attestation has the predicate type `https://spdx.dev/Document/v3`. Use the CycloneDX SBOM or convert if your tools
   only read SPDX 2.x (ADR-028).
+
+### Fixed
+
+- Local image builds no longer copy a local `frontend/node_modules` or database into the image (`.dockerignore`).
 
 ### Security
 

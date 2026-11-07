@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Isolated dev environments with Keycloak
 
-- **Status:** approved
+- **Status:** in progress
 - **Date:** 2026-10-29
 - **Issue:** none
 
@@ -77,16 +77,17 @@ None.
 
 | # | Task | Load | Done when | Status | Commit |
 |---|---|---|---|---|---|
-| 1 | Runs: names, labels, free ports, port check, scratch dir, `run.json`, `--list`, `--cleanup --run`; `dev` unchanged | `dev-setup.py`, `devenv/runtime.py`, `devenv/config.py` | Two runs side by side and `dev` untouched; unit tests for naming, port choice and cleanup by label | todo | |
-| 2 | Keycloak: realm template, start and wait, `--auth oidc` config | `devenv/`, `docs/guides/authentication.md` | Logging in as each user in a browser gives the expected role in `/api/v1/auth/me` | todo | |
-| 3 | Seed owners and systems; `--receiver`; `--app` and `--app image` | `devenv/backends.py`, `tests/conftest.py` | A sync sends a webhook the receiver records; the `owner` user acts for the seeded owner | todo | |
-| 4 | Integration test: Keycloak in testcontainers, the full authorization code flow driven over HTTP (login form post), roles per user, logout | `tests/integration`, `chronowarden/auth/oidc.py` | `pytest -m integration` green locally and in the existing CI integration job | todo | |
-| 5 | Runbook `.ai/docs/dev-env.md` (isolation rules, flags, what `run.json` holds), README "Development", `deploy/AGENTS.md`, router row "Run the app or a dev env", CHANGELOG | deploy, `README.md` | `check_agents_docs.py` passes | todo | |
+| 1 | Runs: names, labels, free ports, port check, scratch dir, `run.json`, `--list`, `--cleanup --run`; `dev` unchanged | `dev-setup.py`, `devenv/runtime.py`, `devenv/config.py` | Two runs side by side and `dev` untouched; unit tests for naming, port choice and cleanup by label | done | c83039c |
+| 2 | Keycloak: realm template, start and wait, `--auth oidc` config | `devenv/`, `docs/guides/authentication.md` | Logging in as each user in a browser gives the expected role in `/api/v1/auth/me` | done | 02c318b |
+| 3 | Seed owners and systems; `--receiver`; `--app` and `--app image` | `devenv/backends.py`, `tests/conftest.py` | A sync sends a webhook the receiver records; the `owner` user acts for the seeded owner | done | cbeea6a |
+| 4 | Integration test: Keycloak in testcontainers, the full authorization code flow driven over HTTP (login form post), roles per user, logout | `tests/integration`, `chronowarden/auth/oidc.py` | `pytest -m integration` green locally and in the existing CI integration job | done | ec9cb04 |
+| 5 | Runbook `.ai/docs/dev-env.md` (isolation rules, flags, what `run.json` holds), README "Development", `deploy/AGENTS.md`, router row "Run the app or a dev env", CHANGELOG | deploy, `README.md` | `check_agents_docs.py` passes | done | 18c4631 |
 
 ## Validation
 
 `uv run black --check . && uv run ruff check . && uv run pytest`, `uv run pytest -m integration`,
-`python3 scripts/check_agents_docs.py`, and by hand: `./dev-setup.py` (unchanged), then
+`python3 scripts/check_agents_docs.py`, and by hand: `./dev-setup.py` (unchanged; the maintainer's check, since
+agents leave the `dev` run alone), then
 `./dev-setup.py --run a --auth oidc --app --receiver` and `--run b` side by side, both cleaned up by name.
 
 ## Open questions
