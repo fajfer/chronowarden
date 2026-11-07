@@ -378,7 +378,8 @@ Chronowarden maintains compatibility with both platforms as [OpenBao intends to 
 
 From 0.7.0 on, every release is built by GitHub Actions from a tag and comes with
 [SLSA Build L3](https://slsa.dev/spec/v1.1/levels) provenance and a [cosign](https://docs.sigstore.dev/) keyless
-signature. Verify an image by its digest:
+signature. Verify an image by its digest, with cosign 3 or later (the images are signed as Sigstore bundles,
+which cosign 2 doesn't find: it reports "no signatures found"):
 
 ```bash
 DIGEST=$(docker buildx imagetools inspect ghcr.io/fajfer/chronowarden:v0.7.0 --format '{{json .Manifest.Digest}}' | tr -d '"')
