@@ -22,7 +22,7 @@ How Chronowarden is built and run: the multi-stage `Dockerfile` (repo root), a C
   headless `python -m chronowarden sync`).
 - `../config.example.yaml`: the full config reference ([core](../chronowarden/AGENTS.md)).
 - `../.github/workflows/`: `docker.yaml` (three targets, amd64 + arm64, pushed except on PRs; `v*` tags: cosign,
-  SLSA provenance and SBOMs for production and headless), `release.yaml` (`v*`: wheel, sdist, source SBOMs,
+  SLSA provenance, SBOMs and VEX for production and headless), `release.yaml` (`v*`: wheel, sdist, source SBOMs/VEX,
   provenance, notes; `-rc.N` = pre-release), `ci.yaml` (also `pytest -m integration`, `devenv/`), `scorecard.yml`,
   `zizmor.yaml`, `agents-docs.yaml`, `cflite_pr.yml` / `cflite_batch.yml` (ClusterFuzzLite).
 

@@ -59,6 +59,10 @@ jobs:
           jq -e '.specVersion == "1.6"' dist/chronowarden-source.cdx.json > /dev/null
           jq -e '."@context" == "https://spdx.org/rdf/3.0.1/spdx-context.jsonld" and any(."@graph"[]; .type == "CreationInfo" and .specVersion == "3.0.1")' dist/chronowarden-source.spdx.json > /dev/null
 
+      - name: Generate the source VEX
+        # Our not-affected statements, pointed at this SBOM's components (ADR-030)
+        run: python3 scripts/vex.py dist/chronowarden-source.cdx.json vex/chronowarden.vex.cdx.json dist/chronowarden-source.vex.cdx.json
+
       - name: Hash release files
         id: hash
         run: |
