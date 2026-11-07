@@ -343,6 +343,22 @@ class TestScratch:
         assert stop(recorded["pid"], recorded["started"])
 
 
+class TestCredentialOutput:
+    def test_a_named_run_points_to_run_json_without_printing_secrets(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        info = RunInfo(run="a", scratch=tmp_path, config=tmp_path / "config.yaml")
+        _load_dev_setup()._print_credentials(info, {VAULT: "root-token-x"}, {"admin": "pw-x"}, "http://kc")
+        out = capsys.readouterr().out
+        assert str(tmp_path / "run.json") in out
+        assert "root-token-x" not in out and "pw-x" not in out
+
+    def test_the_dev_run_prints_them(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _load_dev_setup()._print_credentials(None, {VAULT: "root-token-x"}, {"admin": "pw-x"}, "http://kc")
+        out = capsys.readouterr().out
+        assert "root-token-x" in out and "admin: pw-x" in out
+
+
 class TestKeycloak:
     def test_realm_fills_client_and_users(self) -> None:
         passwords = {"admin": "pa", "owner": "po", "viewer": "pv"}

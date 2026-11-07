@@ -30,6 +30,7 @@ from devenv.processes import spawn, stop, wait_http, wait_listening
 from devenv.runs import (
     DEFAULT_RUN,
     LABEL,
+    RUN_FILE,
     SCRATCH_LABEL,
     RunError,
     RunInfo,
@@ -308,15 +309,27 @@ def setup(
             logger.info("Chronowarden at %s", app_url)
     else:
         logger.info("Run: uv run uvicorn chronowarden:app --reload --port %d", app_port)
-    # Printed, not logged: dev-only credentials for poking at the servers by hand
+    _print_credentials(info, tokens, passwords, idp.address)
+    return 0
+
+
+def _print_credentials(
+    info: RunInfo | None, tokens: dict[Backend, str], passwords: dict[str, str], keycloak_address: str
+) -> None:
+    """
+    Tell where a run's dev-only credentials are. A named run's are in its run.json and are not printed, so they stay
+    out of agent transcripts; the dev run, which has no run.json, prints them for poking at the servers by hand.
+    """
+    if info is not None:
+        print(f"\nCredentials (dev only) are in {info.scratch / RUN_FILE}")
+        return
     print("\nRoot tokens (dev only):")
     for backend, token in tokens.items():
         print(f"  {backend.container} {backend.address}: {token}")
     if passwords:
-        print(f"Keycloak users at {idp.address} (dev only):")
+        print(f"Keycloak users at {keycloak_address} (dev only):")
         for user, password in passwords.items():
             print(f"  {user}: {password}")
-    return 0
 
 
 def _find_scratch(runtime: Runtime, run: str) -> Path | None:

@@ -49,7 +49,8 @@ the Keycloak `owner` user acts for it), system `payments`, and both `apps/secret
 symlink or another user's; `config.yaml` in it is 0600) holds everything
 needed to use the run: `urls` (`app`, `dev-openbao`, `dev-vault`, `keycloak`, `receiver`), `users` (Keycloak
 passwords), `root_tokens` (per vault, to change secrets in Vault), `signing_secrets` (`owner-route`, to verify
-webhook signatures), `pids` (each `{pid, started}`) and `containers`. These are throwaway dev credentials; don't copy them into reports.
+webhook signatures), `pids` (each `{pid, started}`) and `containers`. These are throwaway dev credentials; don't copy them into reports. A named run doesn't print them; the `dev`
+run, which has no `run.json`, does.
 
 ## Using it
 
