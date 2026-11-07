@@ -6,9 +6,11 @@
 
 import importlib.util
 import json
+import os
 import re
 import signal
 import socket
+import stat
 import sys
 import threading
 import time
@@ -24,11 +26,12 @@ from chronowarden.database import Database
 from devenv import keycloak
 from devenv.backends import OPENBAO, POLICY, VAULT
 from devenv.config import HEADER, can_write, write_dev_config
-from devenv.processes import spawn, stop, wait_http
+from devenv.processes import spawn, started_at, stop, wait_http, wait_listening
 from devenv.receiver import make_server
 from devenv.runs import (
     DEFAULT_RUN,
     LABEL,
+    SCRATCH_LABEL,
     RunError,
     RunInfo,
     check_name,
@@ -43,6 +46,16 @@ from devenv.runtime import ContainerRuntimeError, ContainerSpec, Runtime, detect
 from devenv.seed import OWNED_SECRETS, OWNER_EMAIL, seed_database
 
 CREDENTIALS = {OPENBAO: ("role-a", "secret-a"), VAULT: ("role-b", "secret-b")}
+
+
+class TestConfigMode:
+    def test_the_dev_config_is_owner_only(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.yaml"
+        path.touch()
+        path.chmod(0o644)
+        path.write_text(HEADER)
+        write_dev_config(path, CREDENTIALS)
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
 
 class TestPolicy:
@@ -154,13 +167,16 @@ class FakeRuntime:
         del self.containers[name]
         self.removed.append(name)
 
+    def start(self, spec: ContainerSpec) -> None:
+        raise ContainerRuntimeError(f"cannot start {spec.name}")
+
 
 class TestRuns:
     @pytest.mark.parametrize("name", ["dev", "qa-1a2b", "a", "x" * 31])
     def test_accepts_run_names(self, name: str) -> None:
         assert check_name(name) == name
 
-    @pytest.mark.parametrize("name", ["", "-a", "QA", "a_b", "a b", "x" * 32, "../x"])
+    @pytest.mark.parametrize("name", ["", "-a", "QA", "a_b", "a b", "x" * 32, "../x", "a\n"])
     def test_rejects_run_names(self, name: str) -> None:
         with pytest.raises(RunError, match="Run name"):
             check_name(name)
@@ -195,8 +211,29 @@ class TestRuns:
         assert read_run(tmp_path) == json.loads(path.read_text())
         assert read_run(tmp_path / "missing") is None
 
+    def test_read_run_rejects_what_isnt_a_run(self, tmp_path: Path) -> None:
+        (tmp_path / "run.json").write_text("[]")
+        assert read_run(tmp_path) is None
+        (tmp_path / "run.json").write_text('{"run": "a", "pids": []}')
+        assert read_run(tmp_path) is None
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        RunInfo(run="a", scratch=elsewhere, config=elsewhere / "config.yaml").write()
+        (tmp_path / "run.json").unlink()
+        (tmp_path / "run.json").symlink_to(elsewhere / "run.json")
+        assert read_run(tmp_path) is None
+
+    def test_record_process_stores_its_start_time(self, tmp_path: Path) -> None:
+        info = RunInfo(run="a", scratch=tmp_path, config=tmp_path / "config.yaml")
+        info.record_process("app", os.getpid())
+        assert read_run(tmp_path)["pids"] == {"app": {"pid": os.getpid(), "started": started_at(os.getpid())}}
+
 
 class TestCleanup:
+    @pytest.fixture(autouse=True)
+    def _default_scratch_in_tmp(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setattr("devenv.runs.tempfile.gettempdir", lambda: str(tmp_path))
+
     def test_removes_only_the_runs_containers(self, tmp_path: Path) -> None:
         dev_setup = _load_dev_setup()
         runtime = FakeRuntime(
@@ -230,6 +267,38 @@ class TestCleanup:
         assert dev_setup.cleanup(FakeRuntime({}), "a", theirs) == 1
         assert (theirs / "notes.txt").read_text() == "keep"
 
+    def test_finds_a_custom_scratch_dir_from_the_container_labels(self, tmp_path: Path) -> None:
+        dev_setup = _load_dev_setup()
+        custom = tmp_path / "custom"
+        custom.mkdir()
+        RunInfo(run="a", scratch=custom, config=custom / "config.yaml").write()
+        runtime = FakeRuntime({"cw-a-vault": {LABEL: "a", SCRATCH_LABEL: str(custom)}})
+        assert dev_setup.cleanup(runtime, "a", None) == 0
+        assert not custom.exists() and runtime.removed == ["cw-a-vault"]
+
+    def test_refuses_a_scratch_dir_of_another_run(self, tmp_path: Path) -> None:
+        dev_setup = _load_dev_setup()
+        RunInfo(run="a", scratch=tmp_path, config=tmp_path / "config.yaml").write()
+        runtime = FakeRuntime({"cw-b-vault": {LABEL: "b"}})
+        assert dev_setup.cleanup(runtime, "b", tmp_path) == 1
+        assert (tmp_path / "run.json").exists() and runtime.removed == []
+
+    def test_removes_an_empty_scratch_dir(self, tmp_path: Path) -> None:
+        dev_setup = _load_dev_setup()
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        assert dev_setup.cleanup(FakeRuntime({}), "a", empty) == 0
+        assert not empty.exists()
+
+    def test_a_failed_start_leaves_a_run_json_for_cleanup(self, tmp_path: Path) -> None:
+        dev_setup = _load_dev_setup()
+        scratch = tmp_path / "scratch"
+        with pytest.raises(ContainerRuntimeError, match="cannot start"):
+            dev_setup.setup(FakeRuntime({}), "a", scratch, tmp_path / "unused.yaml", False)
+        assert read_run(scratch)["run"] == "a"
+        assert dev_setup.cleanup(FakeRuntime({}), "a", scratch) == 0
+        assert not scratch.exists()
+
     def test_lists_runs_by_label(self, capsys: pytest.CaptureFixture[str]) -> None:
         dev_setup = _load_dev_setup()
         runtime = FakeRuntime({"cw-a-vault": {LABEL: "a"}, "cw-a-openbao": {LABEL: "a"}, "unrelated": {}})
@@ -237,7 +306,74 @@ class TestCleanup:
         assert capsys.readouterr().out == "a: cw-a-openbao, cw-a-vault\n"
 
 
+class TestScratch:
+    def test_an_existing_open_dir_is_made_private(self, tmp_path: Path) -> None:
+        scratch = tmp_path / "s"
+        scratch.mkdir()
+        scratch.chmod(0o777)
+        assert _load_dev_setup()._prepare_scratch(scratch)
+        assert stat.S_IMODE(scratch.stat().st_mode) == 0o700
+
+    def test_a_symlink_is_refused(self, tmp_path: Path) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        (tmp_path / "link").symlink_to(target)
+        assert not _load_dev_setup()._prepare_scratch(tmp_path / "link")
+
+    def test_a_dir_of_another_user_is_refused(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        scratch = tmp_path / "s"
+        scratch.mkdir()
+        dev_setup = _load_dev_setup()
+        monkeypatch.setattr(os, "getuid", lambda: os.stat(scratch).st_uid + 1)
+        assert not dev_setup._prepare_scratch(scratch)
+
+    def test_the_receiver_is_recorded_before_it_is_waited_for(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        dev_setup = _load_dev_setup()
+
+        def never_ready(*args: object, **kwargs: object) -> None:
+            raise ContainerRuntimeError("not ready")
+
+        monkeypatch.setattr(dev_setup, "wait_listening", never_ready)
+        info = RunInfo(run="a", scratch=tmp_path, config=tmp_path / "config.yaml")
+        with pytest.raises(ContainerRuntimeError):
+            dev_setup._start_receiver(info, free_port())
+        recorded = read_run(tmp_path)["pids"]["receiver"]
+        assert stop(recorded["pid"], recorded["started"])
+
+
+class TestCredentialOutput:
+    def test_a_named_run_points_to_run_json_without_printing_secrets(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        info = RunInfo(run="a", scratch=tmp_path, config=tmp_path / "config.yaml")
+        _load_dev_setup()._print_credentials(info, {VAULT: "root-token-x"}, {"admin": "pw-x"}, "http://kc", tmp_path)
+        out = capsys.readouterr().out
+        assert str(tmp_path / "run.json") in out
+        assert "root-token-x" not in out and "pw-x" not in out
+
+    def test_the_dev_run_prints_root_tokens_and_files_passwords(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _load_dev_setup()._print_credentials(None, {VAULT: "root-token-x"}, {"admin": "pw-x"}, "http://kc", tmp_path)
+        out = capsys.readouterr().out
+        assert "root-token-x" in out and "pw-x" not in out and "admin" in out
+        users = tmp_path / "keycloak-users.json"
+        assert json.loads(users.read_text()) == {"keycloak": "http://kc", "users": {"admin": "pw-x"}}
+        assert stat.S_IMODE(users.stat().st_mode) == 0o600
+
+    def test_the_dev_run_without_keycloak_writes_no_file(self, tmp_path: Path) -> None:
+        _load_dev_setup()._print_credentials(None, {VAULT: "root-token-x"}, {}, "http://kc", tmp_path)
+        assert not (tmp_path / "keycloak-users.json").exists()
+
+
 class TestKeycloak:
+    def test_the_realm_says_it_is_dev_only(self) -> None:
+        realm = json.loads(keycloak.REALM_TEMPLATE.read_text())
+        assert realm["displayName"].startswith("Chronowarden DEV ONLY")
+        assert realm["sslRequired"] == "none"  # only for the 127.0.0.1 dev Keycloak; a change here is deliberate
+
     def test_realm_fills_client_and_users(self) -> None:
         passwords = {"admin": "pa", "owner": "po", "viewer": "pv"}
         data = keycloak.realm("http://localhost:9000/api/v1/auth/callback", "s3cret", passwords)
@@ -273,8 +409,9 @@ class TestProcesses:
         process = spawn(
             [sys.executable, "-c", "import time; print('up', flush=True); time.sleep(60)"], tmp_path, tmp_path / "log"
         )
-        assert stop(process.pid)
-        assert not stop(process.pid)  # gone (and reaped) once stop() returns
+        started = started_at(process.pid)
+        assert stop(process.pid, started)
+        assert not stop(process.pid, started)  # gone (and reaped) once stop() returns
 
     def test_stop_kills_what_ignores_sigterm(self, tmp_path: Path) -> None:
         code = (
@@ -285,8 +422,38 @@ class TestProcesses:
         wait_until = time.monotonic() + 5
         while "up" not in (tmp_path / "log").read_text() and time.monotonic() < wait_until:
             time.sleep(0.05)
-        assert stop(process.pid, timeout=0.5)
+        assert stop(process.pid, started_at(process.pid), timeout=0.5)
         assert process.wait(timeout=5) == -signal.SIGKILL
+
+    def test_a_reused_pid_is_not_stopped(self, tmp_path: Path) -> None:
+        process = spawn([sys.executable, "-c", "import time; time.sleep(60)"], tmp_path, tmp_path / "log")
+        try:
+            assert not stop(process.pid, "Thu Jan  1 00:00:00 1970")
+            assert process.poll() is None
+        finally:
+            assert stop(process.pid, started_at(process.pid))
+
+    @pytest.mark.parametrize("pid", [0, 1, -1, "12", True, None])
+    def test_only_plain_pids_above_1_are_stopped(self, pid: object, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(os, "killpg", lambda *args: pytest.fail("signalled"))
+        assert not stop(pid, "any")
+
+    def test_a_pid_of_another_user_is_left_alone(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def refuse(*args: object) -> None:
+            raise PermissionError(1, "Operation not permitted")
+
+        monkeypatch.setattr(os, "killpg", refuse)
+        assert not stop(os.getpid(), started_at(os.getpid()))
+
+    def test_wait_listening_fails_when_another_server_answers(self, tmp_path: Path) -> None:
+        with socket.socket() as other:
+            other.bind(("127.0.0.1", 0))
+            other.listen()
+            port = other.getsockname()[1]
+            process = spawn([sys.executable, "-c", "raise SystemExit(1)"], tmp_path, tmp_path / "log")
+            process.wait(timeout=5)
+            with pytest.raises(ContainerRuntimeError, match="exited"):
+                wait_listening(port, process, tmp_path / "log", timeout=2)
 
     def test_wait_http_fails_fast_when_the_process_dies(self, tmp_path: Path) -> None:
         process = spawn([sys.executable, "-c", "raise SystemExit(3)"], tmp_path, tmp_path / "log")
@@ -307,6 +474,22 @@ class TestReceiver:
         (entry,) = [json.loads(line) for line in out.read_text().splitlines()]
         assert (entry["path"], json.loads(entry["body"])) == ("/owner", {"a": 1})
         assert entry["headers"]["webhook-signature"] == "v1,x"
+
+    def test_a_bad_content_length_is_refused_and_does_not_block(self, tmp_path: Path) -> None:
+        out = tmp_path / "webhooks.jsonl"
+        server = make_server(0, out)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        port = server.server_port
+        try:
+            for length, status in (("-1", 400), ("x", 400), (str(11 * 1024 * 1024), 413)):
+                with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+                    sock.sendall(f"POST / HTTP/1.1\r\nHost: x\r\nContent-Length: {length}\r\n\r\n".encode())
+                    assert sock.recv(64).split()[1] == str(status).encode()
+            with socket.create_connection(("127.0.0.1", port), timeout=5):  # a client that sends nothing
+                assert requests.post(f"http://127.0.0.1:{port}/after", json={}, timeout=5).ok
+        finally:
+            server.shutdown()
+        assert [json.loads(line)["path"] for line in out.read_text().splitlines()] == ["/after"]
 
 
 class TestSeed:

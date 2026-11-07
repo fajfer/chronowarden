@@ -1,5 +1,6 @@
 {
   "realm": "chronowarden",
+  "displayName": "Chronowarden DEV ONLY: plain HTTP and unverified emails, never import into a real Keycloak",
   "enabled": true,
   "sslRequired": "none",
   "groups": [{"name": "cw-admins"}, {"name": "teams"}, {"name": "auditors"}],

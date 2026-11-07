@@ -11,10 +11,13 @@ Run as `python -m devenv.receiver --port <port> --out <file>`; dev-setup.py star
 import argparse
 import json
 import sys
+import threading
 from datetime import datetime, timezone
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+
+MAX_BODY = 10 * 1024 * 1024  # webhook bodies are a few KiB; anything bigger is refused
 
 
 def record(path: Path, request_path: str, headers: dict[str, str], body: bytes) -> None:
@@ -29,20 +32,30 @@ def record(path: Path, request_path: str, headers: dict[str, str], body: bytes) 
         file.write(json.dumps(entry) + "\n")
 
 
-def make_server(port: int, out: Path) -> HTTPServer:
-    """A server on 127.0.0.1:`port` (0 = any free port) recording to `out`."""
+def make_server(port: int, out: Path) -> ThreadingHTTPServer:
+    """A server on 127.0.0.1:`port` (0 = any free port) recording to `out`; one stuck client doesn't block others."""
+    lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802 (http.server's naming)
-            length = int(self.headers.get("Content-Length") or 0)
-            record(out, self.path, dict(self.headers), self.rfile.read(length))
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = -1
+            if not 0 <= length <= MAX_BODY:
+                self.send_response(400 if length < 0 else 413)
+                self.end_headers()
+                return
+            body = self.rfile.read(length)
+            with lock:
+                record(out, self.path, dict(self.headers), body)
             self.send_response(200)
             self.end_headers()
 
         def log_message(self, *args: Any) -> None:
             pass  # the JSON Lines file is the log
 
-    return HTTPServer(("127.0.0.1", port), Handler)
+    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
 
 
 def main() -> int:
