@@ -67,11 +67,16 @@ def free_port() -> int:
 
 def require_free(ports: dict[str, int]) -> None:
     """
-    Check that every port is free before a run starts, so it never talks to whatever already listens there.
+    Check that every port is free and used once before a run starts, so it never talks to whatever listens there.
 
     Raises:
-        RunError: Naming each busy port and what it was meant for.
+        RunError: For a port picked twice, or naming each busy port and what it was meant for.
     """
+    seen: dict[int, str] = {}
+    for what, port in ports.items():
+        if port in seen:
+            raise RunError(f"Port {port} picked for both {seen[port]} and {what}; start the run again")
+        seen[port] = what
     busy = [f"{port} ({what})" for what, port in ports.items() if not port_free(port)]
     if busy:
         raise RunError(f"Port(s) already in use: {', '.join(busy)}; stop what listens there or use another --run")

@@ -246,6 +246,9 @@ def setup(
         return 1
     info: RunInfo | None = None
     if scratch is not None:
+        if ":" in str(scratch):  # it would break the `-v <scratch>:/data` mount of --app image
+            logger.error("%s contains ':'; choose a --scratch without one", scratch)
+            return 1
         if not _prepare_scratch(scratch):
             return 1
         config_path, force = scratch / "config.yaml", True  # the scratch dir belongs to the run
@@ -394,7 +397,7 @@ def main() -> int:
     parser.add_argument("--scratch", type=Path, help="the run's working dir (default for runs other than dev: $TMPDIR)")
     parser.add_argument("--cleanup", action="store_true", help="remove the run's containers and scratch dir and exit")
     parser.add_argument("--list", action="store_true", help="list the runs that have containers and exit")
-    parser.add_argument("--config", type=Path, default=Path("config.yaml"), help="where the dev run writes its config")
+    parser.add_argument("--config", type=Path, help="where the dev run writes its config (default: ./config.yaml)")
     parser.add_argument("--auth", choices=["none", "oidc"], default="none", help="login: none, or oidc via Keycloak")
     parser.add_argument("--receiver", action="store_true", help="start a webhook receiver (<scratch>/webhooks.jsonl)")
     parser.add_argument(
@@ -404,13 +407,16 @@ def main() -> int:
     args = parser.parse_args()
     try:
         run = check_name(args.run)
+        if args.config is not None and run != DEFAULT_RUN:
+            raise RunError("--config is for the dev run; a named run writes <scratch>/config.yaml")
         runtime = Runtime(detect_runtime())
         if args.list:
             return list_runs(runtime)
         if args.cleanup:
             return cleanup(runtime, run, args.scratch)
         scratch = args.scratch if args.scratch or run == DEFAULT_RUN else default_scratch(run)
-        return setup(runtime, run, scratch, args.config, args.force, Options(args.auth, args.receiver, args.app))
+        config = args.config if args.config is not None else Path("config.yaml")
+        return setup(runtime, run, scratch, config, args.force, Options(args.auth, args.receiver, args.app))
     except (ContainerRuntimeError, RunError) as exc:
         print(f"dev-setup: {exc}", file=sys.stderr)
         return 1

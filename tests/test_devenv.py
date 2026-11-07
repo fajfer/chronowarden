@@ -14,6 +14,7 @@ import stat
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
 
@@ -21,6 +22,7 @@ import pytest
 import requests
 import yaml
 
+from chronowarden.alerting.delivery import post
 from chronowarden.config import load_config
 from chronowarden.database import Database
 from devenv import keycloak
@@ -43,7 +45,7 @@ from devenv.runs import (
     require_free,
 )
 from devenv.runtime import ContainerRuntimeError, ContainerSpec, Runtime, detect_runtime
-from devenv.seed import OWNED_SECRETS, OWNER_EMAIL, seed_database
+from devenv.seed import OWNED_SECRETS, OWNER_EMAIL, OWNER_GROUP, seed_database
 
 CREDENTIALS = {OPENBAO: ("role-a", "secret-a"), VAULT: ("role-b", "secret-b")}
 
@@ -200,6 +202,11 @@ class TestRuns:
             with pytest.raises(RunError, match=f"{port} \\(vault\\)"):
                 require_free({"vault": port})
 
+    def test_a_port_picked_twice_is_refused(self) -> None:
+        port = free_port()
+        with pytest.raises(RunError, match=f"Port {port} picked for both receiver and app"):
+            require_free({"receiver": port, "app": port})
+
     def test_default_scratch_is_per_run(self) -> None:
         assert default_scratch("a") != default_scratch("b")
         assert default_scratch("a").name == "chronowarden-a"
@@ -304,6 +311,88 @@ class TestCleanup:
         runtime = FakeRuntime({"cw-a-vault": {LABEL: "a"}, "cw-a-openbao": {LABEL: "a"}, "unrelated": {}})
         dev_setup.list_runs(runtime)
         assert capsys.readouterr().out == "a: cw-a-openbao, cw-a-vault\n"
+
+
+class RecordingRuntime(FakeRuntime):
+    """A runtime whose containers start: records each spec."""
+
+    def __init__(self) -> None:
+        super().__init__({})
+        self.started: list[ContainerSpec] = []
+
+    def start(self, spec: ContainerSpec) -> None:
+        self.started.append(spec)
+        self.containers[spec.name] = dict(spec.labels)
+
+
+class TestSetup:
+    @pytest.fixture
+    def dev_setup(self, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+        """dev-setup.py with the vaults faked: no network, no real ports."""
+        module = _load_dev_setup()
+        monkeypatch.setattr(module, "_wait_ready", lambda backend, token: object())
+        monkeypatch.setattr(module, "seed", lambda client: None)
+        monkeypatch.setattr(module, "setup_approle", lambda client: ("role", "secret"))
+        monkeypatch.setattr(module, "require_free", lambda ports: None)
+        monkeypatch.setattr(module, "seed_database", lambda *args: pytest.fail("the dev run has no database to seed"))
+        return module
+
+    def test_the_dev_run_is_unchanged(self, dev_setup: ModuleType, tmp_path: Path) -> None:
+        runtime = RecordingRuntime()
+        config = tmp_path / "config.yaml"
+        assert dev_setup.setup(runtime, DEFAULT_RUN, None, config, False) == 0
+        specs = {spec.name: spec for spec in runtime.started}
+        assert sorted(specs) == ["openbao-dev", "vault-dev"]
+        assert specs["openbao-dev"].ports == ["127.0.0.1:8200:8200"]
+        assert specs["vault-dev"].ports == ["127.0.0.1:8201:8201"]
+        assert all(spec.labels == {LABEL: DEFAULT_RUN} for spec in specs.values())
+        assert load_config(str(config)).vaults[0].name == "dev-openbao"
+        assert not list(tmp_path.glob("*.json"))  # no run.json and no keycloak-users.json
+
+    def test_the_dev_run_keeps_a_hand_written_config(self, dev_setup: ModuleType, tmp_path: Path) -> None:
+        config = tmp_path / "config.yaml"
+        config.write_text("vaults: []\n")
+        assert dev_setup.setup(RecordingRuntime(), DEFAULT_RUN, None, config, False) == 1
+        assert config.read_text() == "vaults: []\n"
+
+    def test_the_dev_run_has_no_receiver_or_app(self, dev_setup: ModuleType, tmp_path: Path) -> None:
+        options = dev_setup.Options(receiver=True)
+        assert dev_setup.setup(RecordingRuntime(), DEFAULT_RUN, None, tmp_path / "c.yaml", False, options) == 1
+
+    def test_a_scratch_path_with_a_colon_is_refused(self, dev_setup: ModuleType, tmp_path: Path) -> None:
+        scratch = tmp_path / "a:b"
+        assert dev_setup.setup(RecordingRuntime(), "a", scratch, tmp_path / "unused.yaml", False) == 1
+        assert not scratch.exists()
+
+    def test_restarting_a_run_replaces_only_that_run(
+        self, dev_setup: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(dev_setup, "seed_database", lambda *args: None)  # a named run seeds its own database
+        runtime = RecordingRuntime()
+        runtime.containers = {"cw-a-vault": {LABEL: "a"}, "cw-b-vault": {LABEL: "b"}}
+        assert dev_setup.setup(runtime, "a", tmp_path / "a", tmp_path / "unused.yaml", False) == 0
+        assert runtime.removed == ["cw-a-vault"] and "cw-b-vault" in runtime.containers
+
+    def test_config_is_only_for_the_dev_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        dev_setup = _load_dev_setup()
+        monkeypatch.setattr(sys, "argv", ["dev-setup.py", "--run", "a", "--config", "x.yaml"])
+        assert dev_setup.main() == 1
+
+    def test_a_written_oidc_and_alerting_config_loads(self, tmp_path: Path) -> None:
+        idp = keycloak.Keycloak("kc", 8180)
+        path = tmp_path / "config.yaml"
+        alerting = {"enabled": True, "default_routes": [{"name": "dev-receiver", "url": "http://127.0.0.1:9/default"}]}
+        write_dev_config(path, CREDENTIALS, auth=keycloak.oidc_auth(idp, "s3cret", "http://x/cb"), alerting=alerting)
+        config = load_config(str(path))
+        assert config.auth.mode == "oidc" and config.auth.oidc.issuer == idp.issuer
+        assert [route.name for route in config.alerting.default_routes] == ["dev-receiver"]
+
+    def test_the_owner_user_maps_to_the_seeded_owner(self) -> None:
+        """Owner scope comes from the IdP group and email; the realm, the role mapping and the seed must agree."""
+        users = {u["username"]: u for u in json.loads(keycloak.REALM_TEMPLATE.read_text())["users"]}
+        assert users["owner"]["email"] == OWNER_EMAIL
+        assert f"/{OWNER_GROUP}" in users["owner"]["groups"]
+        assert OWNER_GROUP in keycloak.ROLE_GROUPS["owner"]
 
 
 class TestScratch:
@@ -455,6 +544,17 @@ class TestProcesses:
             with pytest.raises(ContainerRuntimeError, match="exited"):
                 wait_listening(port, process, tmp_path / "log", timeout=2)
 
+    def test_wait_http_fails_when_another_server_answers(self, tmp_path: Path) -> None:
+        other = make_server(0, tmp_path / "other.jsonl")  # answers GET with 501, so serve a 200 instead
+        other.RequestHandlerClass.do_GET = lambda self: (self.send_response(200), self.end_headers())  # type: ignore
+        threading.Thread(target=other.serve_forever, daemon=True).start()
+        calls = iter([True, False])  # ours was alive at the first look, gone once something answered
+        try:
+            with pytest.raises(ContainerRuntimeError, match="exited"):
+                wait_http(f"http://127.0.0.1:{other.server_port}/", 5, lambda: next(calls, False))
+        finally:
+            other.shutdown()
+
     def test_wait_http_fails_fast_when_the_process_dies(self, tmp_path: Path) -> None:
         process = spawn([sys.executable, "-c", "raise SystemExit(3)"], tmp_path, tmp_path / "log")
         with pytest.raises(ContainerRuntimeError, match="exited; see app.log"):
@@ -474,6 +574,26 @@ class TestReceiver:
         (entry,) = [json.loads(line) for line in out.read_text().splitlines()]
         assert (entry["path"], json.loads(entry["body"])) == ("/owner", {"a": 1})
         assert entry["headers"]["webhook-signature"] == "v1,x"
+
+    def test_records_a_signed_delivery_from_chronowarden(self, tmp_path: Path) -> None:
+        out = tmp_path / "webhooks.jsonl"
+        server = make_server(0, out)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            status, error = post(
+                f"http://127.0.0.1:{server.server_port}/owner",
+                b'{"status": "firing"}',
+                "msg_1",
+                "whsec_" + "A" * 32,
+                datetime.now(timezone.utc),
+            )
+        finally:
+            server.shutdown()
+        assert (status, error) == (200, "")
+        (entry,) = [json.loads(line) for line in out.read_text().splitlines()]
+        headers = {k.lower(): v for k, v in entry["headers"].items()}
+        assert entry["path"] == "/owner" and headers["webhook-id"] == "msg_1"
+        assert headers["webhook-signature"].startswith("v1,")
 
     def test_a_bad_content_length_is_refused_and_does_not_block(self, tmp_path: Path) -> None:
         out = tmp_path / "webhooks.jsonl"
