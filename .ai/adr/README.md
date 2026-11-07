@@ -40,10 +40,11 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-019](ADR-019-compliance-policies-as-config.md) | Compliance policies as config, with examples instead of built-in packs | Accepted | 2026-10-11 |
 | [ADR-020](ADR-020-pdf-reports-with-typst.md) | PDF reports with Typst | Accepted | 2026-10-11 |
 | [ADR-021](ADR-021-rotation-handover.md) | Rotation hand-over between the rotating and the applying team | Accepted | 2026-10-11 |
-| [ADR-022](ADR-022-webhooks-and-optional-metrics.md) | Built-in webhook alerting, optional Prometheus metrics | Accepted | 2026-10-11 |
+| [ADR-022](ADR-022-webhooks-and-optional-metrics.md) | Built-in webhook alerting, optional Prometheus metrics | Superseded by ADR-029 | 2026-10-11 |
 | [ADR-023](ADR-023-schema-migrations-with-user-version.md) | Schema migrations with PRAGMA user_version | Accepted | 2026-10-11 |
 | [ADR-024](ADR-024-headless-image.md) | Headless image without the UI or Typst | Accepted | 2026-10-12 |
 | [ADR-025](ADR-025-alert-lifecycle-and-webhook-delivery.md) | Alert lifecycle and webhook delivery | Accepted | 2026-10-12 |
 | [ADR-026](ADR-026-sessions-tokens-and-permissions.md) | Sessions, API tokens and the permission matrix | Accepted | 2026-10-27 |
 | [ADR-027](ADR-027-agent-procedures-and-audit-rounds.md) | Agent procedures in `.agents/skills`, thin tool wrappers, audit rounds outside the repo | Accepted | 2026-10-31 |
 | [ADR-028](ADR-028-spdx-3-sboms.md) | Release integrity with SBOMs in SPDX 3.0 | Accepted | 2026-11-07 |
+| [ADR-029](ADR-029-webhook-target-restrictions.md) | Admins can restrict where webhooks go | Accepted | 2026-11-07 |

@@ -7,7 +7,7 @@ SPDX-License-Identifier: EUPL-1.2
 
 ## Purpose
 
-Chronowarden's own alerting (#99, [ADR-022](../../.ai/adr/ADR-022-webhooks-and-optional-metrics.md),
+Chronowarden's own alerting (#99, [ADR-029](../../.ai/adr/ADR-029-webhook-target-restrictions.md),
 [ADR-025](../../.ai/adr/ADR-025-alert-lifecycle-and-webhook-delivery.md)): Alertmanager-compatible webhooks to the
 owners' routes and to `alerting.default_routes`, with state, repeats, retries and Standard Webhooks signing.
 
