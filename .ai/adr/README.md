@@ -48,3 +48,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-027](ADR-027-agent-procedures-and-audit-rounds.md) | Agent procedures in `.agents/skills`, thin tool wrappers, audit rounds outside the repo | Accepted | 2026-10-31 |
 | [ADR-028](ADR-028-spdx-3-sboms.md) | Release integrity with SBOMs in SPDX 3.0 | Accepted | 2026-11-07 |
 | [ADR-029](ADR-029-webhook-target-restrictions.md) | Admins can restrict where webhooks go | Accepted | 2026-11-07 |
+| [ADR-030](ADR-030-vex-for-not-affected-vulnerabilities.md) | CycloneDX VEX for every vulnerability we're not affected by | Accepted | 2026-11-07 |
