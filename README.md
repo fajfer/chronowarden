@@ -404,8 +404,19 @@ cosign verify-attestation "ghcr.io/fajfer/chronowarden@${DIGEST}" --type cyclone
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-The wheel, sdist and source SBOMs on the [GitHub release](https://github.com/fajfer/chronowarden/releases) are covered by
-`chronowarden.intoto.jsonl`:
+Next to each CycloneDX SBOM is a [CycloneDX VEX](https://cyclonedx.org/capabilities/vex/) (`*.vex.cdx.json`): the
+vulnerabilities in that SBOM's components that don't affect Chronowarden, each with what was checked. They come from
+[`vex/chronowarden.vex.cdx.json`](vex/chronowarden.vex.cdx.json). A scanner that reads CycloneDX VEX leaves those
+findings out:
+
+```bash
+trivy sbom --vex chronowarden-source.vex.cdx.json chronowarden-source.cdx.json
+```
+
+The image VEX documents are attested too, with `--type https://cyclonedx.org/vex`.
+
+The wheel, sdist, source SBOMs and source VEX on the
+[GitHub release](https://github.com/fajfer/chronowarden/releases) are covered by `chronowarden.intoto.jsonl`:
 
 ```bash
 slsa-verifier verify-artifact chronowarden-0.7.0-py3-none-any.whl \

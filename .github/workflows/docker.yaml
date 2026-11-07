@@ -208,7 +208,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write # to upload the SBOMs to the release
+      contents: write # to upload the SBOMs and VEX to the release
       packages: write # to push the attestations
       id-token: write # keyless cosign attestations
     env:
@@ -217,6 +217,12 @@ jobs:
       PREFIX: ${{ matrix.variant == 'headless' && 'chronowarden-headless-image' || 'chronowarden-image' }}
       SYFT_FILE_METADATA_SELECTION: none
     steps:
+      - name: Checkout repository
+        # For the VEX statements and scripts/vex.py
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Install syft
         id: syft
         uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
@@ -241,18 +247,19 @@ jobs:
               -o "spdx-json@3.0=${PREFIX}-${arch}.spdx.json"
             jq -e '.specVersion == "1.6"' "${PREFIX}-${arch}.cdx.json" > /dev/null
             jq -e '."@context" == "https://spdx.org/rdf/3.0.1/spdx-context.jsonld" and any(."@graph"[]; .type == "CreationInfo" and .specVersion == "3.0.1")' "${PREFIX}-${arch}.spdx.json" > /dev/null
+            # Our not-affected statements, pointed at this SBOM's components (ADR-030)
+            python3 scripts/vex.py "${PREFIX}-${arch}.cdx.json" vex/chronowarden.vex.cdx.json "${PREFIX}-${arch}.vex.cdx.json"
           done
 
-      - name: Attest the SBOMs to the image
+      - name: Attest the SBOMs and VEX to the image
         run: |
-          for sbom in "${PREFIX}"-*.cdx.json; do
-            cosign attest --yes --type cyclonedx --predicate "$sbom" "$IMAGE"
-          done
-          for sbom in "${PREFIX}"-*.spdx.json; do
-            cosign attest --yes --type https://spdx.dev/Document/v3 --predicate "$sbom" "$IMAGE"
+          for arch in amd64 arm64; do  # named per arch: a *.cdx.json glob would also match the VEX
+            cosign attest --yes --type cyclonedx --predicate "${PREFIX}-${arch}.cdx.json" "$IMAGE"
+            cosign attest --yes --type https://spdx.dev/Document/v3 --predicate "${PREFIX}-${arch}.spdx.json" "$IMAGE"
+            cosign attest --yes --type https://cyclonedx.org/vex --predicate "${PREFIX}-${arch}.vex.cdx.json" "$IMAGE"
           done
 
-      - name: Upload the SBOMs to the release
+      - name: Upload the SBOMs and VEX to the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
