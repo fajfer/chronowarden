@@ -5,7 +5,6 @@
 """Named dev runs: container names, labels, ports and the scratch directory each run owns."""
 
 import json
-import os
 import re
 import socket
 import tempfile
@@ -13,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from devenv.files import write_private
 from devenv.processes import started_at
 
 DEFAULT_RUN = "dev"
@@ -112,12 +112,7 @@ class RunInfo:
 
     def write(self) -> Path:
         """Write `run.json` into the scratch dir, readable by the owner only (it holds dev passwords)."""
-        path = self.scratch / RUN_FILE
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-        with os.fdopen(fd, "w") as file:
-            file.write(json.dumps(self.to_json(), indent=2) + "\n")
-        path.chmod(0o600)  # an older run.json keeps its mode through O_TRUNC
-        return path
+        return write_private(self.scratch / RUN_FILE, json.dumps(self.to_json(), indent=2) + "\n")
 
 
 def read_run(scratch: Path) -> dict[str, Any] | None:

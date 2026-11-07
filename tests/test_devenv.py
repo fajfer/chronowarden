@@ -348,15 +348,24 @@ class TestCredentialOutput:
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         info = RunInfo(run="a", scratch=tmp_path, config=tmp_path / "config.yaml")
-        _load_dev_setup()._print_credentials(info, {VAULT: "root-token-x"}, {"admin": "pw-x"}, "http://kc")
+        _load_dev_setup()._print_credentials(info, {VAULT: "root-token-x"}, {"admin": "pw-x"}, "http://kc", tmp_path)
         out = capsys.readouterr().out
         assert str(tmp_path / "run.json") in out
         assert "root-token-x" not in out and "pw-x" not in out
 
-    def test_the_dev_run_prints_them(self, capsys: pytest.CaptureFixture[str]) -> None:
-        _load_dev_setup()._print_credentials(None, {VAULT: "root-token-x"}, {"admin": "pw-x"}, "http://kc")
+    def test_the_dev_run_prints_root_tokens_and_files_passwords(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _load_dev_setup()._print_credentials(None, {VAULT: "root-token-x"}, {"admin": "pw-x"}, "http://kc", tmp_path)
         out = capsys.readouterr().out
-        assert "root-token-x" in out and "admin: pw-x" in out
+        assert "root-token-x" in out and "pw-x" not in out and "admin" in out
+        users = tmp_path / "keycloak-users.json"
+        assert json.loads(users.read_text()) == {"keycloak": "http://kc", "users": {"admin": "pw-x"}}
+        assert stat.S_IMODE(users.stat().st_mode) == 0o600
+
+    def test_the_dev_run_without_keycloak_writes_no_file(self, tmp_path: Path) -> None:
+        _load_dev_setup()._print_credentials(None, {VAULT: "root-token-x"}, {}, "http://kc", tmp_path)
+        assert not (tmp_path / "keycloak-users.json").exists()
 
 
 class TestKeycloak:

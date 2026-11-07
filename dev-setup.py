@@ -10,6 +10,7 @@ Every environment is a named run (`--run`, default `dev`); see .ai/docs/dev-env.
 """
 
 import argparse
+import json
 import logging
 import os
 import shutil
@@ -26,6 +27,7 @@ from requests.exceptions import RequestException
 from devenv import keycloak
 from devenv.backends import BACKENDS, Backend, random_token, seed, setup_approle
 from devenv.config import can_write, write_dev_config
+from devenv.files import write_private
 from devenv.processes import spawn, stop, wait_http, wait_listening
 from devenv.runs import (
     DEFAULT_RUN,
@@ -50,6 +52,7 @@ logger = logging.getLogger("dev-setup")
 REPO = Path(__file__).resolve().parent
 APP_IMAGE = "chronowarden:test"  # docker build -t chronowarden:test . (deploy/AGENTS.md); podman adds localhost/
 WEBHOOKS_FILE = "webhooks.jsonl"
+KEYCLOAK_USERS_FILE = "keycloak-users.json"  # the dev run's Keycloak passwords, next to its config
 DEV_APP_PORT = 8000  # uvicorn's default, where the dev run's OIDC redirect URI points
 
 
@@ -309,16 +312,21 @@ def setup(
             logger.info("Chronowarden at %s", app_url)
     else:
         logger.info("Run: uv run uvicorn chronowarden:app --reload --port %d", app_port)
-    _print_credentials(info, tokens, passwords, idp.address)
+    _print_credentials(info, tokens, passwords, idp.address, config_path.parent)
     return 0
 
 
 def _print_credentials(
-    info: RunInfo | None, tokens: dict[Backend, str], passwords: dict[str, str], keycloak_address: str
+    info: RunInfo | None,
+    tokens: dict[Backend, str],
+    passwords: dict[str, str],
+    keycloak_address: str,
+    config_dir: Path,
 ) -> None:
     """
-    Tell where a run's dev-only credentials are. A named run's are in its run.json and are not printed, so they stay
-    out of agent transcripts; the dev run, which has no run.json, prints them for poking at the servers by hand.
+    Tell where a run's dev-only credentials are. A named run's are in its run.json; the dev run, which has none,
+    prints its root tokens for poking at the servers by hand and writes Keycloak passwords to a private file. No
+    password is ever printed, so none ends up in a terminal log or an agent transcript.
     """
     if info is not None:
         print(f"\nCredentials (dev only) are in {info.scratch / RUN_FILE}")
@@ -327,9 +335,9 @@ def _print_credentials(
     for backend, token in tokens.items():
         print(f"  {backend.container} {backend.address}: {token}")
     if passwords:
-        print(f"Keycloak users at {keycloak_address} (dev only):")
-        for user, password in passwords.items():
-            print(f"  {user}: {password}")
+        users = {"keycloak": keycloak_address, "users": passwords}
+        path = write_private(config_dir / KEYCLOAK_USERS_FILE, json.dumps(users, indent=2) + "\n")
+        print(f"Keycloak users at {keycloak_address} (dev only): {', '.join(passwords)}; passwords in {path}")
 
 
 def _find_scratch(runtime: Runtime, run: str) -> Path | None:
