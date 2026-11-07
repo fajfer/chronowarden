@@ -101,10 +101,13 @@ def wait_http(url: str, timeout: float, alive: Optional[Callable[[], bool]] = No
         if alive is not None and not alive():
             raise ContainerRuntimeError(f"The server for {url} exited{where}")
         try:
-            if requests.get(url, timeout=5).ok:
-                return
+            answered = requests.get(url, timeout=5).ok
         except RequestException:
-            pass  # not up yet
+            answered = False  # not up yet
+        if answered:
+            if alive is not None and not alive():  # the answer came from something else on the port
+                raise ContainerRuntimeError(f"The server for {url} exited{where}")
+            return
         time.sleep(0.5)
     raise ContainerRuntimeError(f"{url} didn't answer within {timeout:.0f}s{where}")
 
