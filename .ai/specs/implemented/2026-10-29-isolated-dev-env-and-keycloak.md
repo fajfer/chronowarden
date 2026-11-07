@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # Isolated dev environments with Keycloak
 
-- **Status:** in progress
+- **Status:** implemented
 - **Date:** 2026-10-29
 - **Issue:** none
 
@@ -31,8 +31,8 @@ A testcontainers test proves a real Keycloak login end to end.
 
 ## Load
 
-- [root AGENTS.md](../../AGENTS.md), [deploy](../../deploy/AGENTS.md), [auth](../../chronowarden/auth/AGENTS.md)
-- [ADR-015](../adr/ADR-015-authentication.md), [ADR-026](../adr/ADR-026-sessions-tokens-and-permissions.md)
+- [root AGENTS.md](../../../AGENTS.md), [deploy](../../../deploy/AGENTS.md), [auth](../../../chronowarden/auth/AGENTS.md)
+- [ADR-015](../../adr/ADR-015-authentication.md), [ADR-026](../../adr/ADR-026-sessions-tokens-and-permissions.md)
 - `dev-setup.py`, `devenv/*.py`, `tests/integration/test_backends.py`, `docs/guides/authentication.md`
 
 ## ADRs affected
