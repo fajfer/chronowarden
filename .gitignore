@@ -44,6 +44,7 @@ dist/
 .coverage
 htmlcov/
 config.yaml
+keycloak-users.json
 
 # Database
 chronowarden.db*
