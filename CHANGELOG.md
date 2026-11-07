@@ -14,6 +14,12 @@ git history.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** release SBOMs are SPDX 3.0 (JSON-LD, spec version 3.0.1) instead of SPDX 2.3, and the SPDX image
+  attestation has the predicate type `https://spdx.dev/Document/v3`. Use the CycloneDX SBOM or convert if your tools
+  only read SPDX 2.x (ADR-028).
+
 ### Security
 
 - The database file (`chronowarden.db`, and its `-wal` and `-shm` files) is created owner-only (`0600`), and an

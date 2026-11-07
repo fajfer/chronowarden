@@ -34,9 +34,9 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-013](ADR-013-in-process-and-headless-sync.md) | Scheduled sync in-process, plus a headless one-shot mode | Accepted | 2026-10-09 |
 | [ADR-014](ADR-014-rotation-confirmation-and-audit-log.md) | Rotation confirmation, audit log and change history | Accepted | 2026-10-11 |
 | [ADR-015](ADR-015-authentication.md) | Authentication for UI and API | Accepted | 2026-10-09 |
-| [ADR-016](ADR-016-stability-policy-for-1-0.md) | What 1.0 guarantees | Proposed | 2026-10-09 |
+| [ADR-016](ADR-016-stability-policy-for-1-0.md) | What 1.0 guarantees | Accepted | 2026-11-07 |
 | [ADR-017](ADR-017-sqlite-holds-assignments.md) | SQLite holds assignments that can't be rebuilt from the backends | Accepted | 2026-10-11 |
-| [ADR-018](ADR-018-release-integrity.md) | Release integrity with SLSA Build L3, cosign and SBOMs | Accepted | 2026-10-11 |
+| [ADR-018](ADR-018-release-integrity.md) | Release integrity with SLSA Build L3, cosign and SBOMs | Superseded by ADR-028 | 2026-10-11 |
 | [ADR-019](ADR-019-compliance-policies-as-config.md) | Compliance policies as config, with examples instead of built-in packs | Accepted | 2026-10-11 |
 | [ADR-020](ADR-020-pdf-reports-with-typst.md) | PDF reports with Typst | Accepted | 2026-10-11 |
 | [ADR-021](ADR-021-rotation-handover.md) | Rotation hand-over between the rotating and the applying team | Accepted | 2026-10-11 |
@@ -45,3 +45,5 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-024](ADR-024-headless-image.md) | Headless image without the UI or Typst | Accepted | 2026-10-12 |
 | [ADR-025](ADR-025-alert-lifecycle-and-webhook-delivery.md) | Alert lifecycle and webhook delivery | Accepted | 2026-10-12 |
 | [ADR-026](ADR-026-sessions-tokens-and-permissions.md) | Sessions, API tokens and the permission matrix | Accepted | 2026-10-27 |
+| [ADR-027](ADR-027-agent-procedures-and-audit-rounds.md) | Agent procedures in `.agents/skills`, thin tool wrappers, audit rounds outside the repo | Accepted | 2026-10-31 |
+| [ADR-028](ADR-028-spdx-3-sboms.md) | Release integrity with SBOMs in SPDX 3.0 | Accepted | 2026-11-07 |
