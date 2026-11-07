@@ -1,0 +1,43 @@
+{
+  "realm": "chronowarden",
+  "enabled": true,
+  "sslRequired": "none",
+  "groups": [{"name": "cw-admins"}, {"name": "teams"}, {"name": "auditors"}],
+  "clients": [
+    {
+      "clientId": "chronowarden",
+      "name": "Chronowarden (dev)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": {"pkce.code.challenge.method": "S256"},
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {"username": "admin", "email": "admin@chronowarden.test", "firstName": "Ada", "lastName": "Admin", "groups": ["/cw-admins"]},
+    {"username": "owner", "email": "owner@chronowarden.test", "firstName": "Otto", "lastName": "Owner", "groups": ["/teams"]},
+    {"username": "viewer", "email": "viewer@chronowarden.test", "firstName": "Vera", "lastName": "Viewer", "groups": ["/auditors"]}
+  ]
+}
