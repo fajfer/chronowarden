@@ -13,10 +13,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from devenv.processes import started_at
+
 DEFAULT_RUN = "dev"
 LABEL = "chronowarden.devenv.run"
+SCRATCH_LABEL = "chronowarden.devenv.scratch"  # where cleanup finds a run started with --scratch
 RUN_FILE = "run.json"
-_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}$")
+_NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,30}")
 
 
 class RunError(Exception):
@@ -30,7 +33,7 @@ def check_name(name: str) -> str:
     Raises:
         RunError: If it isn't 1-31 lowercase letters, digits or dashes, starting with a letter or digit.
     """
-    if not _NAME.match(name):
+    if not _NAME.fullmatch(name):
         raise RunError(f"Run name {name!r}: use 1-31 lowercase letters, digits or dashes")
     return name
 
@@ -84,7 +87,7 @@ class RunInfo:
     containers: list[str] = field(default_factory=list)
     urls: dict[str, str] = field(default_factory=dict)
     users: dict[str, str] = field(default_factory=dict)
-    pids: dict[str, int] = field(default_factory=dict)
+    pids: dict[str, dict[str, Any]] = field(default_factory=dict)  # name -> {pid, started}
     root_tokens: dict[str, str] = field(default_factory=dict)
     signing_secrets: dict[str, str] = field(default_factory=dict)
 
@@ -102,10 +105,15 @@ class RunInfo:
             "signing_secrets": self.signing_secrets,
         }
 
+    def record_process(self, name: str, pid: int) -> None:
+        """Record a started process with its start time (so a reused PID is never stopped) and write run.json now."""
+        self.pids[name] = {"pid": pid, "started": started_at(pid)}
+        self.write()
+
     def write(self) -> Path:
         """Write `run.json` into the scratch dir, readable by the owner only (it holds dev passwords)."""
         path = self.scratch / RUN_FILE
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
         with os.fdopen(fd, "w") as file:
             file.write(json.dumps(self.to_json(), indent=2) + "\n")
         path.chmod(0o600)  # an older run.json keeps its mode through O_TRUNC
@@ -113,8 +121,14 @@ class RunInfo:
 
 
 def read_run(scratch: Path) -> dict[str, Any] | None:
-    """The `run.json` in `scratch`, or None if there is none or it's unreadable."""
+    """The `run.json` in `scratch`, or None if there is none, it's unreadable or it isn't a run's (a JSON object)."""
+    path = scratch / RUN_FILE
+    if path.is_symlink():
+        return None
     try:
-        return json.loads((scratch / RUN_FILE).read_text())
+        info = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
         return None
+    if not isinstance(info, dict) or not isinstance(info.get("pids", {}), dict):
+        return None
+    return info

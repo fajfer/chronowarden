@@ -4,6 +4,7 @@
 
 """Writing the dev config.yaml without clobbering a hand-written one."""
 
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -66,4 +67,8 @@ def write_dev_config(
         raise ConfigExistsError(
             f"{path} wasn't written by dev-setup.py; use --force to replace it or --config elsewhere"
         )
-    path.write_text(HEADER + yaml.safe_dump(dev_config(credentials, auth, alerting), sort_keys=False))
+    # Owner-only: it holds AppRole secret IDs and the Keycloak client secret
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w") as file:
+        file.write(HEADER + yaml.safe_dump(dev_config(credentials, auth, alerting), sort_keys=False))
+    path.chmod(0o600)  # an older config keeps its mode through O_TRUNC

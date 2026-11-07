@@ -45,10 +45,11 @@ the Keycloak `owner` user acts for it), system `payments`, and both `apps/secret
 
 ## run.json
 
-`<scratch>/run.json` (mode 0600; scratch defaults to `$TMPDIR/chronowarden-<run>/`, mode 0700) holds everything
+`<scratch>/run.json` (mode 0600; scratch defaults to `$TMPDIR/chronowarden-<run>/`, made 0700, refused if it's a
+symlink or another user's; `config.yaml` in it is 0600) holds everything
 needed to use the run: `urls` (`app`, `dev-openbao`, `dev-vault`, `keycloak`, `receiver`), `users` (Keycloak
 passwords), `root_tokens` (per vault, to change secrets in Vault), `signing_secrets` (`owner-route`, to verify
-webhook signatures), `pids` and `containers`. These are throwaway dev credentials; don't copy them into reports.
+webhook signatures), `pids` (each `{pid, started}`) and `containers`. These are throwaway dev credentials; don't copy them into reports.
 
 ## Using it
 
@@ -65,5 +66,7 @@ webhook signatures), `pids` and `containers`. These are throwaway dev credential
 ## Clean up
 
 `./dev-setup.py --cleanup --run <name>` stops the run's processes, removes its containers (by the label
-`chronowarden.devenv.run=<name>`) and deletes the scratch dir, but only a scratch dir that has a `run.json`.
+`chronowarden.devenv.run=<name>`) and deletes the scratch dir: the one the containers' `chronowarden.devenv.scratch`
+label names, so no `--scratch` is needed. It deletes only an empty dir or one whose `run.json` is this run's, and
+stops a PID only while its start time matches the one recorded (a reused PID is left alone).
 Starting a run with an existing name replaces that run alone.
