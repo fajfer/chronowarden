@@ -12,9 +12,10 @@ How a release goes out, as done for 0.8.0 and 0.9.0. The maintainer gives the go
 
 1. Every spec for the release is `implemented` or explicitly left out; open specs that are only waiting on the
    maintainer say so in their task's Status.
-2. Open Dependabot PRs: a runtime dependency with a security alert goes in before the tag (0.9.0: certifi). Each
-   Dependabot PR is updated to `main` (`gh pr update-branch`) and merged once its checks pass, one at a time,
-   because several touch `uv.lock`.
+2. Open Dependabot PRs: a runtime dependency with a security alert goes in before the tag (0.9.0: certifi). Merge
+   them one at a time once their checks pass, because several touch `uv.lock`. A PR that conflicts gets a
+   `@dependabot rebase` comment; never `gh pr update-branch`: its merge commit isn't Dependabot's, and the ruleset
+   then holds the PR for an extra approval.
 3. `gh api repos/fajfer/chronowarden/dependabot/alerts?state=open` lists what the release would ship; dev-only
    alerts don't block it. An alert judged not exploitable gets a statement in `vex/chronowarden.vex.cdx.json`
    (`not_affected`, a justification, and a `detail` naming what was checked) before it is dismissed, and the

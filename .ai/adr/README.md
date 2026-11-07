@@ -26,7 +26,7 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-005](ADR-005-sqlite-metadata-cache.md) | SQLite as the local metadata cache | Superseded by ADR-017 | 2026-02-07 |
 | [ADR-006](ADR-006-config-source-of-truth.md) | Config is the source of truth for severity | Accepted (retroactive) | 2026-02-08 |
 | [ADR-007](ADR-007-sveltekit-spa-served-by-fastapi.md) | SvelteKit SPA served by FastAPI, API under /api/v1 | Accepted (retroactive) | 2026-02-07 |
-| [ADR-008](ADR-008-container-and-deployment-targets.md) | Distroless image; Compose and bare Kubernetes manifests | Accepted (retroactive) | 2026-02-09 |
+| [ADR-008](ADR-008-container-and-deployment-targets.md) | Distroless image; Compose and bare Kubernetes manifests | Superseded by ADR-031 | 2026-02-09 |
 | [ADR-009](ADR-009-offline-tolerant-reconnect.md) | Start with offline vaults and reconnect in the background | Accepted (retroactive) | 2026-03-18 |
 | [ADR-010](ADR-010-owners-systems-and-permissions.md) | Owners and systems assigned to secrets, editable without RBAC for now | Accepted | 2026-10-09 |
 | [ADR-011](ADR-011-provider-registry.md) | Generic provider registry | Accepted | 2026-10-09 |
@@ -49,3 +49,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-028](ADR-028-spdx-3-sboms.md) | Release integrity with SBOMs in SPDX 3.0 | Accepted | 2026-11-07 |
 | [ADR-029](ADR-029-webhook-target-restrictions.md) | Admins can restrict where webhooks go | Accepted | 2026-11-07 |
 | [ADR-030](ADR-030-vex-for-not-affected-vulnerabilities.md) | CycloneDX VEX for every vulnerability we're not affected by | Accepted | 2026-11-07 |
+| [ADR-031](ADR-031-podman-and-buildah.md) | Podman and Buildah everywhere; a Containerfile; `podman kube play` for one host | Accepted | 2026-11-07 |
