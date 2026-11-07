@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: EUPL-1.2
 
-name: Docker
+name: Container images
 
 on:
   push:
@@ -24,57 +24,61 @@ jobs:
     outputs:
       digest: ${{ steps.push-production.outputs.digest }}
       headless_digest: ${{ steps.push-headless.outputs.digest }}
-    # A normal run takes ~6 minutes; fail fast instead of hanging for GitHub's 6-hour default
-    timeout-minutes: 30
+    # buildah has no layer cache across runs and builds arm64 under emulation (ADR-031): slower than Buildx was
+    timeout-minutes: 60
     env:
+      IMAGE: ghcr.io/${{ github.repository }}
       IMAGE_TAG: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
-      # Release images build from scratch so a poisoned Actions cache entry can't end up in a signed image
-      CACHE_FROM: ${{ !startsWith(github.ref, 'refs/tags/v') && 'type=gha' || '' }}
-      CACHE_TO: ${{ !startsWith(github.ref, 'refs/tags/v') && 'type=gha,mode=max' || '' }}
+      PUSH: ${{ github.event_name != 'pull_request' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Install arm64 emulation
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q qemu-user-static
+          buildah --version
+          podman --version
 
       - name: Login to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | buildah login --username "$GITHUB_ACTOR" --password-stdin ghcr.io
 
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ghcr.io/${{ github.repository }}
+      - name: Image labels
+        env:
+          DESCRIPTION: ${{ github.event.repository.description }}
+        run: |
+          # The OCI labels docker/metadata-action used to set, one --label per line for the builds below
+          {
+            echo "--label=org.opencontainers.image.title=${GITHUB_REPOSITORY#*/}"
+            echo "--label=org.opencontainers.image.description=${DESCRIPTION}"
+            echo "--label=org.opencontainers.image.version=${IMAGE_TAG}"
+            echo "--label=org.opencontainers.image.revision=${GITHUB_SHA}"
+            echo "--label=org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "--label=org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+            echo "--label=org.opencontainers.image.url=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+            echo "--label=org.opencontainers.image.licenses=EUPL-1.2"
+          } > "$RUNNER_TEMP/labels"
 
       - name: Build production image for smoke test
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          load: true
-          tags: chronowarden:smoke-test
-          platforms: linux/amd64
-          cache-from: ${{ env.CACHE_FROM }}
-          no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: buildah build --layers --platform linux/amd64 --target production -t localhost/chronowarden:smoke-test -f Containerfile .
 
       - name: Smoke test production image
         run: |
           printf 'vaults: []\nauth:\n  mode: none\n' > "$RUNNER_TEMP/config.yaml"
-          docker run -d --name smoke -p 127.0.0.1:8000:8000 \
-            -v "$RUNNER_TEMP/config.yaml:/data/config.yaml:ro" chronowarden:smoke-test
+          podman run -d --name smoke -p 127.0.0.1:8000:8000 \
+            -v "$RUNNER_TEMP/config.yaml:/data/config.yaml:ro" localhost/chronowarden:smoke-test
           for _ in $(seq 1 30); do
             curl -fsS http://127.0.0.1:8000/api/v1/health && break
             sleep 1
           done
           if ! curl -fsS http://127.0.0.1:8000/api/v1/health; then
             echo "::error::production image did not become healthy within 30s"
-            docker logs smoke
+            podman logs smoke
             exit 1
           fi
           # Path traversal regression: the SPA catch-all must never serve files outside the build directory
@@ -88,67 +92,60 @@ jobs:
           curl -fsS -o "$RUNNER_TEMP/report.pdf" "http://127.0.0.1:8000/api/v1/compliance/snapshots/${id}/report.pdf"
           if ! head -c 5 "$RUNNER_TEMP/report.pdf" | grep -q '%PDF-' || ! grep -aq 'pdfaid:part' "$RUNNER_TEMP/report.pdf"; then
             echo "::error::the production image did not render a PDF/A report"
-            docker logs smoke
+            podman logs smoke
             exit 1
           fi
-          docker rm -f smoke
+          podman rm -f smoke
 
       - name: Build and push (production target)
         id: push-production
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/${{ github.repository }}:${{ env.IMAGE_TAG }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: ${{ env.CACHE_FROM }}
-          no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          cache-to: ${{ env.CACHE_TO }}
+        run: |
+          mapfile -t labels < "$RUNNER_TEMP/labels"
+          buildah build --layers --platform linux/amd64,linux/arm64 --target production --manifest production \
+            "${labels[@]}" -f Containerfile .
+          if [ "$PUSH" = true ]; then
+            buildah manifest push --all --format oci --digestfile "$RUNNER_TEMP/production.digest" \
+              production "docker://${IMAGE}:${IMAGE_TAG}"
+            echo "digest=$(cat "$RUNNER_TEMP/production.digest")" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install cosign
         if: startsWith(github.ref, 'refs/tags/v')
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
+      - name: Login to GHCR for cosign
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | cosign login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
       - name: Sign the production image
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           DIGEST: ${{ steps.push-production.outputs.digest }}
-        run: cosign sign --yes "ghcr.io/${GITHUB_REPOSITORY}@${DIGEST}"
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
       - name: Build and push (dev target)
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: dev
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/${{ github.repository }}:${{ env.IMAGE_TAG }}-dev
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: ${{ env.CACHE_FROM }}
-          no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          cache-to: ${{ env.CACHE_TO }}
+        run: |
+          mapfile -t labels < "$RUNNER_TEMP/labels"
+          buildah build --layers --platform linux/amd64,linux/arm64 --target dev --manifest dev \
+            "${labels[@]}" -f Containerfile .
+          if [ "$PUSH" = true ]; then
+            buildah manifest push --all --format oci dev "docker://${IMAGE}:${IMAGE_TAG}-dev"
+          fi
 
       - name: Build headless image for smoke test
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: headless
-          load: true
-          tags: chronowarden:smoke-headless
-          platforms: linux/amd64
-          cache-from: ${{ env.CACHE_FROM }}
-          no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: buildah build --layers --platform linux/amd64 --target headless -t localhost/chronowarden:smoke-headless -f Containerfile .
 
       - name: Smoke test headless image
         run: |
-          docker run -d --name smoke-headless -p 127.0.0.1:8001:8000 \
-            -v "$RUNNER_TEMP/config.yaml:/data/config.yaml:ro" chronowarden:smoke-headless
+          podman run -d --name smoke-headless -p 127.0.0.1:8001:8000 \
+            -v "$RUNNER_TEMP/config.yaml:/data/config.yaml:ro" localhost/chronowarden:smoke-headless
           for _ in $(seq 1 30); do
             curl -fsS http://127.0.0.1:8001/api/v1/health && break
             sleep 1
           done
-          fail() { echo "::error::headless image: $1"; docker logs smoke-headless; exit 1; }
+          fail() { echo "::error::headless image: $1"; podman logs smoke-headless; exit 1; }
           curl -fsS http://127.0.0.1:8001/api/v1/health > /dev/null || fail "not healthy within 30s"
           # ADR-024: no UI, no Typst; the report route stays and answers 501
           [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/)" = 404 ] || fail "/ is not 404"
@@ -156,27 +153,25 @@ jobs:
             http://127.0.0.1:8001/api/v1/compliance/snapshots | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
           code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8001/api/v1/compliance/snapshots/${id}/report.pdf")
           [ "$code" = 501 ] || fail "report.pdf answered $code, not 501"
-          docker rm -f smoke-headless
+          podman rm -f smoke-headless
 
       - name: Build and push (headless target)
         id: push-headless
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: headless
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/${{ github.repository }}:${{ env.IMAGE_TAG }}-headless
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: ${{ env.CACHE_FROM }}
-          no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          cache-to: ${{ env.CACHE_TO }}
+        run: |
+          mapfile -t labels < "$RUNNER_TEMP/labels"
+          buildah build --layers --platform linux/amd64,linux/arm64 --target headless --manifest headless \
+            "${labels[@]}" -f Containerfile .
+          if [ "$PUSH" = true ]; then
+            buildah manifest push --all --format oci --digestfile "$RUNNER_TEMP/headless.digest" \
+              headless "docker://${IMAGE}:${IMAGE_TAG}-headless"
+            echo "digest=$(cat "$RUNNER_TEMP/headless.digest")" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Sign the headless image
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           DIGEST: ${{ steps.push-headless.outputs.digest }}
-        run: cosign sign --yes "ghcr.io/${GITHUB_REPOSITORY}@${DIGEST}"
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
   provenance:
     name: SLSA provenance for the ${{ matrix.variant }} image
@@ -231,11 +226,10 @@ jobs:
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Login to GHCR
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        # cosign writes the Docker-format config that syft reads too
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | cosign login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 
       - name: Generate image SBOMs
         env:

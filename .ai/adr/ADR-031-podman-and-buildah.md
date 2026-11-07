@@ -5,7 +5,7 @@ SPDX-License-Identifier: EUPL-1.2
 -->
 # ADR-031: Podman and Buildah everywhere; a Containerfile; `podman kube play` for one host
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-032
 - **Date:** 2026-11-07
 - **Evidence:** maintainer decisions of 2026-11-07
 - **Supersedes:** ADR-008
