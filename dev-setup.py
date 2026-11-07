@@ -337,7 +337,8 @@ def _print_credentials(
     if passwords:
         users = {"keycloak": keycloak_address, "users": passwords}
         path = write_private(config_dir / KEYCLOAK_USERS_FILE, json.dumps(users, indent=2) + "\n")
-        print(f"Keycloak users at {keycloak_address} (dev only): {', '.join(passwords)}; passwords in {path}")
+        names = ", ".join(keycloak.usernames())  # from the realm, not from the passwords
+        print(f"Keycloak users at {keycloak_address} (dev only): {names}; passwords in {path}")
 
 
 def _find_scratch(runtime: Runtime, run: str) -> Path | None:

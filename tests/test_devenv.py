@@ -369,6 +369,11 @@ class TestCredentialOutput:
 
 
 class TestKeycloak:
+    def test_the_realm_says_it_is_dev_only(self) -> None:
+        realm = json.loads(keycloak.REALM_TEMPLATE.read_text())
+        assert realm["displayName"].startswith("Chronowarden DEV ONLY")
+        assert realm["sslRequired"] == "none"  # only for the 127.0.0.1 dev Keycloak; a change here is deliberate
+
     def test_realm_fills_client_and_users(self) -> None:
         passwords = {"admin": "pa", "owner": "po", "viewer": "pv"}
         data = keycloak.realm("http://localhost:9000/api/v1/auth/callback", "s3cret", passwords)
