@@ -64,16 +64,26 @@ Join us on [Matrix](https://matrix.to/#/#chronowarden:reszka.org) to discuss and
 
 ## Quick Start
 
-### Docker
+Podman is preferred: it's what the images are built and tested with. Docker runs them the same way.
+
+**Podman:**
 ```bash
-docker run --network=host --rm -p 8000:8000 \
-    -v $(pwd)/config.yaml:/data/config.yaml \
+podman run -d --name chronowarden -p 127.0.0.1:8000:8000 \
+  -v ./config.yaml:/data/config.yaml:ro,Z -v chronowarden-data:/app/data -w /app/data \
   ghcr.io/fajfer/chronowarden:v0.10.0
 ```
 
-Add `-v $(pwd)/chronowarden.db:/app/chronowarden.db` to keep the database. From 0.7 it holds system and owner
-assignments that can't be rebuilt from Vault, so **back up `chronowarden.db`**; it is upgraded automatically on
-startup.
+**Docker:**
+```bash
+docker run -d --name chronowarden -p 127.0.0.1:8000:8000 -v ./config.yaml:/data/config.yaml:ro -v chronowarden-data:/app/data -w /app/data ghcr.io/fajfer/chronowarden:v0.10.0
+```
+
+The `chronowarden-data` volume keeps the database (`chronowarden.db`, with its `-wal` and `-shm` files). From 0.7
+it holds system and owner assignments that can't be rebuilt from Vault, so **back it up**; it is upgraded
+automatically on startup. To reach a Vault on the host's `localhost`, add `--network=host` (then `-p` isn't
+needed).
+
+To run it as a service on one host, use the Kubernetes manifests with `podman kube play` ([Deployment](#deployment)).
 
 #### Image variants
 Each release publishes three images for amd64 and arm64:
@@ -87,20 +97,22 @@ Each release publishes three images for amd64 and arm64:
 The production and headless images are signed and carry SLSA provenance and SBOM attestations.
 
 #### Building image
-Production (default) \
-`docker build -t fajfer/chronowarden:0.10.0 .`
+With buildah (preferred) or podman (`podman build` takes the same options):
 
-Headless \
-`docker build --target headless -t fajfer/chronowarden:0.10.0-headless .`
+```bash
+buildah build -t chronowarden:0.10.0 .                                 # production (default)
+buildah build --target headless -t chronowarden:0.10.0-headless .
+buildah build --target dev -t chronowarden:0.10.0-dev .
+```
 
-Development \
-`docker build --target dev -t fajfer/chronowarden:0.10.0-dev .`
+With Docker, name the file: `docker build -f Containerfile -t chronowarden:0.10.0 .` (add `--target headless` or
+`--target dev` for the others).
 
 ### Prerequisites
 
 - Python 3.12+ (tested on 3.13.5)
 - Node.js 18+ (for frontend)
-- Docker (optional, for dev Vaults)
+- Podman (optional, for dev Vaults; Docker works too)
 
 ### Backend Setup
 
@@ -360,17 +372,24 @@ uv run pytest --cov=chronowarden --cov-report=html
 
 Test compatibility with both HashiCorp Vault and OpenBao:
 
+`./dev-setup.py` starts both dev servers for you (see [Development Environment](#development-environment)). By
+hand, with podman (or the same with `docker`):
+
 **OpenBao (port 8200):**
 ```bash
-docker run -p 127.0.0.1:8200:8200 --name openbao-dev --detach quay.io/openbao/openbao
+podman run -p 127.0.0.1:8200:8200 --name openbao-dev --detach quay.io/openbao/openbao
 ```
 
 **HashiCorp Vault (port 8201):**
 ```bash
-docker run -p 127.0.0.1:8201:8201 --cap-add=IPC_LOCK \
+podman run -p 127.0.0.1:8201:8201 --cap-add=IPC_LOCK \
   -e 'VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8201' \
-  -d --name=vault-dev hashicorp/vault
+  -d --name=vault-dev docker.io/hashicorp/vault
 ```
+
+`uv run pytest -m integration` starts its own containers through testcontainers, which speaks the Docker API: with
+podman, run `podman system service --time=0 unix://$XDG_RUNTIME_DIR/podman/podman.sock &` and set
+`DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock` and `TESTCONTAINERS_RYUK_DISABLED=true`.
 
 Chronowarden maintains compatibility with both platforms as [OpenBao intends to remain API compatible](https://openbao.org/api-docs/libraries/).
 
@@ -382,7 +401,10 @@ signature. Verify an image by its digest, with cosign 3 or later (the images are
 which cosign 2 doesn't find: it reports "no signatures found"):
 
 ```bash
-DIGEST=$(docker buildx imagetools inspect ghcr.io/fajfer/chronowarden:v0.7.0 --format '{{json .Manifest.Digest}}' | tr -d '"')
+# The digest of the multi-arch image index, as the registry serves it (skopeo, from the podman family)
+DIGEST=sha256:$(skopeo inspect --raw docker://ghcr.io/fajfer/chronowarden:v0.7.0 | sha256sum | cut -d' ' -f1)
+# or with Docker:
+# DIGEST=$(docker buildx imagetools inspect ghcr.io/fajfer/chronowarden:v0.7.0 --format '{{json .Manifest.Digest}}' | tr -d '"')
 
 # Built by this repository's workflow from the tag (SLSA provenance)
 slsa-verifier verify-image "ghcr.io/fajfer/chronowarden@${DIGEST}" \
@@ -426,9 +448,17 @@ slsa-verifier verify-artifact chronowarden-0.7.0-py3-none-any.whl \
 
 ## Deployment
 
-See [deploy/](deploy/) for:
-- Docker Compose setup (`deploy/compose/`)
-- Kubernetes manifests (`deploy/kubernetes/`)
+[`deploy/kubernetes/`](deploy/kubernetes/) has the manifests, for a Kubernetes cluster (`kubectl apply -k`) and for
+a single host with podman. Write your config into a copy of `config-secret.example.yaml`, then:
+
+```bash
+podman kube play --publish 127.0.0.1:8000:8000 \
+  config-secret.yaml deploy/kubernetes/pvc.yaml deploy/kubernetes/deployment.yaml
+```
+
+The volume `chronowarden-data` keeps the database across `podman kube down` and `play` (`down --force` removes
+it). `podman kube play` doesn't run Services or CronJobs: `--publish` replaces the Service, and on one host the
+server syncs itself on `polling_interval`, so the sync CronJob isn't needed.
 
 ## Roadmap
 

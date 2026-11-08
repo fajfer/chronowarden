@@ -31,4 +31,4 @@ Sync runs only when `POST /api/v1/sync/vault/{name}` is called. Metrics-based al
 - [`chronowarden/app.py`](../../chronowarden/app.py)
 - [`chronowarden/metadata.py`](../../chronowarden/metadata.py)
 - [`chronowarden/config.py`](../../chronowarden/config.py)
-- [`Dockerfile`](../../Dockerfile)
+- [`Containerfile`](../../Containerfile) (was `Dockerfile`)

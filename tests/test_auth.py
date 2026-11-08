@@ -201,8 +201,10 @@ class TestResolve:
 
 def test_images_keep_the_tcp_peer() -> None:
     """Uvicorn must not replace the peer from X-Forwarded-For, or anyone could pose as a trusted proxy (ADR-026)."""
-    dockerfile = (Path(__file__).parent.parent / "Dockerfile").read_text()
-    starts = [line for line in dockerfile.splitlines() if line.startswith(("CMD", "ENTRYPOINT")) and "uvicorn" in line]
+    containerfile = (Path(__file__).parent.parent / "Containerfile").read_text()
+    starts = [
+        line for line in containerfile.splitlines() if line.startswith(("CMD", "ENTRYPOINT")) and "uvicorn" in line
+    ]
     assert len(starts) == 3 and all("--no-proxy-headers" in line for line in starts)
 
 

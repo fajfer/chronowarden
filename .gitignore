@@ -44,6 +44,7 @@ dist/
 .coverage
 htmlcov/
 config.yaml
+config-secret.yaml
 keycloak-users.json
 
 # Database

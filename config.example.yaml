@@ -6,16 +6,16 @@
 #
 # This file can be used as:
 #   - A plain YAML config file (set CHRONOWARDEN_CONFIG env var or place at /etc/chronowarden/config.yaml)
-#   - A Kubernetes ConfigMap (mount at /etc/chronowarden/config.yaml)
-#   - Part of a Docker/Podman Compose setup (bind mount into container)
+#   - A Kubernetes Secret (deploy/kubernetes/config-secret.example.yaml), also for `podman kube play`
+#   - A file bind-mounted into a podman or Docker container at /data/config.yaml
 #
 # Validation is strict: unknown keys (typos), severities without an expiry profile, invalid values,
 # unparsable YAML, or a CHRONOWARDEN_CONFIG path that does not exist all stop Chronowarden at startup.
 #
 # Sensitive values (tokens) can be provided via:
 #   - token:      literal value (for development only)
-#   - token_env:  environment variable name (Docker Compose .env, K8s env from Secret)
-#   - token_file: file path (K8s Secret volume mount, Docker secret)
+#   - token_env:  environment variable name (`podman run -e`, K8s env from Secret)
+#   - token_file: file path (K8s Secret volume mount, podman or Docker secret)
 #
 # Token resolution priority: token_file > token_env > token
 #

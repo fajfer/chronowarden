@@ -15,7 +15,7 @@ resources:
   # - cronjob-sync.yaml
   ## Supplement your own
   # - ingress.yaml
-  # - config-secret.yaml
+  # - config-secret.yaml  # your copy of config-secret.example.yaml (keep it out of git)
 
 # One way to input custom certificates into the image
 # secretGenerator:
