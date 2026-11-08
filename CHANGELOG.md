@@ -14,6 +14,11 @@ git history.
 
 ## [Unreleased]
 
+### Fixed
+
+- A re-run of a failed image SBOM job no longer attests the SBOMs and VEX a second time: the job now attests only
+  after the files are on the release. v0.10.0 keeps the duplicate attestations from its re-runs.
+
 ## [0.10.0] - 2026-11-07
 
 Verifiable dependencies and safer defaults: every release carries a CycloneDX VEX per SBOM, stating which reported
