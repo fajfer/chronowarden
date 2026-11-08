@@ -11,6 +11,7 @@ import re
 import signal
 import socket
 import stat
+import subprocess
 import sys
 import threading
 import time
@@ -145,6 +146,20 @@ def _load_dev_setup() -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_the_dev_run_does_not_import_the_app() -> None:
+    """A host with only hvac and PyYAML (the demo machine) can run `./dev-setup.py` for the dev run."""
+    script = (
+        "import importlib.util, sys; "
+        "spec = importlib.util.spec_from_file_location('dev_setup', 'dev-setup.py'); "
+        "spec.loader.exec_module(importlib.util.module_from_spec(spec)); "
+        "print('chronowarden' in sys.modules)"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], cwd=Path(__file__).parent.parent, capture_output=True, text=True, check=True
+    )
+    assert result.stdout.strip() == "False"
 
 
 class FakeRuntime:

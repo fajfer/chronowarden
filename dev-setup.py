@@ -44,7 +44,6 @@ from devenv.runs import (
     require_free,
 )
 from devenv.runtime import ContainerRuntimeError, ContainerSpec, Runtime, detect_runtime
-from devenv.seed import seed_database
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("dev-setup")
@@ -100,6 +99,13 @@ def _remove_run(runtime: Runtime, run: str) -> list[str]:
         runtime.remove(name)
         logger.info("Removed %s", name)
     return names
+
+
+def seed_database(db_path: Path, receiver_url: Optional[str], vaults: list[str]) -> Optional[str]:
+    """Seed a named run's database; the app is imported only here, so the dev run needs just hvac and PyYAML."""
+    from devenv.seed import seed_database as seed
+
+    return seed(db_path, receiver_url, vaults)
 
 
 def _backends(run: str, services: tuple[str, ...]) -> list[Backend]:
