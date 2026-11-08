@@ -38,6 +38,9 @@ How a release goes out, as done for 0.8.0 and 0.9.0. The maintainer gives the go
    (`gh api repos/fajfer/chronowarden/commits/<full sha>/check-runs`; `gh run list --commit` needs the full SHA).
 2. On the maintainer's go: `git tag -a vX.Y.Z -m "vX.Y.Z - <theme>" <sha>` (annotated, as earlier tags) and push it.
 3. `release.yaml` (wheel, sdist, source SBOMs, provenance, notes) and `docker.yaml` (images, SBOMs, provenance,
-   signatures) run on the tag; both must end green and the GitHub release must list the wheel, sdist, 10 SBOMs,
-   `chronowarden.intoto.jsonl` and `SHA256SUMS`.
+   signatures) run on the tag; both must end green and the GitHub release must list the wheel, sdist, 10 SBOMs, 5 VEX documents
+   (`*.vex.cdx.json`), `chronowarden.intoto.jsonl` and `SHA256SUMS`. When the SLSA generator fails (0.10.0: its
+   Rekor upload, "giving up after 1 attempt(s)"), re-run the **whole** Release workflow: its `generator` job ends
+   green and hands the failure to `final`, so `gh run rerun --failed` re-runs only `final`, which fails again
+   without retrying.
 4. Close the release's GitHub milestone and the issues it finished, each with a comment naming the evidence.
