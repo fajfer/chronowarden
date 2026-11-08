@@ -8,6 +8,12 @@ SPDX-License-Identifier: EUPL-1.2
 How a release goes out, as done for 0.8.0 and 0.9.0. The maintainer gives the go for the final tag (root
 **Never**); everything before it lands through PRs like any change.
 
+## What goes in a release
+
+Every feature, or pack of related features, gets its own **minor** release; it doesn't have to be big. A very big
+or breaking change gets a **major** release. A patch release (`X.Y.Z+1`) only fixes. When a feature doesn't fit
+the release in progress, it becomes the next minor, with its own spec, rather than a cut-down version of itself.
+
 ## Before the release PR
 
 1. Every spec for the release is `implemented` or explicitly left out; open specs that are only waiting on the

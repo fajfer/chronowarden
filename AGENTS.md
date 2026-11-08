@@ -85,6 +85,9 @@ page starts with a notice that it is an AI-generated draft, and only the maintai
 ## Conventions
 
 - Commits: [conventional commits](https://www.conventionalcommits.org/).
+- Versions: every feature, or pack of related features, gets its own minor release (0.10 → 0.11); a big or
+  breaking change gets a major one. Don't shrink a feature to fit the current release or hold one back to keep a
+  release small; plan the next minor instead. Patch releases are for fixes only ([release](.ai/docs/release.md)).
 - Every commit made in an AI-assisted session carries an `Assisted-by: <agent-name>/<model-id>` trailer, with both
   values substituted by the agent's own.
 - Python style: black, line length 120 (ruff uses the same); PEP 8 naming (snake_case functions/variables,
