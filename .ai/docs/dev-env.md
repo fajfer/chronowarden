@@ -30,7 +30,7 @@ Each rule is a check, not advice:
 
 | Flag | Starts |
 |---|---|
-| (always) | OpenBao and Vault dev servers (`cw-<run>-openbao`, `cw-<run>-vault`) on free ports, seeded with 3 KV v2 engines × 5 secrets and an AppRole |
+| (always) | OpenBao and Vault dev servers (`cw-<run>-openbao`, `cw-<run>-vault`) on free ports, seeded with 3 KV v2 engines × 5 secrets and an AppRole; `--backends openbao` (or `vault`) starts only one |
 | `--auth oidc` | Keycloak 26 (`cw-<run>-keycloak`), realm `chronowarden`, users `admin`, `owner`, `viewer` in groups `cw-admins`, `teams`, `auditors`; the config maps them to the three roles |
 | `--receiver` | `devenv/receiver.py` on a free port: answers 200 and appends each request to `<scratch>/webhooks.jsonl` |
 | `--app` | `uvicorn chronowarden:app` from this checkout on the run's app port, working dir = scratch, log `<scratch>/app.log` |

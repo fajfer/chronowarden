@@ -25,7 +25,7 @@ import hvac
 from requests.exceptions import RequestException
 
 from devenv import keycloak
-from devenv.backends import BACKENDS, Backend, random_token, seed, setup_approle
+from devenv.backends import BACKENDS, SERVICES, Backend, random_token, seed, setup_approle
 from devenv.config import can_write, write_dev_config
 from devenv.files import write_private
 from devenv.processes import spawn, stop, wait_http, wait_listening
@@ -102,11 +102,12 @@ def _remove_run(runtime: Runtime, run: str) -> list[str]:
     return names
 
 
-def _backends(run: str) -> list[Backend]:
-    """The backends of `run`: the `dev` run on its fixed ports, any other on free ones."""
+def _backends(run: str, services: tuple[str, ...]) -> list[Backend]:
+    """The backends of `run` named in `services`: the `dev` run on its fixed ports, any other on free ones."""
+    chosen = [b for b in BACKENDS if b.service in services]
     if run == DEFAULT_RUN:
-        return list(BACKENDS)
-    return [b.for_run(container_name(run, b.service, b.container), free_port()) for b in BACKENDS]
+        return chosen
+    return [b.for_run(container_name(run, b.service, b.container), free_port()) for b in chosen]
 
 
 def _start_keycloak(
@@ -183,6 +184,7 @@ class Options:
     auth: str = "none"  # or "oidc": Keycloak
     receiver: bool = False  # a webhook receiver writing <scratch>/webhooks.jsonl
     app: Optional[str] = None  # "source" or "image": start Chronowarden too
+    backends: tuple[str, ...] = SERVICES  # which dev servers: "openbao", "vault"
 
 
 def _start_receiver(info: RunInfo, port: int) -> None:
@@ -259,7 +261,7 @@ def setup(
         return 1
     _remove_run(runtime, run)
     dev = run == DEFAULT_RUN
-    backends = _backends(run)
+    backends = _backends(run, options.backends)
     app_port = DEV_APP_PORT if dev else free_port()
     idp = keycloak.Keycloak(container_name(run, "keycloak", "keycloak-dev"), keycloak.DEV_PORT if dev else free_port())
     ports = {b.container: b.published_port for b in backends}
@@ -299,7 +301,11 @@ def setup(
         info.users = passwords
         info.root_tokens = {b.config_name: tokens[b] for b in backends}
         info.write()
-        route_secret = seed_database(scratch / "chronowarden.db", f"{receiver_url}/owner" if receiver_url else None)
+        route_secret = seed_database(
+            scratch / "chronowarden.db",
+            f"{receiver_url}/owner" if receiver_url else None,
+            [b.config_name for b in backends],
+        )
         if route_secret is not None:
             info.signing_secrets["owner-route"] = route_secret
         if receiver_url is not None:
@@ -404,6 +410,13 @@ def main() -> int:
         "--app", nargs="?", const="source", choices=["source", "image"], help="start Chronowarden: source or image"
     )
     parser.add_argument("--force", action="store_true", help="replace a config not written by dev-setup.py")
+    parser.add_argument(
+        "--backends",
+        nargs="+",
+        choices=SERVICES,
+        default=list(SERVICES),
+        help="which dev servers to start (default: both); one saves memory on a small host",
+    )
     args = parser.parse_args()
     try:
         run = check_name(args.run)
@@ -416,7 +429,9 @@ def main() -> int:
             return cleanup(runtime, run, args.scratch)
         scratch = args.scratch if args.scratch or run == DEFAULT_RUN else default_scratch(run)
         config = args.config if args.config is not None else Path("config.yaml")
-        return setup(runtime, run, scratch, config, args.force, Options(args.auth, args.receiver, args.app))
+        return setup(
+            runtime, run, scratch, config, args.force, Options(args.auth, args.receiver, args.app, tuple(args.backends))
+        )
     except (ContainerRuntimeError, RunError) as exc:
         print(f"dev-setup: {exc}", file=sys.stderr)
         return 1

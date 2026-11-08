@@ -349,6 +349,17 @@ class TestSetup:
         assert load_config(str(config)).vaults[0].name == "dev-openbao"
         assert not list(tmp_path.glob("*.json"))  # no run.json and no keycloak-users.json
 
+    def test_the_dev_run_can_start_openbao_alone(self, dev_setup: ModuleType, tmp_path: Path) -> None:
+        runtime = RecordingRuntime()
+        config = tmp_path / "config.yaml"
+        options = dev_setup.Options(backends=("openbao",))
+        assert dev_setup.setup(runtime, DEFAULT_RUN, None, config, False, options) == 0
+        assert [spec.name for spec in runtime.started] == ["openbao-dev"]
+        assert [vault.name for vault in load_config(str(config)).vaults] == ["dev-openbao"]
+
+    def test_a_named_run_can_start_vault_alone(self, dev_setup: ModuleType) -> None:
+        assert [b.container for b in dev_setup._backends("a", ("vault",))] == ["cw-a-vault"]
+
     def test_the_dev_run_keeps_a_hand_written_config(self, dev_setup: ModuleType, tmp_path: Path) -> None:
         config = tmp_path / "config.yaml"
         config.write_text("vaults: []\n")
@@ -615,7 +626,7 @@ class TestReceiver:
 class TestSeed:
     def test_owner_system_and_signed_route(self, tmp_path: Path) -> None:
         db_path = tmp_path / "chronowarden.db"
-        secret = seed_database(db_path, "http://127.0.0.1:9/owner")
+        secret = seed_database(db_path, "http://127.0.0.1:9/owner", ["dev-openbao", "dev-vault"])
         assert secret is not None and secret.startswith("whsec_")
         db = Database(db_path)
         db.connect()
@@ -630,4 +641,15 @@ class TestSeed:
             db.close()
 
     def test_without_receiver_no_route(self, tmp_path: Path) -> None:
-        assert seed_database(tmp_path / "chronowarden.db", None) is None
+        assert seed_database(tmp_path / "chronowarden.db", None, ["dev-openbao"]) is None
+
+    def test_only_the_runs_vaults_get_assignments(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "chronowarden.db"
+        seed_database(db_path, None, ["dev-openbao"])
+        db = Database(db_path)
+        db.connect()
+        try:
+            systems, owners = db.get_assignments()
+            assert set(systems) == set(owners) == {("dev-openbao", "apps", "secret-1")}
+        finally:
+            db.close()

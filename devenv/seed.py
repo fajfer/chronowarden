@@ -6,6 +6,7 @@
 
 import base64
 import secrets
+from collections.abc import Collection
 from pathlib import Path
 from typing import Optional
 
@@ -26,10 +27,11 @@ def signing_secret() -> str:
     return "whsec_" + base64.b64encode(secrets.token_bytes(24)).decode()
 
 
-def seed_database(db_path: Path, receiver_url: Optional[str]) -> Optional[str]:
+def seed_database(db_path: Path, receiver_url: Optional[str], vaults: Collection[str]) -> Optional[str]:
     """
-    Create the owner (matching the `owner` user by email and IdP group), a system it owns and two secrets
-    assigned to both; with `receiver_url`, a signed webhook route of the owner to it.
+    Create the owner (matching the `owner` user by email and IdP group), a system it owns and the run's
+    `OWNED_SECRETS` (those in `vaults`, the config names of the run's backends) assigned to both; with
+    `receiver_url`, a signed webhook route of the owner to it.
 
     Returns:
         The route's signing secret, or None without a receiver.
@@ -40,7 +42,7 @@ def seed_database(db_path: Path, receiver_url: Optional[str]) -> Optional[str]:
         db.create_owner(OWNER_ID, "Team Owner", OWNER_EMAIL, idp_group=OWNER_GROUP)
         db.create_system(SYSTEM_ID, "Payments", "Seeded by dev-setup.py", None, None)
         db.set_system_owners(SYSTEM_ID, [OWNER_ID])
-        for identity in OWNED_SECRETS:
+        for identity in (owned for owned in OWNED_SECRETS if owned[0] in vaults):
             db.set_secret_system(identity, SYSTEM_ID)
             db.set_secret_owners(identity, [OWNER_ID])
         if receiver_url is None:
