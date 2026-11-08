@@ -182,6 +182,8 @@ This script:
 - writes `config.yaml` for both (only if it doesn't exist or was written by `dev-setup.py`; `--force` replaces
   another one, `--config PATH` writes elsewhere) and prints the dev root tokens.
 
+`--backends openbao` (or `vault`) starts only one of them, for a host with little memory.
+
 **Cleanup** (stops and removes both dev containers):
 ```bash
 uv run python dev-setup.py --cleanup

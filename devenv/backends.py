@@ -85,6 +85,7 @@ VAULT = Backend(
     cap_add=("IPC_LOCK",),
 )
 BACKENDS = (OPENBAO, VAULT)
+SERVICES = tuple(b.service for b in BACKENDS)  # what --backends takes: openbao, vault
 
 
 def random_token() -> str:
