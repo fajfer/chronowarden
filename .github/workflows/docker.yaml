@@ -251,14 +251,6 @@ jobs:
             python3 scripts/vex.py "${PREFIX}-${arch}.cdx.json" vex/chronowarden.vex.cdx.json "${PREFIX}-${arch}.vex.cdx.json"
           done
 
-      - name: Attest the SBOMs and VEX to the image
-        run: |
-          for arch in amd64 arm64; do  # named per arch: a *.cdx.json glob would also match the VEX
-            cosign attest --yes --type cyclonedx --predicate "${PREFIX}-${arch}.cdx.json" "$IMAGE"
-            cosign attest --yes --type https://spdx.dev/Document/v3 --predicate "${PREFIX}-${arch}.spdx.json" "$IMAGE"
-            cosign attest --yes --type https://cyclonedx.org/vex --predicate "${PREFIX}-${arch}.vex.cdx.json" "$IMAGE"
-          done
-
       - name: Upload the SBOMs and VEX to the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -269,3 +261,13 @@ jobs:
             sleep 30
           done
           gh release upload "$GITHUB_REF_NAME" "${PREFIX}"-*.json --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Attest the SBOMs and VEX to the image
+        # Only after the upload: a run whose upload failed must not attest, or its re-run attests a second set
+        # that differs from the files on the release (A1 of the 0.10.0 audit)
+        run: |
+          for arch in amd64 arm64; do  # named per arch: a *.cdx.json glob would also match the VEX
+            cosign attest --yes --type cyclonedx --predicate "${PREFIX}-${arch}.cdx.json" "$IMAGE"
+            cosign attest --yes --type https://spdx.dev/Document/v3 --predicate "${PREFIX}-${arch}.spdx.json" "$IMAGE"
+            cosign attest --yes --type https://cyclonedx.org/vex --predicate "${PREFIX}-${arch}.vex.cdx.json" "$IMAGE"
+          done
