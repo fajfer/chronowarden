@@ -43,7 +43,7 @@ What replaces what. Nothing in the "today" column is dropped without a maintaine
 | Today (GitHub) | After | Free / GitHub fallback if Ultimate lapses |
 |---|---|---|
 | CI (`ci.yaml`, `agents-docs.yaml`) | GitLab CI calling `scripts/ci/*`; JUnit, coverage, Code Quality in MRs | same CI on GitLab Free |
-| Release, SLSA L3, cosign, ghcr (`release.yaml`, `docker.yaml`) | unchanged on GitHub Actions, triggered by mirrored tags; GitLab experimental attestations as well | n/a (no Ultimate needed) |
+| Release, SLSA L3, cosign, ghcr (`release.yaml`, `docker.yaml`) | unchanged on GitHub Actions, triggered by mirrored tags; GitLab experimental attestations as well; images copied to registry.gitlab.com with `cosign copy` | n/a (no Ultimate needed) |
 | zizmor | kept for GitHub workflows; GitLab CI: mitigations + **requirement** for a linter (task 12) | same |
 | Scorecard (`scorecard.yml`) | Scorecard CLI on GitLab, badge on both READMEs | Scorecard on GitHub Actions |
 | ClusterFuzzLite | moved as is to GitLab CI | same |
@@ -74,6 +74,7 @@ What replaces what. Nothing in the "today" column is dropped without a maintaine
 | 9 | **Switch:** protected branch/tags, approval rules, policies and push rules on GitLab; flip to a GitLab → GitHub push mirror; GitHub `main` writable only by the mirror; issue template on GitHub; README, SECURITY.md, CONTRIBUTING.md point to GitLab | ADR-033 | a merge on GitLab appears on GitHub within minutes; a direct push to GitHub `main` is refused | todo | |
 | 10 | PR bridge: GitHub PR → GitLab MR (commits kept), status reported back | ADR-033 §3 | a fork PR on GitHub becomes an MR, and after merging, GitHub shows the PR as merged | todo | |
 | 11 | Release on the new topology: an rc tag pushed on GitLab builds on GitHub; GitLab Release links to the assets; GitLab experimental SLSA attestations | release.md, ADR-028 | the rc verifies as in the README, and the GitLab attestation verifies with `glab attestation verify` | todo | |
+| 11b | After each release, a GitLab job copies both images from ghcr with `cosign copy` (job token, no GitHub-side secret); protected immutable `v*` tags; a cleanup policy for `-dev` | ADR-033 §7 | `cosign verify` and `slsa-verifier verify-image` pass on the registry.gitlab.com copy with the README commands | todo | |
 | 12 | Find or build a security linter for `.gitlab-ci.yml` (requirement from ADR-033 §10) | — | the linter runs in CI and fails on an unpinned image or script injection | todo | |
 | 13 | Ultimate extras, one change each: DAST and API security testing against a CI-started app, license approval policies, compliance framework, audit events review, requirements for spec "Done when" items, Service Desk, error tracking, dependency proxy | ADR-033 §5 | each is enabled and listed in the feature map with its fallback | todo | |
 

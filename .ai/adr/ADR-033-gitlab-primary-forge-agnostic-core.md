@@ -56,7 +56,12 @@ The forces:
    - **GitLab's experimental attestations** are produced alongside.
    - **When releases move:** only with a major version, once GitLab's attestations are GA and verifiable with
      common tools.
-7. **Images stay on `ghcr.io`.** GitLab scans them from there.
+7. **Images: `ghcr.io` is canonical** (in the docs and examples), and each release is copied to
+   `registry.gitlab.com/reszka-org/chronowarden` with `cosign copy`, by a GitLab job that uses its own job token.
+   - **Same digest:** the copy keeps the signatures, SLSA provenance and SBOM/VEX attestations, so the same verify
+     commands work on both registries, and no GitLab credential is stored on GitHub.
+   - **What the copy adds:** GitLab's registry scanning on new advisories, protected immutable tags, and a second
+     source if GitHub fails.
 8. **Scorecard runs on GitLab,** and its badge is shown in the README on both forges.
 9. **Security reports are accepted on both forges.**
    - **Intake:** GitHub private vulnerability reporting, and GitLab confidential issues or Service Desk.
