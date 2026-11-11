@@ -50,3 +50,4 @@ Decisions that future work must respect. Read an ADR only when the Task Router, 
 | [ADR-029](ADR-029-webhook-target-restrictions.md) | Admins can restrict where webhooks go | Accepted | 2026-11-07 |
 | [ADR-030](ADR-030-vex-for-not-affected-vulnerabilities.md) | CycloneDX VEX for every vulnerability we're not affected by | Accepted | 2026-11-07 |
 | [ADR-031](ADR-031-podman-and-buildah.md) | Podman and Buildah everywhere; a Containerfile; `podman kube play` for one host | Accepted | 2026-11-07 |
+| [ADR-033](ADR-033-gitlab-primary-forge-agnostic-core.md) | GitLab as the primary forge, GitHub as a mirror, a forge-agnostic core | Accepted | 2026-11-11 |

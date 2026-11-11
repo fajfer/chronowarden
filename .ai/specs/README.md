@@ -28,6 +28,7 @@ files an agent must read (**Load**), so it can be done with only those files.
 | [2026-10-29-auditor-agent](2026-10-29-auditor-agent.md) | Read-only auditor (diff, security, module, catalogue), findings as self-contained work items, rounds in `~/chronowarden-audits/` |
 | [2026-10-29-live-qa-agent](2026-10-29-live-qa-agent.md) | QA agent: isolated run, Playwright scenarios through Keycloak, PASS/FAIL report with findings |
 | [2026-11-07-podman-and-buildah](2026-11-07-podman-and-buildah.md) | 0.11: podman/buildah in CI and docs, Containerfile, `podman kube play` (ADR-031) |
+| [2026-11-11-gitlab-primary-forge](2026-11-11-gitlab-primary-forge.md) | GitLab as the primary forge, GitHub as a mirror with a PR bridge, Ultimate scanners (ADR-033) |
 | [2026-11-07-config-key-review](2026-11-07-config-key-review.md) | Review every config key before 1.0, then freeze them with a test (ADR-016) |
 | [2026-10-10-compliance-policies-and-reports](2026-10-10-compliance-policies-and-reports.md) | 0.7.x: policies in config with example YAML, PDF reports with Typst |
 
