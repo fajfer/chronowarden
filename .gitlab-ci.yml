@@ -182,4 +182,4 @@ api_security:
   variables:
     APISEC_TARGET_URL: http://chronowarden:8000
     APISEC_OPENAPI: http://chronowarden:8000/openapi.json
-    APISEC_PROFILE: Quick-10
+    APISEC_PROFILE: Full
