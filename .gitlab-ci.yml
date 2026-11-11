@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: 2026 Damian Fajfer <damian@fajfer.org>
+#
+# SPDX-License-Identifier: EUPL-1.2
+
+# GitLab CI (ADR-033): the same checks as .github/workflows/ci.yaml and agents-docs.yaml, plus GitLab Ultimate's
+# security scanners. Images are pinned by digest (ADR-033 §10: no workflow linter for GitLab CI yet).
+
+workflow:
+  rules:
+    # One pipeline per change: MR pipelines for MRs, branch pipelines otherwise (the mirror's main, tags)
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+stages:
+  - test
+
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/SAST-IaC.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
+  - template: Jobs/Container-Scanning.gitlab-ci.yml
+
+variables:
+  GITLAB_ADVANCED_SAST_ENABLED: "true"
+  # The released production image; GitLab scans it from ghcr (ADR-033 §7)
+  CS_IMAGE: ghcr.io/fajfer/chronowarden:v0.10.0
+  UV_PYTHON: "3.13.5"
+  UV_LINK_MODE: copy
+  UV_CACHE_DIR: .uv-cache
+
+.uv:
+  image: ghcr.io/astral-sh/uv:0.13.7-trixie-slim@sha256:f6da342fe598dc462a7e6f61e7b3bf7fc84e381467efbdf29ccc1d32f2fc68a4
+  cache:
+    key:
+      files: [uv.lock]
+    paths: [.uv-cache]
+  before_script:
+    - uv sync --locked
+
+backend:
+  extends: .uv
+  stage: test
+  script:
+    - uv run black --check .
+    - uv run ruff check --exit-zero --output-format=gitlab --output-file=gl-code-quality.json .
+    - uv run ruff check .
+    - uv run pytest --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      codequality: gl-code-quality.json
+
+integration:
+  extends: .uv
+  stage: test
+  timeout: 20m
+  services:
+    - name: docker:29-dind@sha256:08a98015fce594af7c382883bea080ea206de74402a95da9dc52b6428c8cd121
+      alias: docker
+  variables:
+    # testcontainers talks to the dind service; the containers' ports are published on that host
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    TESTCONTAINERS_HOST_OVERRIDE: docker
+  script:
+    - uv run pytest -m integration --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+
+frontend:
+  stage: test
+  image: node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
+  cache:
+    key:
+      files: [frontend/package-lock.json]
+    paths: [frontend/.npm]
+  script:
+    - cd frontend
+    - npm ci --cache .npm --prefer-offline
+    - npm run check
+
+agents-docs:
+  stage: test
+  image: python:3.13.17-slim@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962
+  script:
+    - python3 scripts/check_agents_docs.py
