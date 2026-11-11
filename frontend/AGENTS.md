@@ -63,8 +63,8 @@ Dashboard UI for secret health, owners, vaults and sync. It is built to static f
   here. A filter bug is usually in that `$derived.by` block or in `stores/filters.ts`.
 - Role-based hiding is convenience only (the server enforces ADR-026); put new edit controls under an `auth` helper.
 - Svelte 5 runes in pages, `svelte/store` in stores; a function named `state` shadows `$state`.
-- `npm run check` currently reports 0 errors and 0 warnings; don't add new ones.
-- Don't edit `build/` or `.svelte-kit/`; they are generated.
+- `npm run check` reports 0 errors and 0 warnings; keep it so. `build/` and `.svelte-kit/` are generated: don't edit.
+- flowbite-svelte charts bundle `apexcharts` (revenue-capped licence): allowed here; keep docs/risks/forking.md true.
 - Regenerate `package-lock.json` with the npm the build uses (Node 22, see `Dockerfile` and `ci.yaml`), e.g.
   `docker run --rm -v $PWD:/w -w /w node:22-alpine npm install --package-lock-only`. A lockfile written by a newer npm
   can drop optional entries and make `npm ci` fail in Docker and CI.
