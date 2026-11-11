@@ -16,6 +16,7 @@ workflow:
 
 stages:
   - test
+  - deploy
 
 include:
   - template: Jobs/SAST.gitlab-ci.yml
@@ -39,13 +40,15 @@ variables:
       files: [uv.lock]
     paths: [.uv-cache]
   before_script:
-    # devenv/processes.py identifies its processes with ps, which the slim image lacks
-    - apt-get update -qq && apt-get install -y -qq --no-install-recommends procps > /dev/null
     - uv sync --locked
 
 backend:
   extends: .uv
   stage: test
+  before_script:
+    # devenv/processes.py identifies its processes with ps, which the slim image lacks
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends procps > /dev/null
+    - uv sync --locked
   script:
     - uv run black --check .
     - uv run ruff check --exit-zero --output-format=gitlab --output-file=gl-code-quality.json .
@@ -93,3 +96,22 @@ agents-docs:
   image: python:3.13.17-slim@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962
   script:
     - python3 scripts/check_agents_docs.py
+
+# The mkdocs site: checked on every branch, published to GitLab Pages from the default branch
+docs:
+  extends: .uv
+  stage: test
+  script:
+    - uv run mkdocs build --strict -d public
+  rules:
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+
+pages:
+  extends: .uv
+  stage: deploy
+  script:
+    - uv run mkdocs build --strict -d public
+  artifacts:
+    paths: [public]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

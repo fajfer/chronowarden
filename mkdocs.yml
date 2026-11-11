@@ -1,6 +1,6 @@
 site_name: Chronowarden Docs
 site_description: Secret lifecycle observability service tracking Vault TTLs and rotation metadata.
-site_url: https://fajfer.github.io/chronowarden/
+site_url: https://reszka-org.gitlab.io/chronowarden/
 repo_url: https://github.com/fajfer/chronowarden
 repo_name: fajfer/chronowarden
 
