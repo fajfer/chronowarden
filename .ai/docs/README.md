@@ -11,4 +11,5 @@ file. Agent-only: user documentation lives in `docs/` (mkdocs) and is written by
 | Document | For |
 |---|---|
 | [dev-env](dev-env.md) | Starting an isolated environment (vaults, Keycloak, webhook receiver, the app), using it, cleaning it up |
+| [forge-access](forge-access.md) | Which credentials agents use on GitLab and GitHub, their exact permissions, rotation |
 | [release](release.md) | Releasing a version: Dependabot PRs, the release PR, the tag and what to check after it |

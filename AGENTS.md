@@ -75,6 +75,7 @@ Shorthand: `<area>` means `<area>/AGENTS.md`. Read root + the listed files, noth
 | Run the app or a dev env (vaults, Keycloak, webhook receiver) | [dev-env](.ai/docs/dev-env.md), [deploy](deploy/AGENTS.md) |
 | Container image, Kubernetes, CI | [deploy](deploy/AGENTS.md), [ADR-031](.ai/adr/ADR-031-podman-and-buildah.md) |
 | Architecture model (LikeC4) | [architecture](architecture/AGENTS.md) |
+| GitLab/GitHub, mirroring, forge credentials | [forge-access](.ai/docs/forge-access.md), [ADR-033](.ai/adr/ADR-033-gitlab-primary-forge-agnostic-core.md) |
 | Record a decision | [.ai/adr](.ai/adr/README.md) |
 | Plan a 3+ step task | [.ai/specs](.ai/specs/README.md) |
 | Cut a release, handle Dependabot PRs | [release](.ai/docs/release.md), [deploy](deploy/AGENTS.md) |
