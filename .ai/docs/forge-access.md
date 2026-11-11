@@ -25,7 +25,9 @@ in the audit events.
 | Stored | on the maintainer's workstation only, by `glab auth login --hostname gitlab.com` (glab's config file, mode 0600) | never in the repo, CI variables or the agent's memory |
 | Git over HTTPS | remote `https://gitlab.com/reszka-org/chronowarden.git`, with glab as the credential helper | pushes go through the token's Developer role, not the maintainer's SSH key |
 
-**Current token:** created —, expires —. The maintainer fills this in on each rotation.
+**Current token:** created 2026-11-11, expires 2027-02-28; bot user
+`project_88817028_bot_7c85545c13d34dcb1cdb66be3c2bc80e`, Developer (checked with the API). Update this line on each
+rotation.
 
 **Rotation:** create a new token with the same fields, run `glab auth login` again, revoke the old one, and update
 the line above.
