@@ -61,3 +61,4 @@ nav:
       - Prometheus metrics: guides/metrics.md
   - Reference:
       - Vault Permissions: reference/vault-permissions.md
+      - Third-party licences: reference/third-party-licences.md
