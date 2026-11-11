@@ -30,6 +30,8 @@ include:
   - template: API-Security.gitlab-ci.yml
 
 variables:
+  # The security templates skip merge request pipelines unless this is set; the approval policies need their reports
+  AST_ENABLE_MR_PIPELINES: "true"
   GITLAB_ADVANCED_SAST_ENABLED: "true"
   # The released production image; GitLab scans it from ghcr (ADR-033 §7)
   CS_IMAGE: ghcr.io/fajfer/chronowarden:v0.10.0
