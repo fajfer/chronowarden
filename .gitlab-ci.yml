@@ -16,6 +16,8 @@ workflow:
 
 stages:
   - test
+  - build
+  - dast
   - deploy
 
 include:
@@ -24,6 +26,8 @@ include:
   - template: Jobs/Secret-Detection.gitlab-ci.yml
   - template: Jobs/Dependency-Scanning.gitlab-ci.yml
   - template: Jobs/Container-Scanning.gitlab-ci.yml
+  - template: DAST.gitlab-ci.yml
+  - template: API-Security.gitlab-ci.yml
 
 variables:
   GITLAB_ADVANCED_SAST_ENABLED: "true"
@@ -115,3 +119,65 @@ pages:
     paths: [public]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# DAST and API security testing attack the app built from this commit, running in the scan job with a dev OpenBao
+# (auth: none, so the scanners reach every endpoint). The image goes to this project's registry under ci/.
+build-image:
+  stage: build
+  image: docker:29-cli@sha256:2357639ad1ea7d0194134bf3292622fd4e562483966ed674e5d7c945b5f3b28d
+  services:
+    - name: docker:29-dind@sha256:08a98015fce594af7c382883bea080ea206de74402a95da9dc52b6428c8cd121
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
+    - docker build --target production -t "$CI_REGISTRY_IMAGE/ci:$CI_COMMIT_SHA" .
+    - docker push "$CI_REGISTRY_IMAGE/ci:$CI_COMMIT_SHA"
+
+.running-app:
+  needs: [build-image]
+  services:
+    - name: quay.io/openbao/openbao:2.7.1@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf
+      alias: openbao
+      command: ["server", "-dev", "-dev-root-token-id=dast-root", "-dev-listen-address=0.0.0.0:8200"]
+    - name: $CI_REGISTRY_IMAGE/ci:$CI_COMMIT_SHA
+      alias: chronowarden
+      # The image has no shell: write the config from CW_SCAN_CONFIG, then start uvicorn as the entrypoint does
+      entrypoint:
+        - python
+        - -c
+        - >-
+          import os, pathlib, runpy, sys;
+          pathlib.Path("/tmp/chronowarden.yaml").write_text(os.environ["CW_SCAN_CONFIG"]);
+          os.environ["CHRONOWARDEN_CONFIG"] = "/tmp/chronowarden.yaml";
+          sys.argv = ["uvicorn", "chronowarden:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"];
+          runpy.run_module("uvicorn", run_name="__main__", alter_sys=True)
+  variables:
+    VAULT_SCAN_TOKEN: dast-root
+    CW_SCAN_CONFIG: |
+      allowed_hosts: ["*"]
+      auth:
+        mode: none
+      vaults:
+        - name: scan-openbao
+          address: http://openbao:8200
+          token_env: VAULT_SCAN_TOKEN
+          mount_path: secret
+          verify_ssl: false
+          auth_method: token
+
+dast:
+  extends: .running-app
+  variables:
+    DAST_TARGET_URL: http://chronowarden:8000
+    DAST_FULL_SCAN: "true"
+    DAST_TARGET_CHECK_TIMEOUT: "300"
+
+api_security:
+  extends: .running-app
+  variables:
+    APISEC_TARGET_URL: http://chronowarden:8000
+    APISEC_OPENAPI: http://chronowarden:8000/openapi.json
+    APISEC_PROFILE: Quick-10
