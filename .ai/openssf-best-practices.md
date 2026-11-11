@@ -29,7 +29,7 @@ defended. Update a row when the evidence changes, and keep the site in sync with
 | floss_license | MUST | Met | Met | EUPL-1.2, R/blob/main/LICENSE | | |
 | floss_license_osi | SUGGESTED | Met | Met | EUPL-1.2 is OSI-approved. | | |
 | license_location | MUST | Met | Met | R/blob/main/LICENSE and `LICENSES/`; SPDX header on every file (ADR-001). | | |
-| documentation_basics | MUST | Met | Met | README (install, config, API), docs site https://fajfer.github.io/chronowarden/ | | Keep `docs/` current; AI drafts carry a notice until reviewed. |
+| documentation_basics | MUST | Met | Met | README (install, config, API), docs site https://reszka-org.gitlab.io/chronowarden/ | | Keep `docs/` current; AI drafts carry a notice until reviewed. |
 | documentation_interface | MUST | ? | Met | README "API Endpoints"; OpenAPI at `/docs` on every instance; `config.example.yaml` documents every option. | | |
 | sites_https | MUST | Met | Met | GitHub, GHCR and GitHub Pages are HTTPS-only. | | |
 | discussion | MUST | Met | Met | GitHub issues and PRs (searchable, URL per thread). | | |
