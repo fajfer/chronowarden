@@ -222,7 +222,7 @@ Vault credentials.
 
 Milestone [0.7 Compliance evidence](https://github.com/fajfer/chronowarden/milestone/4): Chronowarden now produces
 evidence an auditor accepts, about your secrets and about itself. **Read the upgrade notes first: back up
-`chronowarden.db`.** See also the [upgrade guide](https://fajfer.github.io/chronowarden/guides/upgrading-to-0.7/).
+`chronowarden.db`.** See also the [upgrade guide](https://reszka-org.gitlab.io/chronowarden/guides/upgrading-to-0.7/).
 
 ### Upgrade notes
 
